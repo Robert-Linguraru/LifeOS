@@ -1,0 +1,121 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-text">LifeOS</div>
+            <div class="logo-sub">Personal OS</div>
+        </div>
+
+        <nav class="nav-section">
+
+            <div class="nav-section-label">Overview</div>
+            <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+                </svg>
+                <span>Dashboard</span>
+            </NavLink>
+
+            <div class="nav-section-label">Life Modules</div>
+            <NavLink class="nav-item" href="/tasks">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                <span>Tasks</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/habits">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                </svg>
+                <span>Habits</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/finance">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" />
+                </svg>
+                <span>Finance</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/fitness">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z" />
+                </svg>
+                <span>Fitness</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/sleep">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74c-3.6-.76-3.54-.75-3.67-.75-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z" />
+                </svg>
+                <span>Sleep</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/nutrition">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8.38-9.01-8-15.03-8v4c0 4.42 3.58 8 8 8 4.42 0 7.03-2 7.03-4z" />
+                </svg>
+                <span>Nutrition</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/study">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
+                </svg>
+                <span>Study</span>
+            </NavLink>
+            <NavLink class="nav-item" href="/wellbeing">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <span>Wellbeing</span>
+            </NavLink>
+
+            <div class="nav-section-label">Assistant</div>
+            <NavLink class="nav-item" href="/ai">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+                </svg>
+                <span>JARVIS</span>
+            </NavLink>
+
+        </nav>
+
+        <!-- User info at bottom -->
+        <div style="padding: 12px 20px; border-top: 1px solid var(--border-subtle);">
+            <div style="font-size:12px; color: var(--accent-cyan); font-weight:600;">ROBERT</div>
+            <div style="font-size:10px; color: var(--text-disabled);">Iron · Lv 1</div>
+        </div>
+    </aside>
+
+    <!-- ── Main Content ── -->
+    <div class="main-content">
+        <header class="topbar">
+            <span class="topbar-title">@GetPageTitle()</span>
+            <span class="topbar-meta">@DateTime.Now.ToString("dddd, dd MMM yyyy")</span>
+        </header>
+
+        <main class="page-body">
+            @Body
+        </main>
+    </div>
+
+</div>
+
+@code {
+    private string GetPageTitle()
+    {
+        var path = Nav.Uri.Replace(Nav.BaseUri, "/").TrimEnd('/');
+        return path switch
+        {
+            "/" or "" => "Dashboard",
+            "/tasks" => "Tasks",
+            "/habits" => "Habits",
+            "/finance" => "Finance",
+            "/fitness" => "Fitness",
+            "/sleep" => "Sleep",
+            "/nutrition" => "Nutrition",
+            "/study" => "Study & Projects",
+            "/wellbeing" => "Wellbeing",
+            "/ai" => "JARVIS AI",
+            _ => "LifeOS"
+        };
+    }
+}

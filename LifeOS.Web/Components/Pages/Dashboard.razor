@@ -1,0 +1,46 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Authorization
+@* @attribute [Authorize] *@
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+
+    <div class="card">
+        <div class="card-title">Daily Score</div>
+        <div style="font-size: 42px; font-weight: 700; color: var(--accent-cyan);">—</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">No data yet</div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Today's Tasks</div>
+        <div style="font-size: 28px; font-weight: 600; color: var(--text-primary);">0 <span style="font-size:14px; color:var(--text-secondary)">due</span></div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Tasks module not yet configured</div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Active Streaks</div>
+        <div style="font-size: 28px; font-weight: 600; color: var(--text-primary);">0</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Habits module coming in Milestone 2</div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">XP · Level</div>
+        <div style="font-size: 28px; font-weight: 600;">
+            <span class="accent">0 XP</span>
+            <span style="font-size:14px; color:var(--text-secondary);"> · Lv 1</span>
+        </div>
+        <div style="margin-top:8px;">
+            <div style="height:4px; background:var(--border-subtle); border-radius:2px;">
+                <div style="width:0%; height:4px; background:var(--accent-cyan); border-radius:2px;"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div style="margin-top: 24px;" class="card">
+    <div class="card-title">JARVIS · AI Insights</div>
+    <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.7;">
+        AI assistant will be available in Milestone 8. Start logging data in Milestones 2–7
+        to give JARVIS enough context to generate meaningful insights.
+    </div>
+</div>
