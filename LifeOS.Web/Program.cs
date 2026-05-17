@@ -1,7 +1,11 @@
 using LifeOS.Core.Entities;
+using LifeOS.Core.Interfaces;
 using LifeOS.Infrastructure.Data;
+using LifeOS.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
@@ -9,6 +13,8 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IXPService, XPService>();
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
@@ -27,6 +33,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
+builder.Services.AddAntiforgery();
 
 
 
@@ -47,6 +54,12 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+app.MapPost("/logout", async (SignInManager<ApplicationUser> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Redirect("/login");
+}).RequireAuthorization();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

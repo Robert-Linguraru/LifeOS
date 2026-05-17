@@ -1,46 +1,155 @@
 ﻿@page "/"
+@using LifeOS.Core.Entities
+@using LifeOS.Core.Enums
+@using LifeOS.Core.Interfaces
+@using LifeOS.Infrastructure.Data
 @using Microsoft.AspNetCore.Authorization
-@* @attribute [Authorize] *@
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AppDbContext Db
+@inject IXPService XpService
+@inject AuthenticationStateProvider AuthProvider
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize]
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+<PageTitle>Dashboard — LifeOS</PageTitle>
 
-    <div class="card">
-        <div class="card-title">Daily Score</div>
-        <div style="font-size: 42px; font-weight: 700; color: var(--accent-cyan);">—</div>
-        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">No data yet</div>
+<div class="dashboard-grid">
+
+    <div class="card widget">
+        <div class="widget-label">Daily Score</div>
+        <div class="widget-value">@DailyScore<span class="widget-unit">/100</span></div>
     </div>
 
-    <div class="card">
+    <div class="card widget">
+        <div class="widget-label">Today's Tasks</div>
+        <div class="widget-value">@CompletedToday<span class="widget-unit">/@TotalDueToday done</span></div>
+    </div>
+
+    <div class="card widget">
+        <div class="widget-label">Active Streaks</div>
+        <div class="widget-value">@ActiveStreaks</div>
+    </div>
+
+    <div class="card widget">
+        <div class="widget-label">Level · XP</div>
+        <div class="widget-value">@Level <span class="widget-unit echelon-@Echelon?.ToString().ToLower()">@Echelon</span></div>
+        <div class="xp-bar-track">
+            <div class="xp-bar-fill" style="width: @XpPercent%"></div>
+        </div>
+        <div class="xp-sub">@TotalXP XP lifetime · @DailyQuestXP/500 XP today</div>
+    </div>
+
+</div>
+
+<div class="dashboard-lower">
+
+    <div class="card today-tasks">
         <div class="card-title">Today's Tasks</div>
-        <div style="font-size: 28px; font-weight: 600; color: var(--text-primary);">0 <span style="font-size:14px; color:var(--text-secondary)">due</span></div>
-        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Tasks module not yet configured</div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">Active Streaks</div>
-        <div style="font-size: 28px; font-weight: 600; color: var(--text-primary);">0</div>
-        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Habits module coming in Milestone 2</div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">XP · Level</div>
-        <div style="font-size: 28px; font-weight: 600;">
-            <span class="accent">0 XP</span>
-            <span style="font-size:14px; color:var(--text-secondary);"> · Lv 1</span>
-        </div>
-        <div style="margin-top:8px;">
-            <div style="height:4px; background:var(--border-subtle); border-radius:2px;">
-                <div style="width:0%; height:4px; background:var(--accent-cyan); border-radius:2px;"></div>
+        @if (!TodayTasks.Any())
+        {
+            <p class="empty-state">No tasks due today. 🎯</p>
+        }
+        @foreach (var task in TodayTasks)
+        {
+            <div class="task-row">
+                <span class="@(task.Status == LifeOS.Core.Enums.TaskStatus.Completed ? "done" : "")">@task.Title</span>
+                <span class="badge badge-priority">@task.Priority</span>
+                <span class="badge badge-xp">⚡ @XpService.CalculateQuestXP(task.EstimatedTime, task.FrictionLevel)</span>
             </div>
-        </div>
+        }
+    </div>
+
+    <div class="card today-habits">
+        <div class="card-title">Today's Habits</div>
+        @if (!TodayHabits.Any())
+        {
+            <p class="empty-state">No habits configured yet.</p>
+        }
+        @foreach (var (habit, logged) in TodayHabits)
+        {
+            <div class="habit-row @(logged ? "done" : "")">
+                <span>@habit.Name</span>
+                @if (logged)
+                {
+                    <span class="done-mark">✓</span>
+                }
+                else
+                {
+
+                    <span class="pending-mark">○</span>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="card jarvis-panel">
+        <div class="card-title">JARVIS Insights</div>
+        <p class="jarvis-placeholder">AI insights coming in Milestone 8. Your data is being collected.</p>
     </div>
 
 </div>
 
-<div style="margin-top: 24px;" class="card">
-    <div class="card-title">JARVIS · AI Insights</div>
-    <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.7;">
-        AI assistant will be available in Milestone 8. Start logging data in Milestones 2–7
-        to give JARVIS enough context to generate meaningful insights.
-    </div>
-</div>
+@code {
+    private string? UserId;
+    private int DailyScore = 0;
+    private int CompletedToday = 0;
+    private int TotalDueToday = 0;
+    private int ActiveStreaks = 0;
+    private int Level = 1;
+    private Echelon? Echelon;
+    private long TotalXP = 0;
+    private int DailyQuestXP = 0;
+    private int XpPercent = 0;
+    private List<TaskItem> TodayTasks = new();
+    private List<(Habit habit, bool logged)> TodayHabits = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        UserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (UserId is null) return;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var todayDt = DateTime.UtcNow.Date;
+
+        var progression = await XpService.GetProgressionAsync(UserId);
+        if (progression is not null)
+        {
+            Level = progression.CurrentLevel;
+            Echelon = progression.CurrentEchelon;
+            TotalXP = progression.TotalLifetimeXP;
+            DailyQuestXP = progression.DailyQuestXPDate == today ? progression.DailyQuestXPToday : 0;
+            XpPercent = (int)Math.Min(100, (DailyQuestXP / 500.0) * 100);
+        }
+
+        TodayTasks = await Db.TaskItems
+            .Where(t => t.UserId == UserId
+                && t.DueDate.HasValue
+                && t.DueDate.Value.Date == todayDt)
+            .ToListAsync();
+
+        CompletedToday = TodayTasks.Count(t => t.Status == LifeOS.Core.Enums.TaskStatus.Completed);
+        TotalDueToday = TodayTasks.Count;
+
+        var habits = await Db.HabitEntities
+            .Where(h => h.UserId == UserId && h.IsActive)
+            .ToListAsync();
+
+        var todayLogsList = await Db.HabitLogs
+            .Where(l => l.UserId == UserId && l.Date == today)
+            .Select(l => l.HabitId)
+            .ToListAsync();
+
+        var todayLogs = todayLogsList.ToHashSet();
+
+        var habitsCompleted = TodayHabits.Count(x => x.logged);
+        var habitsDue = TodayHabits.Count;
+        var habitScore = habitsDue > 0 ? (int)((habitsCompleted / (double)habitsDue) * 30) : 0;
+        var taskScore = TotalDueToday > 0 ? (int)((CompletedToday / (double)TotalDueToday) * 20) : 0;
+        DailyScore = habitScore + taskScore; // grows as more modules are added
+
+        ActiveStreaks = await Db.StreakRecords
+            .CountAsync(s => s.UserId == UserId && s.CurrentStreak > 0);
+    }
+}

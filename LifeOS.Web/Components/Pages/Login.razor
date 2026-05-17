@@ -1,0 +1,47 @@
+﻿@page "/login"
+@using LifeOS.Web.Components.Layout
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using LifeOS.Core.Entities
+@layout EmptyLayout
+@inject NavigationManager Nav
+
+<div class="login-wrapper">
+    <div class="login-card card">
+        <div class="login-logo">⬡ LIFEOS</div>
+        <h2 class="login-title">Welcome back, Robert</h2>
+
+        @if (!string.IsNullOrEmpty(Error))
+        {
+            <p class="login-error">@Error</p>
+        }
+
+        <EditForm method="post" FormName="LoginForm" OnValidSubmit="DoLogin" Model="this">
+            <DataAnnotationsValidator />
+            <InputText class="input" @bind-Value="Email" placeholder="Email" />
+            <InputText class="input" type="password" @bind-Value="Password" placeholder="Password" />
+            <button class="btn-primary login-btn" type="submit">Sign In</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] public HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm] public string Email { get; set; } = "";
+    [SupplyParameterFromForm] public string Password { get; set; } = "";
+    public string Error { get; set; } = "";
+
+    private async Task DoLogin()
+    {
+        var signInManager = HttpContext.RequestServices
+            .GetRequiredService<SignInManager<ApplicationUser>>();
+
+        var result = await signInManager.PasswordSignInAsync(
+            Email, Password, isPersistent: true, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+            Nav.NavigateTo("/", forceLoad: true);
+        else
+            Error = "Invalid email or password.";
+    }
+}

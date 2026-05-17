@@ -1,0 +1,292 @@
+﻿@page "/tasks"
+@using LifeOS.Core.Entities
+@using LifeOS.Core.Enums
+@using LifeOS.Core.Interfaces
+@using LifeOS.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AppDbContext Db
+@inject IXPService XpService
+@inject AuthenticationStateProvider AuthProvider
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize]
+
+<PageTitle>Tasks — LifeOS</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Tasks</h1>
+    <button class="btn-primary" @onclick="() => ShowForm = true">+ New Task</button>
+</div>
+
+@if (ShowForm)
+{
+    <div class="card form-card">
+        <h3>@(EditingTask is null ? "New Task" : "Edit Task")</h3>
+        <div class="form-grid">
+            <input class="input" placeholder="Title" @bind="FormTitle" />
+            <textarea class="input" placeholder="Notes (optional)" @bind="FormNotes"></textarea>
+            <select class="input" @bind="FormPriority">
+                @foreach (var p in Enum.GetValues<TaskPriority>())
+                {
+                    <option value="@p">@p</option>
+                }
+            </select>
+            <select class="input" @bind="FormCategory">
+                @foreach (var c in Enum.GetValues<TaskCategory>())
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+            <input class="input" type="datetime-local" @bind="FormDueDate" />
+            <select class="input" @bind="FormEstimatedTime">
+                @foreach (var t in Enum.GetValues<EstimatedTime>())
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+            <select class="input" @bind="FormFriction">
+                @foreach (var f in Enum.GetValues<FrictionLevel>())
+                {
+                    <option value="@f">@f</option>
+                }
+            </select>
+            <select class="input" @bind="FormQuestCategory">
+                @foreach (var q in Enum.GetValues<QuestCategory>())
+                {
+                    <option value="@q">@q</option>
+                }
+            </select>
+        </div>
+        <div class="form-preview">
+            <span class="badge badge-xp">⚡ ~@XpService.CalculateQuestXP(FormEstimatedTime, FormFriction) XP</span>
+        </div>
+        <div class="form-actions">
+            <button class="btn-primary" @onclick="SaveTask">Save</button>
+            <button class="btn-ghost" @onclick="CancelForm">Cancel</button>
+        </div>
+    </div>
+}
+
+<div class="task-list">
+    @foreach (var task in TaskItems.Where(t => t.Status != LifeOS.Core.Enums.TaskStatus.Completed))
+    {
+        <div class="task-item @(task.Priority == TaskPriority.Critical ? "task-critical" : "")">
+            <button class="task-check" @onclick="() => CompleteTask(task)">○</button>
+            <div class="task-body">
+                <span class="task-title">@task.Title</span>
+                @if (task.DueDate.HasValue)
+                {
+                    <span class="task-due @(task.DueDate < DateTime.UtcNow ? "overdue" : "")">
+                        @task.DueDate.Value.ToString("MMM d")
+                    </span>
+                }
+                <span class="badge badge-category">@task.Category</span>
+                <span class="badge badge-priority">@task.Priority</span>
+                <span class="badge badge-xp">⚡ @XpService.CalculateQuestXP(task.EstimatedTime, task.FrictionLevel) XP</span>
+            </div>
+            <div class="task-actions">
+                <button class="btn-icon" @onclick="() => EditTask(task)">✏</button>
+                <button class="btn-icon btn-danger" @onclick="() => DeleteTask(task)">✕</button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (TaskItems.Any(t => t.Status == LifeOS.Core.Enums.TaskStatus.Completed))
+{
+    <div style="margin-top:2rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem;">
+            <button class="btn-ghost" @onclick="() => ShowCompleted = !ShowCompleted">
+                @(ShowCompleted ? "▾" : "▸") Completed (@TaskItems.Count(t => t.Status == LifeOS.Core.Enums.TaskStatus.Completed))
+            </button>
+            <span class="badge badge-xp">
+                ⚡ @TaskItems.Where(t => t.Status == LifeOS.Core.Enums.TaskStatus.Completed).Sum(t => t.CalculatedXP ?? 0) XP earned
+            </span>
+        </div>
+
+        @if (ShowCompleted)
+        {
+            @foreach (var (monthLabel, group) in CompletedGrouped)
+            {
+                <div style="margin-bottom:1.25rem;">
+                    <div class="card-title" style="margin-bottom:.5rem;">@monthLabel</div>
+                    <div style="display:flex; flex-direction:column; gap:.4rem;">
+                        @foreach (var task in group)
+                        {
+                            <div class="task-item task-done">
+                                <span class="task-check done">✓</span>
+                                <div class="task-body">
+                                    <span class="task-title">@task.Title</span>
+                                    <span class="badge badge-category">@task.Category</span>
+                                    <span class="badge badge-xp">⚡ @task.CalculatedXP XP</span>
+                                    @if (task.CompletedAt.HasValue)
+                                    {
+                                        <span class="task-due">
+                                            @task.CompletedAt.Value.ToString("MMM d")
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+}
+
+@code {
+    private List<TaskItem> TaskItems = new();
+    private string? UserId;
+    private bool ShowForm = false;
+    private bool ShowCompleted = false;
+    private Dictionary<string, List<TaskItem>> CompletedGrouped = new();
+    private TaskItem? EditingTask;
+
+    private string FormTitle = "";
+    private string? FormNotes;
+    private TaskPriority FormPriority = TaskPriority.Medium;
+    private TaskCategory FormCategory = TaskCategory.Personal;
+    private DateTime? FormDueDate;
+    private EstimatedTime FormEstimatedTime = EstimatedTime.Under15m;
+    private FrictionLevel FormFriction = FrictionLevel.Low;
+    private QuestCategory FormQuestCategory = QuestCategory.Productivity;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        UserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        if (UserId is null) return;
+
+        TaskItems = await Db.TaskItems
+            .Where(t => t.UserId == UserId)
+            .OrderBy(t => t.DueDate)
+            .ThenByDescending(t => t.Priority)
+            .ToListAsync();
+
+        CompletedGrouped = TaskItems
+            .Where(t => t.Status == LifeOS.Core.Enums.TaskStatus.Completed)
+            .OrderByDescending(t => t.CompletedAt)
+            .GroupBy(t => t.CompletedAt.HasValue
+                ? t.CompletedAt.Value.ToString("MMMM yyyy")
+                : "Unknown")
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private async Task SaveTask()
+    {
+        if (string.IsNullOrWhiteSpace(FormTitle) || UserId is null) return;
+
+        try
+        {
+            int xp = XpService.CalculateQuestXP(FormEstimatedTime, FormFriction);
+
+            if (EditingTask is null)
+            {
+                // CREATE — add new row
+                Db.TaskItems.Add(new TaskItem
+                {
+                    UserId = UserId,
+                    Title = FormTitle,
+                    Notes = FormNotes,
+                    Priority = FormPriority,
+                    Category = FormCategory,
+                    DueDate = FormDueDate.HasValue
+                        ? DateTime.SpecifyKind(FormDueDate.Value, DateTimeKind.Utc)
+                        : null,
+                    EstimatedTime = FormEstimatedTime,
+                    FrictionLevel = FormFriction,
+                    QuestCategory = FormQuestCategory,
+                    CalculatedXP = xp
+                });
+            }
+            else
+            {
+                // EDIT — mutate the tracked entity, no Add() call
+                var tracked = await Db.TaskItems.FindAsync(EditingTask.Id);
+                if (tracked is not null)
+                {
+                    tracked.Title = FormTitle;
+                    tracked.Notes = FormNotes;
+                    tracked.Priority = FormPriority;
+                    tracked.Category = FormCategory;
+                    tracked.DueDate = FormDueDate.HasValue
+                        ? DateTime.SpecifyKind(FormDueDate.Value, DateTimeKind.Utc)
+                        : null;
+                    tracked.EstimatedTime = FormEstimatedTime;
+                    tracked.FrictionLevel = FormFriction;
+                    tracked.QuestCategory = FormQuestCategory;
+                    tracked.CalculatedXP = xp;
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            CancelForm();
+            await LoadTasks();
+        }
+        catch (Exception ex)
+        {
+            // surface any future errors visibly
+            Console.WriteLine($"SaveHabit error: {ex.Message} | {ex.InnerException?.Message}");
+        }
+    }
+
+    private async Task CompleteTask(TaskItem task)
+    {
+        task.Status = LifeOS.Core.Enums.TaskStatus.Completed;
+        task.CompletedAt = DateTime.UtcNow;
+        await Db.SaveChangesAsync();
+
+        if (UserId is not null)
+        {
+            await XpService.AwardQuestXPAsync(UserId, task.Id,
+                task.EstimatedTime, task.FrictionLevel, XPSource.QuestCompletion);
+            if (task.IsRecurring)
+                await XpService.UpdateStreakAsync(UserId, task.Id, StreakSourceType.Task);
+        }
+
+        await LoadTasks();
+    }
+
+    private void EditTask(TaskItem task)
+    {
+        EditingTask = task;
+        FormTitle = task.Title;
+        FormNotes = task.Notes;
+        FormPriority = task.Priority;
+        FormCategory = task.Category;
+        FormDueDate = task.DueDate;
+        FormEstimatedTime = task.EstimatedTime;
+        FormFriction = task.FrictionLevel;
+        FormQuestCategory = task.QuestCategory;
+        ShowForm = true;
+    }
+
+    private async Task DeleteTask(TaskItem task)
+    {
+        Db.TaskItems.Remove(task);
+        await Db.SaveChangesAsync();
+        await LoadTasks();
+    }
+
+    private void CancelForm()
+    {
+        ShowForm = false;
+        EditingTask = null;
+        FormTitle = "";
+        FormNotes = null;
+        FormPriority = TaskPriority.Medium;
+        FormCategory = TaskCategory.Personal;
+        FormDueDate = null;
+        FormEstimatedTime = EstimatedTime.Under15m;
+        FormFriction = FrictionLevel.Low;
+        FormQuestCategory = QuestCategory.Productivity;
+    }
+}

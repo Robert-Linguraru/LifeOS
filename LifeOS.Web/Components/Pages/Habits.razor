@@ -1,0 +1,310 @@
+﻿@page "/habits"
+@using LifeOS.Core.Entities
+@using LifeOS.Core.Enums
+@using LifeOS.Core.Interfaces
+@using LifeOS.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AppDbContext Db
+@inject IXPService XpService
+@inject AuthenticationStateProvider AuthProvider
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize]
+
+
+<PageTitle>Habits — LifeOS</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Habits</h1>
+    <div style="display:flex; gap:.75rem;">
+        <button class="@(ShowArchived ? "btn-ghost" : "btn-primary")"
+                @onclick="() => ShowArchived = false">
+            Active
+        </button>
+        <button class="@(ShowArchived ? "btn-primary" : "btn-ghost")"
+                @onclick="() => ShowArchived = true">
+            Archived
+        </button>
+        @if (!ShowArchived)
+        {
+            <button class="btn-primary" @onclick="() => ShowForm = true">+ New Habit</button>
+        }
+    </div>
+</div>
+
+@if (ShowForm)
+{
+
+
+    <div class="card form-card">
+        <h3>@(EditingHabit is null ? "New Habit" : "Edit Habit")</h3>
+        <div class="form-grid">
+            <input class="input" placeholder="Habit name" @bind="FormName" />
+            <input class="input" placeholder="Description (optional)" @bind="FormDescription" />
+            <select class="input" @bind="FormFrequency">
+                @foreach (var f in Enum.GetValues<HabitFrequency>())
+                {
+                    <option value="@f">@f</option>
+                }
+            </select>
+            <label class="checkbox-label">
+                <input type="checkbox" @bind="FormIsQuantitative" /> Quantitative habit
+            </label>
+            @if (FormIsQuantitative)
+            {
+                <input class="input" type="number" placeholder="Target value" @bind="FormTargetValue" />
+                <input class="input" placeholder="Unit (e.g. liters, pages)" @bind="FormUnit" />
+            }
+            <select class="input" @bind="FormEstimatedTime">
+                @foreach (var t in Enum.GetValues<EstimatedTime>())
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+            <select class="input" @bind="FormFriction">
+                @foreach (var f in Enum.GetValues<FrictionLevel>())
+                {
+                    <option value="@f">@f</option>
+                }
+            </select>
+            <select class="input" @bind="FormQuestCategory">
+                @foreach (var q in Enum.GetValues<QuestCategory>())
+                {
+                    <option value="@q">@q</option>
+                }
+            </select>
+        </div>
+        <div class="form-preview">
+            <span class="badge badge-xp">⚡ ~@XpService.CalculateQuestXP(FormEstimatedTime, FormFriction) XP per completion</span>
+        </div>
+        <div class="form-actions">
+            <button class="btn-primary" @onclick="SaveHabit">Save</button>
+            <button class="btn-ghost" @onclick="CancelForm">Cancel</button>
+        </div>
+    </div>
+}
+
+<div class="habits-grid">
+    @foreach (var habit in HabitEntities.Where(h => h.IsActive == !ShowArchived))
+    {
+        var loggedToday = TodayLogs.ContainsKey(habit.Id);
+        var streak = Streaks.GetValueOrDefault(habit.Id);
+
+        <div class="habit-card @(loggedToday ? "habit-done" : "")">
+            <div class="habit-header">
+                <span class="habit-name">@habit.Name</span>
+                <span class="badge badge-streak">🔥 @(streak?.CurrentStreak ?? 0)</span>
+            </div>
+            @if (habit.IsQuantitative)
+            {
+                <span class="habit-target">Target: @habit.TargetValue @habit.Unit</span>
+            }
+            <div class="habit-meta">
+                <span class="badge">@habit.Frequency</span>
+                <span class="badge badge-xp">⚡ @XpService.CalculateQuestXP(habit.EstimatedTime, habit.FrictionLevel) XP</span>
+            </div>
+            <div class="habit-actions">
+                @if (!ShowArchived)
+                {
+                    @if (!loggedToday)
+                    {
+                        <button class="btn-primary btn-sm" @onclick="() => LogHabit(habit)">
+                            @(habit.IsQuantitative ? "Log" : "Done ✓")
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="completed-label">✓ Logged</span>
+                    }
+                    <button class="btn-icon" @onclick="() => EditHabit(habit)">✏</button>
+                    <button class="btn-icon btn-danger" @onclick="() => ArchiveHabit(habit)">✕</button>
+                }
+                else
+                {
+                    <button class="btn-primary btn-sm" @onclick="() => UnarchiveHabit(habit)">↩ Restore</button>
+                    <button class="btn-icon" @onclick="() => EditHabit(habit)">✏</button>
+                    <button class="btn-icon btn-danger" @onclick="() => DeleteHabit(habit)">🗑</button>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private List<Habit> HabitEntities = new();
+    private Dictionary<Guid, HabitLog> TodayLogs = new();
+    private Dictionary<Guid, StreakRecord> Streaks = new();
+    private string? UserId;
+    private bool ShowForm = false;
+    private Habit? EditingHabit;
+    private bool ShowArchived = false;
+    private string FormName = "";
+    private string? FormDescription;
+    private HabitFrequency FormFrequency = HabitFrequency.Daily;
+    private bool FormIsQuantitative = false;
+    private decimal? FormTargetValue;
+    private string? FormUnit;
+    private EstimatedTime FormEstimatedTime = EstimatedTime.Under15m;
+    private FrictionLevel FormFriction = FrictionLevel.Low;
+    private QuestCategory FormQuestCategory = QuestCategory.Routines;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        UserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (UserId is null) return;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        HabitEntities = await Db.HabitEntities
+            .Where(h => h.UserId == UserId)
+            .OrderBy(h => h.Name)
+            .ToListAsync();
+
+        TodayLogs = await Db.HabitLogs
+            .Where(l => l.UserId == UserId && l.Date == today)
+            .ToDictionaryAsync(l => l.HabitId);
+
+        Streaks = await Db.StreakRecords
+            .Where(s => s.UserId == UserId && s.SourceType == StreakSourceType.Habit)
+            .ToDictionaryAsync(s => s.SourceId);
+    }
+
+    private async Task LogHabit(Habit habit)
+    {
+        if (UserId is null) return;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        int xp = await XpService.AwardQuestXPAsync(UserId, habit.Id,
+            habit.EstimatedTime, habit.FrictionLevel, XPSource.QuestCompletion);
+
+        Db.HabitLogs.Add(new HabitLog
+        {
+            HabitId = habit.Id,
+            UserId = UserId,
+            Date = today,
+            Completed = true,
+            XPAwarded = xp
+        });
+
+        await Db.SaveChangesAsync();
+        await XpService.UpdateStreakAsync(UserId, habit.Id, StreakSourceType.Habit);
+        await LoadData();
+    }
+
+    private async Task SaveHabit()
+    {
+        if (string.IsNullOrWhiteSpace(FormName) || UserId is null) return;
+
+        try
+        {
+            if (EditingHabit is null)
+            {
+                // CREATE
+                Db.HabitEntities.Add(new Habit
+                {
+                    UserId = UserId,
+                    Name = FormName,
+                    Description = FormDescription,
+                    Frequency = FormFrequency,
+                    IsQuantitative = FormIsQuantitative,
+                    TargetValue = FormTargetValue,
+                    Unit = FormUnit,
+                    EstimatedTime = FormEstimatedTime,
+                    FrictionLevel = FormFriction,
+                    QuestCategory = FormQuestCategory
+                });
+            }
+            else
+            {
+                // EDIT
+                var tracked = await Db.HabitEntities.FindAsync(EditingHabit.Id);
+                if (tracked is not null)
+                {
+                    tracked.Name = FormName;
+                    tracked.Description = FormDescription;
+                    tracked.Frequency = FormFrequency;
+                    tracked.IsQuantitative = FormIsQuantitative;
+                    tracked.TargetValue = FormTargetValue;
+                    tracked.Unit = FormUnit;
+                    tracked.EstimatedTime = FormEstimatedTime;
+                    tracked.FrictionLevel = FormFriction;
+                    tracked.QuestCategory = FormQuestCategory;
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            CancelForm();
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            // surface any future errors visibly
+            Console.WriteLine($"SaveHabit error: {ex.Message} | {ex.InnerException?.Message}");
+        }
+    }
+
+    private void EditHabit(Habit habit)
+    {
+        EditingHabit = habit;
+        FormName = habit.Name;
+        FormDescription = habit.Description;
+        FormFrequency = habit.Frequency;
+        FormIsQuantitative = habit.IsQuantitative;
+        FormTargetValue = habit.TargetValue;
+        FormUnit = habit.Unit;
+        FormEstimatedTime = habit.EstimatedTime;
+        FormFriction = habit.FrictionLevel;
+        FormQuestCategory = habit.QuestCategory;
+        ShowForm = true;
+    }
+
+    private async Task ArchiveHabit(Habit habit)
+    {
+        habit.IsActive = false;
+        await Db.SaveChangesAsync();
+        await LoadData();
+    }
+    private async Task UnarchiveHabit(Habit habit)
+    {
+        var tracked = await Db.HabitEntities.FindAsync(habit.Id);
+        if (tracked is not null)
+        {
+            tracked.IsActive = true;
+            await Db.SaveChangesAsync();
+        }
+        await LoadData();
+    }
+
+    private async Task DeleteHabit(Habit habit)
+    {
+        var tracked = await Db.HabitEntities.FindAsync(habit.Id);
+        if (tracked is not null)
+        {
+            Db.HabitEntities.Remove(tracked);
+            await Db.SaveChangesAsync();
+        }
+        await LoadData();
+    }
+
+    private void CancelForm()
+    {
+        ShowForm = false;
+        EditingHabit = null;
+        FormName = "";
+        FormDescription = null;
+        FormFrequency = HabitFrequency.Daily;
+        FormIsQuantitative = false;
+        FormTargetValue = null;
+        FormUnit = null;
+        FormEstimatedTime = EstimatedTime.Under15m;
+        FormFriction = FrictionLevel.Low;
+        FormQuestCategory = QuestCategory.Routines;
+    }
+}
