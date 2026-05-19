@@ -14,6 +14,7 @@ namespace LifeOS.Infrastructure.Data
         public DbSet<XPTransaction> XPTransactions { get; set; }
         public DbSet<StreakRecord> StreakRecords { get; set; }
         public DbSet<DailyScore> DailyScores { get; set; }
+        public DbSet<Notification> Notifications => Set<Notification>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

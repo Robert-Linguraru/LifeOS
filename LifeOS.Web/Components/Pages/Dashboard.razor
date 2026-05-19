@@ -6,7 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Components.Authorization
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject IXPService XpService
 @inject AuthenticationStateProvider AuthProvider
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
@@ -76,7 +76,6 @@
                 }
                 else
                 {
-
                     <span class="pending-mark">○</span>
                 }
             </div>
@@ -123,7 +122,9 @@
             XpPercent = (int)Math.Min(100, (DailyQuestXP / 500.0) * 100);
         }
 
-        TodayTasks = await Db.TaskItems
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        TodayTasks = await db.TaskItems
             .Where(t => t.UserId == UserId
                 && t.DueDate.HasValue
                 && t.DueDate.Value.Date == todayDt)
@@ -132,24 +133,28 @@
         CompletedToday = TodayTasks.Count(t => t.Status == LifeOS.Core.Enums.TaskStatus.Completed);
         TotalDueToday = TodayTasks.Count;
 
-        var habits = await Db.HabitEntities
+        var habits = await db.HabitEntities
             .Where(h => h.UserId == UserId && h.IsActive)
             .ToListAsync();
 
-        var todayLogsList = await Db.HabitLogs
+        var todayLogsList = await db.HabitLogs
             .Where(l => l.UserId == UserId && l.Date == today)
             .Select(l => l.HabitId)
             .ToListAsync();
 
         var todayLogs = todayLogsList.ToHashSet();
 
+        TodayHabits = habits
+            .Select(h => (h, todayLogs.Contains(h.Id)))
+            .ToList();
+
         var habitsCompleted = TodayHabits.Count(x => x.logged);
         var habitsDue = TodayHabits.Count;
         var habitScore = habitsDue > 0 ? (int)((habitsCompleted / (double)habitsDue) * 30) : 0;
         var taskScore = TotalDueToday > 0 ? (int)((CompletedToday / (double)TotalDueToday) * 20) : 0;
-        DailyScore = habitScore + taskScore; // grows as more modules are added
+        DailyScore = habitScore + taskScore;
 
-        ActiveStreaks = await Db.StreakRecords
+        ActiveStreaks = await db.StreakRecords
             .CountAsync(s => s.UserId == UserId && s.CurrentStreak > 0);
     }
 }

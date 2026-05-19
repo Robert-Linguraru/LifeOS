@@ -8,10 +8,10 @@ namespace LifeOS.Infrastructure.Services
 {
     public class XPService : IXPService
     {
-        private readonly AppDbContext _db;
+        private readonly IDbContextFactory<AppDbContext> _dbFactory;
         private const int DailyQuestXPCap = 500;
 
-        public XPService(AppDbContext db) => _db = db;
+        public XPService(IDbContextFactory<AppDbContext> dbFactory) => _dbFactory = dbFactory;
 
         public int CalculateQuestXP(EstimatedTime time, FrictionLevel friction)
         {
@@ -38,10 +38,11 @@ namespace LifeOS.Infrastructure.Services
         public async Task<int> AwardQuestXPAsync(string userId, Guid sourceEntityId,
             EstimatedTime time, FrictionLevel friction, XPSource source)
         {
-            var progression = await _db.UserProgressions.FindAsync(userId);
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var progression = await db.UserProgressions.FindAsync(userId);
             if (progression is null) return 0;
 
-            // Reset daily cap if it's a new day
             if (progression.DailyQuestXPDate < DateOnly.FromDateTime(DateTime.UtcNow))
             {
                 progression.DailyQuestXPToday = 0;
@@ -59,7 +60,7 @@ namespace LifeOS.Infrastructure.Services
             progression.CurrentLevel = ComputeLevel(progression.TotalLifetimeXP);
             progression.CurrentEchelon = ComputeEchelon(progression.CurrentLevel);
 
-            _db.XPTransactions.Add(new XPTransaction
+            db.XPTransactions.Add(new XPTransaction
             {
                 UserId = userId,
                 Source = source,
@@ -68,18 +69,50 @@ namespace LifeOS.Infrastructure.Services
                 Notes = $"{time} / {friction} friction"
             });
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
             return awarded;
         }
 
+        public async Task AwardFlatXPAsync(string userId, int amount, XPSource source, Guid? sourceEntityId = null, string? notes = null)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var progression = await db.Set<UserProgression>()
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+
+            if (progression == null) return;
+
+            progression.TotalLifetimeXP += amount;
+            progression.CurrentLevel = ComputeLevel(progression.TotalLifetimeXP);
+            progression.CurrentEchelon = ComputeEchelon(progression.CurrentLevel);
+
+            db.Set<XPTransaction>().Add(new XPTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Source = source,
+                XPAmount = amount,
+                SourceEntityId = sourceEntityId,
+                Timestamp = DateTime.UtcNow,
+                Notes = notes
+            });
+
+            await db.SaveChangesAsync();
+        }
+
         public async Task<UserProgression?> GetProgressionAsync(string userId)
-            => await _db.UserProgressions.FindAsync(userId);
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.UserProgressions.FindAsync(userId);
+        }
 
         public async Task UpdateStreakAsync(string userId, Guid sourceId, StreakSourceType sourceType)
         {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-            var streak = await _db.StreakRecords
+            var streak = await db.StreakRecords
                 .FirstOrDefaultAsync(s => s.UserId == userId
                     && s.SourceId == sourceId
                     && s.SourceType == sourceType);
@@ -95,7 +128,7 @@ namespace LifeOS.Infrastructure.Services
                     LongestStreak = 1,
                     LastCompletedDate = today
                 };
-                _db.StreakRecords.Add(streak);
+                db.StreakRecords.Add(streak);
             }
             else
             {
@@ -110,15 +143,14 @@ namespace LifeOS.Infrastructure.Services
                 }
                 else
                 {
-                    streak.CurrentStreak = 1; // reset
+                    streak.CurrentStreak = 1;
                 }
                 streak.LastCompletedDate = today;
             }
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
 
-        // XP needed to reach level N = Sum of (L*30 + 150) for L from 1 to N
         private static int ComputeLevel(long totalXP)
         {
             int level = 1;

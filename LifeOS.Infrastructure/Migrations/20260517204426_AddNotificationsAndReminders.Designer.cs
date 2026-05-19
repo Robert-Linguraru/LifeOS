@@ -3,6 +3,7 @@ using System;
 using LifeOS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LifeOS.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260517204426_AddNotificationsAndReminders")]
+    partial class AddNotificationsAndReminders
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -161,9 +164,6 @@ namespace LifeOS.Infrastructure.Migrations
 
                     b.Property<int>("FrictionLevel")
                         .HasColumnType("integer");
-
-                    b.Property<string>("HangfireJobId")
-                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -345,9 +345,6 @@ namespace LifeOS.Infrastructure.Migrations
 
                     b.Property<int>("FrictionLevel")
                         .HasColumnType("integer");
-
-                    b.Property<string>("HangfireJobId")
-                        .HasColumnType("text");
 
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("boolean");

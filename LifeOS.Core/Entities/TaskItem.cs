@@ -26,7 +26,10 @@ namespace LifeOS.Core.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAt { get; set; }
-
+        public bool ReminderEnabled { get; set; } = false;
+        public DateTime? ReminderTime { get; set; }
+        public DateTime? LastReminderSentAt { get; set; }
+        public string? HangfireJobId { get; set; }
         public ApplicationUser? User { get; set; }
     }
 }

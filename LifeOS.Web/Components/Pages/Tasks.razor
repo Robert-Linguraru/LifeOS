@@ -6,8 +6,9 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Components.Authorization
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject IXPService XpService
+@inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthProvider
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize]
@@ -57,6 +58,17 @@
                     <option value="@q">@q</option>
                 }
             </select>
+            <label>
+                <input type="checkbox" @bind="FormReminderEnabled" />
+                Enable Reminder
+            </label>
+            @if (FormReminderEnabled)
+            {
+                <input class="input"
+                       type="datetime-local"
+                       value="@FormReminderTimeString"
+                       @onchange="(ChangeEventArgs e) => FormReminderTimeString = e.Value?.ToString() ?? string.Empty" />
+            }
         </div>
         <div class="form-preview">
             <span class="badge badge-xp">⚡ ~@XpService.CalculateQuestXP(FormEstimatedTime, FormFriction) XP</span>
@@ -134,7 +146,6 @@
             }
         }
     </div>
-
 }
 
 @code {
@@ -147,6 +158,11 @@
 
     private string FormTitle = "";
     private string? FormNotes;
+    private bool FormReminderEnabled = false;
+    private string FormReminderTimeString = "";
+    private DateTime? FormReminderTime => string.IsNullOrEmpty(FormReminderTimeString)
+        ? null
+        : DateTime.TryParse(FormReminderTimeString, out var dt) ? dt : null;
     private TaskPriority FormPriority = TaskPriority.Medium;
     private TaskCategory FormCategory = TaskCategory.Personal;
     private DateTime? FormDueDate;
@@ -165,7 +181,9 @@
     {
         if (UserId is null) return;
 
-        TaskItems = await Db.TaskItems
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        TaskItems = await db.TaskItems
             .Where(t => t.UserId == UserId)
             .OrderBy(t => t.DueDate)
             .ThenByDescending(t => t.Priority)
@@ -186,12 +204,12 @@
 
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
             int xp = XpService.CalculateQuestXP(FormEstimatedTime, FormFriction);
 
             if (EditingTask is null)
             {
-                // CREATE — add new row
-                Db.TaskItems.Add(new TaskItem
+                var newTask = new TaskItem
                 {
                     UserId = UserId,
                     Title = FormTitle,
@@ -205,14 +223,41 @@
                     FrictionLevel = FormFriction,
                     QuestCategory = FormQuestCategory,
                     CalculatedXP = xp
-                });
+                };
+
+                if (FormReminderEnabled && FormReminderTime.HasValue)
+                {
+                    newTask.ReminderEnabled = true;
+                    newTask.ReminderTime = FormReminderTime.Value;
+
+                    string jobId = await NotificationService.ScheduleReminderAsync(
+                        UserId!,
+                        $"⚡ Task Reminder: {newTask.Title}",
+                        $"Your task \"{newTask.Title}\" is due soon.",
+                        FormReminderTime.Value,
+                        NotificationSourceType.TaskReminder,
+                        newTask.Id);
+
+                    newTask.HangfireJobId = jobId;
+                }
+
+                db.TaskItems.Add(newTask);
             }
             else
             {
-                // EDIT — mutate the tracked entity, no Add() call
-                var tracked = await Db.TaskItems.FindAsync(EditingTask.Id);
+                var tracked = await db.TaskItems.FindAsync(EditingTask.Id);
                 if (tracked is not null)
                 {
+                    if (!string.IsNullOrEmpty(tracked.HangfireJobId))
+                    {
+                        await NotificationService.CancelReminderAsync(tracked.HangfireJobId);
+                        tracked.HangfireJobId = null;
+                    }
+                    var staleNotifs = await db.Notifications
+                        .Where(n => n.SourceEntityId == tracked.Id && !n.IsRead)
+                        .ToListAsync();
+                    foreach (var n in staleNotifs) n.IsRead = true;
+
                     tracked.Title = FormTitle;
                     tracked.Notes = FormNotes;
                     tracked.Priority = FormPriority;
@@ -224,25 +269,49 @@
                     tracked.FrictionLevel = FormFriction;
                     tracked.QuestCategory = FormQuestCategory;
                     tracked.CalculatedXP = xp;
+
+                    if (FormReminderEnabled && FormReminderTime.HasValue)
+                    {
+                        tracked.ReminderEnabled = true;
+                        tracked.ReminderTime = FormReminderTime.Value;
+
+                        string jobId = await NotificationService.ScheduleReminderAsync(
+                            UserId!,
+                            $"⚡ Task Reminder: {tracked.Title}",
+                            $"Your task \"{tracked.Title}\" is due soon.",
+                            FormReminderTime.Value,
+                            NotificationSourceType.TaskReminder,
+                            tracked.Id);
+
+                        tracked.HangfireJobId = jobId;
+                    }
+                    else
+                    {
+                        tracked.ReminderEnabled = false;
+                        tracked.ReminderTime = null;
+                    }
                 }
             }
 
-            await Db.SaveChangesAsync();
+            await db.SaveChangesAsync();
             CancelForm();
             await LoadTasks();
         }
         catch (Exception ex)
         {
-            // surface any future errors visibly
-            Console.WriteLine($"SaveHabit error: {ex.Message} | {ex.InnerException?.Message}");
+            Console.WriteLine($"SaveTask error: {ex.Message} | {ex.InnerException?.Message}");
         }
     }
 
     private async Task CompleteTask(TaskItem task)
     {
-        task.Status = LifeOS.Core.Enums.TaskStatus.Completed;
-        task.CompletedAt = DateTime.UtcNow;
-        await Db.SaveChangesAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var tracked = await db.TaskItems.FindAsync(task.Id);
+        if (tracked is null) return;
+
+        tracked.Status = LifeOS.Core.Enums.TaskStatus.Completed;
+        tracked.CompletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
 
         if (UserId is not null)
         {
@@ -260,6 +329,10 @@
         EditingTask = task;
         FormTitle = task.Title;
         FormNotes = task.Notes;
+        FormReminderEnabled = task.ReminderEnabled;
+        FormReminderTimeString = task.ReminderTime.HasValue
+            ? task.ReminderTime.Value.ToString("yyyy-MM-ddTHH:mm")
+            : "";
         FormPriority = task.Priority;
         FormCategory = task.Category;
         FormDueDate = task.DueDate;
@@ -270,9 +343,22 @@
     }
 
     private async Task DeleteTask(TaskItem task)
-    {
-        Db.TaskItems.Remove(task);
-        await Db.SaveChangesAsync();
+    { 
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var tracked = await db.TaskItems.FindAsync(task.Id);
+        if (tracked is null) return;
+
+        if (!string.IsNullOrEmpty(tracked.HangfireJobId))
+            await NotificationService.CancelReminderAsync(tracked.HangfireJobId);
+
+        var staleNotifs = await db.Notifications
+            .Where(n => n.SourceEntityId == tracked.Id)
+            .ToListAsync();
+
+        db.Notifications.RemoveRange(staleNotifs);
+        db.TaskItems.Remove(tracked);
+        await db.SaveChangesAsync();
         await LoadTasks();
     }
 
@@ -282,6 +368,8 @@
         EditingTask = null;
         FormTitle = "";
         FormNotes = null;
+        FormReminderEnabled = false;
+        FormReminderTimeString = "";
         FormPriority = TaskPriority.Medium;
         FormCategory = TaskCategory.Personal;
         FormDueDate = null;

@@ -1,9 +1,12 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject IXPService XpService
+@inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthProvider
+@using LifeOS.Core.Entities
 @using LifeOS.Core.Interfaces
 @using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
 
 <div class="app-shell">
     <aside class="sidebar">
@@ -82,11 +85,10 @@
 
         </nav>
 
-        <!-- User info at bottom -->
         <div style="padding: 12px 20px; border-top: 1px solid var(--border-subtle);">
             <div style="font-size:12px; color: var(--accent-cyan); font-weight:600;">
                 <div style="font-size:12px; color: var(--accent-cyan); font-weight:600;" class="sidebar-user">
-                    ROBERT · @Echelon · Lv @Level 
+                    ROBERT · @Echelon · Lv @Level
                 </div>
                 <form method="post" action="/logout">
                     <AntiforgeryToken />
@@ -98,26 +100,61 @@
         </div>
     </aside>
 
-    <!-- ── Main Content ── -->
     <div class="main-content">
         <header class="topbar">
             <span class="topbar-title">@GetPageTitle()</span>
             <span class="topbar-meta">@DateTime.Now.ToString("dddd, dd MMM yyyy")</span>
+            <div class="topbar-bell" @onclick="ToggleBell">
+                <span class="bell-icon">🔔</span>
+                @if (_unread.Count > 0)
+                {
+                    <span class="bell-badge">@_unread.Count</span>
+                }
+            </div>
         </header>
+        @if (_showBell)
+        {
+            <div class="notification-panel">
+                @if (!_unread.Any())
+                {
+                    <p class="no-notifs">No new notifications</p>
+                }
+                else
+                {
+                    @foreach (var n in _unread.ToList())
+                    {
+                        var notif = n;
+                        <div class="notif-item">
+                            <strong>@notif.Title</strong>
+                            <p>@notif.Body</p>
+                            <small>@notif.CreatedAt.ToLocalTime().ToString("HH:mm")</small>
+                            <button @onclick="async () => {
+                                await NotificationService.MarkReadAsync(notif.Id);
+                                _unread.Remove(notif);
+                                StateHasChanged();
+                            }">Dismiss</button>
+                        </div>
+                    }
+                    <button @onclick="MarkAllRead">Mark all read</button>
+                }
+            </div>
+        }
 
         <main class="page-body">
             @Body
         </main>
     </div>
-
 </div>
 
 @code {
+    private List<Notification> _unread = new();
+    private bool _showBell = false;
     private int Level = 1;
     private string Echelon = "Iron";
 
     protected override async Task OnInitializedAsync()
     {
+        Nav.LocationChanged += async (s, e) => await RefreshNotificationsAsync();
         var auth = await AuthProvider.GetAuthenticationStateAsync();
         var userId = auth.User
             .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -130,8 +167,11 @@
                 Level = progression.CurrentLevel;
                 Echelon = progression.CurrentEchelon.ToString();
             }
+            _unread = await NotificationService.GetUnreadAsync(userId);
         }
+        _ = PollNotificationsAsync();
     }
+
     private string GetPageTitle()
     {
         var path = Nav.Uri.Replace(Nav.BaseUri, "/").TrimEnd('/');
@@ -151,4 +191,50 @@
         };
     }
 
+    private void ToggleBell() => _showBell = !_showBell;
+
+    private async Task MarkAllRead()
+    {
+        foreach (var n in _unread)
+            await NotificationService.MarkReadAsync(n.Id);
+        _unread.Clear();
+        _showBell = false;
+        StateHasChanged();
+    }
+
+    private async Task RefreshNotificationsAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var userId = auth.User
+            .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId is not null)
+            _unread = await NotificationService.GetUnreadAsync(userId);
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private CancellationTokenSource _cts = new();
+
+    private async Task PollNotificationsAsync()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+            while (await timer.WaitForNextTickAsync(_cts.Token).ConfigureAwait(false))
+            {
+                await RefreshNotificationsAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when _cts is cancelled on dispose — not an error
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
 }

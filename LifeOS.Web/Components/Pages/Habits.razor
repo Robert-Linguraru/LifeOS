@@ -3,15 +3,16 @@
 @using LifeOS.Core.Enums
 @using LifeOS.Core.Interfaces
 @using LifeOS.Infrastructure.Data
+@using LifeOS.Infrastructure.Services
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Components.Authorization
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject IXPService XpService
+@inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthProvider
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize]
-
 
 <PageTitle>Habits — LifeOS</PageTitle>
 
@@ -35,8 +36,6 @@
 
 @if (ShowForm)
 {
-
-
     <div class="card form-card">
         <h3>@(EditingHabit is null ? "New Habit" : "Edit Habit")</h3>
         <div class="form-grid">
@@ -74,6 +73,17 @@
                     <option value="@q">@q</option>
                 }
             </select>
+            <label>
+                <input type="checkbox" @bind="FormReminderEnabled" />
+                Enable Reminder
+            </label>
+            @if (FormReminderEnabled)
+            {
+                <input class="input"
+                       type="datetime-local"
+                       value="@FormReminderTimeString"
+                       @onchange="(ChangeEventArgs e) => FormReminderTimeString = e.Value?.ToString() ?? string.Empty" />
+            }
         </div>
         <div class="form-preview">
             <span class="badge badge-xp">⚡ ~@XpService.CalculateQuestXP(FormEstimatedTime, FormFriction) XP per completion</span>
@@ -129,7 +139,6 @@
             </div>
         </div>
     }
-
 </div>
 
 @code {
@@ -146,6 +155,11 @@
     private bool FormIsQuantitative = false;
     private decimal? FormTargetValue;
     private string? FormUnit;
+    private bool FormReminderEnabled = false;
+    private string FormReminderTimeString = "";
+    private DateTime? FormReminderTime => string.IsNullOrEmpty(FormReminderTimeString)
+        ? null
+        : DateTime.TryParse(FormReminderTimeString, out var dt) ? dt : null;
     private EstimatedTime FormEstimatedTime = EstimatedTime.Under15m;
     private FrictionLevel FormFriction = FrictionLevel.Low;
     private QuestCategory FormQuestCategory = QuestCategory.Routines;
@@ -162,16 +176,18 @@
         if (UserId is null) return;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        HabitEntities = await Db.HabitEntities
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        HabitEntities = await db.HabitEntities
             .Where(h => h.UserId == UserId)
             .OrderBy(h => h.Name)
             .ToListAsync();
 
-        TodayLogs = await Db.HabitLogs
+        TodayLogs = await db.HabitLogs
             .Where(l => l.UserId == UserId && l.Date == today)
             .ToDictionaryAsync(l => l.HabitId);
 
-        Streaks = await Db.StreakRecords
+        Streaks = await db.StreakRecords
             .Where(s => s.UserId == UserId && s.SourceType == StreakSourceType.Habit)
             .ToDictionaryAsync(s => s.SourceId);
     }
@@ -184,7 +200,9 @@
         int xp = await XpService.AwardQuestXPAsync(UserId, habit.Id,
             habit.EstimatedTime, habit.FrictionLevel, XPSource.QuestCompletion);
 
-        Db.HabitLogs.Add(new HabitLog
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        db.HabitLogs.Add(new HabitLog
         {
             HabitId = habit.Id,
             UserId = UserId,
@@ -193,7 +211,12 @@
             XPAwarded = xp
         });
 
-        await Db.SaveChangesAsync();
+        var notifs = await db.Notifications
+        .Where(n => n.SourceEntityId == habit.Id && !n.IsRead)
+        .ToListAsync();
+            foreach (var n in notifs) n.IsRead = true;
+
+        await db.SaveChangesAsync();
         await XpService.UpdateStreakAsync(UserId, habit.Id, StreakSourceType.Habit);
         await LoadData();
     }
@@ -204,10 +227,12 @@
 
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             if (EditingHabit is null)
             {
-                // CREATE
-                Db.HabitEntities.Add(new Habit
+
+                var newHabit = new Habit
                 {
                     UserId = UserId,
                     Name = FormName,
@@ -219,14 +244,41 @@
                     EstimatedTime = FormEstimatedTime,
                     FrictionLevel = FormFriction,
                     QuestCategory = FormQuestCategory
-                });
+                };
+
+                if (FormReminderEnabled && FormReminderTime.HasValue)
+                {
+                    newHabit.ReminderEnabled = true;
+                    newHabit.ReminderTime = FormReminderTime.Value;
+
+                    string jobId = await NotificationService.ScheduleReminderAsync(
+                        UserId!,
+                        $"🔁 Habit Reminder: {newHabit.Name}",
+                        $"Don't forget to log \"{newHabit.Name}\" today.",
+                        FormReminderTime.Value,
+                        NotificationSourceType.HabitReminder,
+                        newHabit.Id);
+
+                    newHabit.HangfireJobId = jobId;
+                }
+
+                db.HabitEntities.Add(newHabit);
             }
             else
             {
-                // EDIT
-                var tracked = await Db.HabitEntities.FindAsync(EditingHabit.Id);
+                var tracked = await db.HabitEntities.FindAsync(EditingHabit.Id);
                 if (tracked is not null)
                 {
+                    if (!string.IsNullOrEmpty(tracked.HangfireJobId))
+                    {
+                        await NotificationService.CancelReminderAsync(tracked.HangfireJobId);
+                        tracked.HangfireJobId = null;
+                    }
+                    var staleNotifs = await db.Notifications
+                        .Where(n => n.SourceEntityId == tracked.Id && !n.IsRead)
+                        .ToListAsync();
+                    foreach (var n in staleNotifs) n.IsRead = true;
+
                     tracked.Name = FormName;
                     tracked.Description = FormDescription;
                     tracked.Frequency = FormFrequency;
@@ -236,22 +288,43 @@
                     tracked.EstimatedTime = FormEstimatedTime;
                     tracked.FrictionLevel = FormFriction;
                     tracked.QuestCategory = FormQuestCategory;
+
+                    if (FormReminderEnabled && FormReminderTime.HasValue)
+                    {
+                        tracked.ReminderEnabled = true;
+                        tracked.ReminderTime = FormReminderTime.Value;
+
+                        string jobId = await NotificationService.ScheduleReminderAsync(
+                            UserId!,
+                            $"🔁 Habit Reminder: {tracked.Name}",
+                            $"Don't forget to log \"{tracked.Name}\" today.",
+                            FormReminderTime.Value,
+                            NotificationSourceType.HabitReminder,
+                            tracked.Id);
+
+                        tracked.HangfireJobId = jobId;
+                    }
+                    else
+                    {
+                        tracked.ReminderEnabled = false;
+                        tracked.ReminderTime = null;
+                    }
                 }
             }
 
-            await Db.SaveChangesAsync();
+            await db.SaveChangesAsync();
             CancelForm();
             await LoadData();
         }
         catch (Exception ex)
         {
-            // surface any future errors visibly
             Console.WriteLine($"SaveHabit error: {ex.Message} | {ex.InnerException?.Message}");
         }
     }
 
     private void EditHabit(Habit habit)
     {
+
         EditingHabit = habit;
         FormName = habit.Name;
         FormDescription = habit.Description;
@@ -262,33 +335,61 @@
         FormEstimatedTime = habit.EstimatedTime;
         FormFriction = habit.FrictionLevel;
         FormQuestCategory = habit.QuestCategory;
+        FormReminderEnabled = habit.ReminderEnabled;
+        FormReminderTimeString = habit.ReminderTime.HasValue
+            ? habit.ReminderTime.Value.ToString("yyyy-MM-ddTHH:mm")
+            : "";
         ShowForm = true;
+
     }
 
     private async Task ArchiveHabit(Habit habit)
     {
-        habit.IsActive = false;
-        await Db.SaveChangesAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var tracked = await db.HabitEntities.FindAsync(habit.Id);
+        if (tracked is not null)
+        {
+            tracked.IsActive = false;
+            if (!string.IsNullOrEmpty(tracked.HangfireJobId))
+                await NotificationService.CancelReminderAsync(tracked.HangfireJobId);
+            var notifs = await db.Notifications
+            .Where(n => n.SourceEntityId == tracked.Id && !n.IsRead)
+            .ToListAsync();
+            foreach (var n in notifs) n.IsRead = true;
+            await db.SaveChangesAsync();
+
+        }
         await LoadData();
     }
+
     private async Task UnarchiveHabit(Habit habit)
     {
-        var tracked = await Db.HabitEntities.FindAsync(habit.Id);
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var tracked = await db.HabitEntities.FindAsync(habit.Id);
         if (tracked is not null)
         {
             tracked.IsActive = true;
-            await Db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
         await LoadData();
     }
 
     private async Task DeleteHabit(Habit habit)
     {
-        var tracked = await Db.HabitEntities.FindAsync(habit.Id);
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var tracked = await db.HabitEntities.FindAsync(habit.Id);
         if (tracked is not null)
         {
-            Db.HabitEntities.Remove(tracked);
-            await Db.SaveChangesAsync();
+            if (!string.IsNullOrEmpty(tracked.HangfireJobId))
+                await NotificationService.CancelReminderAsync(tracked.HangfireJobId);
+
+            var staleNotifs = await db.Notifications
+                .Where(n => n.SourceEntityId == tracked.Id)
+                .ToListAsync();
+            db.Notifications.RemoveRange(staleNotifs);
+
+            db.HabitEntities.Remove(tracked);
+            await db.SaveChangesAsync();
         }
         await LoadData();
     }
@@ -306,5 +407,7 @@
         FormEstimatedTime = EstimatedTime.Under15m;
         FormFriction = FrictionLevel.Low;
         FormQuestCategory = QuestCategory.Routines;
+        FormReminderEnabled = false;
+        FormReminderTimeString = "";
     }
 }

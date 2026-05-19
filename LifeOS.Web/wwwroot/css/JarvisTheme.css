@@ -149,6 +149,7 @@ html, body {
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
+    position: relative;
 }
 
 .topbar-title {
@@ -695,4 +696,70 @@ html, body {
     font-size: .8rem;
     padding: .4rem;
     text-align: center;
+}
+.topbar-bell {
+    position: relative;
+    cursor: pointer;
+    font-size: 1.4rem;
+    margin-left: auto;
+    padding: 0 1rem;
+}
+
+.bell-badge {
+    position: absolute;
+    top: -4px;
+    right: 8px;
+    background: #00e5ff;
+    color: #0a0a0a;
+    border-radius: 50%;
+    font-size: 0.65rem;
+    font-weight: bold;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-panel {
+    position: absolute;
+    top: 60px;
+    right: 1rem;
+    width: 320px;
+    background: #1a1a2e;
+    border: 1px solid #00e5ff33;
+    border-radius: 8px;
+    padding: 1rem;
+    z-index: 1000;
+    box-shadow: 0 4px 20px rgba(0, 229, 255, 0.1);
+}
+
+.notif-item {
+    border-bottom: 1px solid #ffffff11;
+    padding: 0.6rem 0;
+    font-size: 0.85rem;
+}
+
+    .notif-item p {
+        color: #aaaaaa;
+        margin: 0.2rem 0;
+    }
+
+.no-notifs {
+    color: #666;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.notification-panel {
+    position: fixed;
+    top: 56px;
+    right: 16px;
+    width: 320px;
+    z-index: 9999;
+    background: #1a1a2e;
+    border: 1px solid #00e5ff33;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 229, 255, 0.15);
 }
