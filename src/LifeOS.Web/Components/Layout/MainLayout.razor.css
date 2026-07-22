@@ -20,6 +20,7 @@
 .app-sidebar {
     padding: 1rem;
     border-right: 1px solid #ddd;
+    display:flow;
 }
 
 .app-content {

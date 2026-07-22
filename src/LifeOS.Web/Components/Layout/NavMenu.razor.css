@@ -1,0 +1,22 @@
+﻿.nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.nav-link {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    border-radius: 6px;
+}
+
+    .nav-link:hover {
+        background-color: #f2f2f2;
+    }
+
+    .nav-link.active {
+        background-color: #dbeafe;
+        font-weight: 600;
+    }
