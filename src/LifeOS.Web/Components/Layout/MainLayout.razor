@@ -1,6 +1,19 @@
 ﻿@inherits LayoutComponentBase
 
-@Body
+<div class="app-layout">
+    <header class="app-header">
+        <h1>LifeOS</h1>
+    </header>
+    <div class="app-container">
+    <aside class="app-sidebar">
+        <p>Navigation</p>
+    </aside>
+
+    <main class="app-content">
+        @Body
+    </main>
+    </div>
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
