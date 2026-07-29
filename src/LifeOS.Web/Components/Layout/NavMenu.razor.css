@@ -8,15 +8,17 @@
     display: block;
     padding: 0.5rem 0.75rem;
     text-decoration: none;
-    color: inherit;
+    color: var(--color-text);
     border-radius: 6px;
+    transition: background-color 0.2s ease;
 }
 
     .nav-link:hover {
-        background-color: #f2f2f2;
+        background-color: var(--color-surface);
     }
 
     .nav-link.active {
-        background-color: #dbeafe;
+        background-color: var(--color-accent);
+        color: var(--color-background);
         font-weight: 600;
     }
