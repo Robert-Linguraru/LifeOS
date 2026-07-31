@@ -1,4 +1,6 @@
-﻿using LifeOS.Infrastructure.Persistence;
+﻿using LifeOS.Core.Abstractions;
+using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,9 @@ public static class DependencyInjection
         {
             options.UseNpgsql(connectionString);
         });
+
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         return services;
     }
