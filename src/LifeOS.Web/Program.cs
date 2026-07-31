@@ -1,11 +1,22 @@
-using LifeOS.Web.Components;
+using LifeOS.Core.Abstractions;
 using LifeOS.Infrastructure.Extensions;
+using LifeOS.Web.Components;
+using LifeOS.Web.Options;
+using LifeOS.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.Configure<DevelopmentUserOptions>(
+    builder.Configuration.GetSection(
+        DevelopmentUserOptions.SectionName));
+
+builder.Services.AddScoped<ICurrentUserService,
+    DevelopmentCurrentUserService>();
+
 builder.Services.AddInfrastructure(builder.Configuration);
 
 
