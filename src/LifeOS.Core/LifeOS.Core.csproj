@@ -12,7 +12,6 @@
     <Folder Include="ValueObjects\" />
     <Folder Include="Constants\" />
     <Folder Include="Common\" />
-    <Folder Include="Entities\" />
     <Folder Include="Abstractions\" />
   </ItemGroup>
 
