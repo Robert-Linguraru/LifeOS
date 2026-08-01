@@ -3,6 +3,7 @@ using LifeOS.Infrastructure.Extensions;
 using LifeOS.Web.Components;
 using LifeOS.Web.Options;
 using LifeOS.Web.Services;
+using LifeOS.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,13 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.Configure<DevelopmentUserOptions>(
-    builder.Configuration.GetSection(
-        DevelopmentUserOptions.SectionName));
-
-builder.Services.AddScoped<ICurrentUserService,
-    DevelopmentCurrentUserService>();
-
+builder.Services.AddWeb(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 
 
