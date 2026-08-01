@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using LifeOS.Core.Entities;
 
 namespace LifeOS.Infrastructure.Persistence;
 
@@ -8,6 +9,8 @@ public class AppDbContext : DbContext
         : base(options)
     {
     }
+    public DbSet<UserSettings> UserSettings =>
+    Set<UserSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
