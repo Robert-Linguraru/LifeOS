@@ -20,4 +20,5 @@ public sealed class DevelopmentCurrentUserService
     }
 
     public Guid UserId { get; }
+    public bool IsAuthenticated => true;
 }
