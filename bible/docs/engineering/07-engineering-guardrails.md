@@ -25,7 +25,7 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 - Do not inject `AppDbContext` into Razor pages for feature workflows unless explicitly approved for read-only prototype/debug pages.
 - Every personal entity must have `UserId`.
 - Every user-facing service query must be user-scoped.
-- Protected pages must require authorization.
+- Feature workflows must obtain user ownership through `ICurrentUserService`; a future Identity implementation must preserve this abstraction rather than bypass it.
 - Use Guid IDs consistently unless the architecture decision is changed before scaffolding.
 - Do not hard-code single-user assumptions into services.
 - Do not introduce packages casually. New dependencies need a reason.

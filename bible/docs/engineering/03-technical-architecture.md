@@ -15,7 +15,7 @@ V1 stack:
 - Language: C#
 - ORM: Entity Framework Core
 - Database: PostgreSQL
-- Authentication: ASP.NET Identity
+- Current user: `ICurrentUserService` with `DevelopmentCurrentUserService`; ASP.NET Identity is future integration work
 - Background jobs: Hangfire or equivalent
 - Styling: app-owned CSS with dark JARVIS-inspired design system
 - Tests: .NET test project with unit and integration tests where practical
@@ -39,7 +39,6 @@ lifeos/
     LifeOS.Web/
     LifeOS.Core/
     LifeOS.Infrastructure/
-    LifeOS.Application/        optional future extraction only
   tests/
     LifeOS.Tests/
   AGENTS.md
@@ -94,33 +93,24 @@ Responsibilities:
 - future AI connectors;
 - external integration adapters.
 
-### 3.4 LifeOS.Application optional future layer
+### 3.4 Service placement
 
-V1 should start with a simple three-project structure: Web, Core, and Infrastructure. Add `LifeOS.Application` later only if the service layer becomes large enough to justify a separate use-case layer.
+LifeOS uses three projects: Web, Core, and Infrastructure. There is no separate Application project.
 
-If added later, `LifeOS.Application` may contain:
+- Core contains service contracts, DTOs/read models, entities, enums, and application exceptions.
+- Infrastructure contains EF-backed repositories and service implementations, EF configuration, and persistence concerns.
+- Web contains Razor/UI and the composition root.
 
-- feature service interfaces;
-- commands/use cases;
-- DTOs/read models;
-- validation rules;
-- orchestration between domain and infrastructure.
-
-Until then, service interfaces should live in Core and EF-backed implementations should live in Infrastructure. Business workflows still must not live in Web.
+Business workflows still must not live in Web. A separate Application project is not planned; reconsidering that structure requires a future architecture decision.
 
 ## 4. Dependency direction
 
 Allowed dependency direction:
 
 ```text
-V1 default:
 LifeOS.Web -> LifeOS.Core
 LifeOS.Web -> LifeOS.Infrastructure only for composition/DI setup
 LifeOS.Infrastructure -> LifeOS.Core
-
-Future if Application is introduced:
-LifeOS.Web -> LifeOS.Application -> LifeOS.Core
-LifeOS.Infrastructure -> LifeOS.Application and LifeOS.Core
 ```
 
 Preferred runtime pattern:
@@ -134,25 +124,23 @@ Preferred runtime pattern:
 
 V1 shall use Guid IDs consistently.
 
-- ApplicationUser should inherit from IdentityUser<Guid>.
+- Identity integration is future work. When introduced, its user type should use Guid keys and must not absorb user-preference fields.
 - BaseEntity.Id should be Guid.
 - UserOwnedEntity.UserId should be Guid.
 - Avoid mixing string user IDs with Guid entity IDs unless the decision is made deliberately before scaffolding.
-- The seeded development user must be created idempotently.
-- Authentication and authorization should be present before feature pages are added.
+- The development user configuration must be idempotent.
+- Until Identity is introduced, `DevelopmentCurrentUserService` is the valid implementation of `ICurrentUserService`.
 
 ## 6. Cross-cutting services
 
 ### 6.1 Current user service
 
-Provide an `ICurrentUserService` that exposes:
+`ICurrentUserService` is the application-wide current-user abstraction. Its current contract exposes:
 
 - current user ID;
-- authentication status;
-- maybe display name/email;
-- time zone setting if useful.
+- authentication status.
 
-All user-owned queries must use the current user service or an explicit user ID validated at the service boundary.
+All user-owned queries must use this service or an explicit user ID validated at the service boundary. Identity, `HttpContext`, claims, and an Identity user type must remain behind a future implementation of this abstraction.
 
 ### 6.2 Date/time provider
 
@@ -166,16 +154,16 @@ Do not scatter `DateTime.Now` or `DateTime.UtcNow` across services.
 
 ### 6.3 Time zone service
 
-Because reminders rely on correct local-time behavior, provide a time zone policy:
+User time zone is stored on `UserSettings`. Services that require user preferences must use `IUserSettingsService` or the appropriate UserSettings abstraction. The time-zone policy is:
 
 - store user's time zone ID in settings as an IANA time zone ID, for example Europe/Bucharest;
 - convert local form values to UTC before persistence;
 - display UTC instants in local time;
 - use `DateOnly` for business dates that do not represent instants.
 
-### 6.4 Notification service
+### 6.4 Future cross-cutting services
 
-Provide an `INotificationService` for:
+The following services belong to later milestones and must not be introduced as dependencies of the Milestone 3 Task slice:
 
 - creating notifications;
 - listing unread notifications;
@@ -184,7 +172,7 @@ Provide an `INotificationService` for:
 
 ### 6.5 XP service
 
-Provide an `IXpService` for:
+Provide an `IXPService` for:
 
 - calculating quest XP;
 - enforcing daily caps;
@@ -249,7 +237,7 @@ All personal records must have `UserId`, including:
 
 ### 7.3 Soft delete
 
-Soft delete should be used for records where history matters.
+All `BaseEntity` types support soft deletion. `AppDbContext` currently applies audit timestamps and converts EF delete operations into soft deletes. It currently has an explicit soft-delete query filter for `UserSettings`; a reusable global convention for all `BaseEntity` types is planned technical debt, not a prerequisite architecture extraction.
 
 Use soft delete for:
 
@@ -303,6 +291,10 @@ Use these rules:
 - Garmin imports: store source metadata and imported time zone/offset where available.
 
 Avoid global timestamp behavior switches as a permanent solution.
+
+## 8.1 Blazor persistence
+
+Blazor Server persistence uses `IDbContextFactory<AppDbContext>`. Repositories and Infrastructure service implementations create and dispose a context for each operation; Razor components do not receive `AppDbContext` for feature workflows. This avoids sharing a DbContext across a Blazor circuit while preserving the service and repository boundary.
 
 ## 9. Background jobs
 

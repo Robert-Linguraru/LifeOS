@@ -52,9 +52,7 @@ V1 includes:
 - .NET solution structure;
 - PostgreSQL database;
 - EF Core migrations;
-- ASP.NET Identity;
-- seeded single user support;
-- protected app pages;
+- development current-user support through `ICurrentUserService`;
 - user-owned entities;
 - base entity audit fields;
 - service layer;
@@ -78,7 +76,7 @@ V1 includes:
 - notes;
 - estimated time;
 - friction level;
-- status: active, completed, archived/deleted;
+- status: `TaskItemStatus` active, completed, or archived; archive and soft delete are distinct operations;
 - today view;
 - overdue handling;
 - simple list filters.
@@ -200,7 +198,7 @@ V1 includes:
 
 These decisions remove ambiguity before implementation:
 
-- Identity uses stable user IDs from the start; every personal record is user-owned.
+- Every personal record uses a stable Guid `UserId` from the start through `ICurrentUserService`; future Identity integration must provide this abstraction.
 - V1 habits are daily-only. More complex schedules are deferred.
 - V1 task due dates are calendar dates, with optional local due time for planning. Reminder delivery is handled by the Reminder module, not by task due-time shortcuts.
 - V1 quest XP uses the documented Time Base times Friction Multiplier formula.
@@ -283,7 +281,7 @@ V1 is successful if:
 - reminders fire at the intended local time;
 - finance totals are correct for the selected month;
 - the dashboard loads quickly and is useful;
-- protected pages require authentication;
+- all feature workflows are user-scoped through `ICurrentUserService`;
 - all user-owned data is user-scoped;
 - migrations work from a clean database;
 - future modules can be added without major restructuring.

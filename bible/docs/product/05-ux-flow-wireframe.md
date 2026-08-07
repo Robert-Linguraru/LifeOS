@@ -121,7 +121,8 @@ Sections:
 - Today
 - Overdue
 - Upcoming
-- Completed/Archived collapsed
+- Unscheduled
+- Completed and Archived as separate status views
 
 Actions:
 
@@ -147,7 +148,6 @@ Fields:
 - Category/domain
 - Estimated time
 - Friction level
-- Optional one-time reminder
 
 After save:
 
@@ -162,9 +162,9 @@ Flow:
 1. User clicks complete.
 2. UI disables button during request.
 3. Task service marks task complete.
-4. XP service awards XP if eligible.
-5. UI updates task list and XP chip.
-6. If level-up occurs, notification is created/displayed.
+4. UI updates the task list.
+
+Milestone 3 has no XP or reminder integration. Those interactions are introduced only with their Milestone 5 and 6 slices.
 
 Failure behavior:
 

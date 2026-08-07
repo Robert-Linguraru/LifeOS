@@ -24,7 +24,7 @@ This implementation was chosen intentionally because it is simple and easy to un
 
 ### Future improvement
 
-As more modules are introduced (Tasks, Habits, Finance, Calendar, Reminders, XP), extract these responsibilities into dedicated persistence behaviors (or EF Core interceptors if appropriate).
+As more modules are introduced, consider extracting these responsibilities into dedicated persistence behaviors (or EF Core interceptors if appropriate).
 
 Examples:
 
@@ -43,7 +43,7 @@ Medium
 
 ### Target
 
-After Milestone 3.
+Reassess after multiple `BaseEntity` feature slices make the current lifecycle code difficult to maintain.
 
 ---
 
@@ -102,7 +102,7 @@ Medium
 
 ### Target
 
-Early Milestone 3.
+Reassess when task mappings create meaningful duplication. This does not require unrelated UserSettings refactoring.
 
 ---
 
@@ -116,7 +116,7 @@ Currently only `UserSettings` requires one.
 
 ### Future improvement
 
-When the second soft-deletable entity (`TaskItem`) is introduced, replace per-entity filters with a reusable convention that automatically applies:
+When multiple soft-deletable entities make individual filters error-prone, replace per-entity filters with a reusable convention that automatically applies:
 
 ```csharp
 HasQueryFilter(e => !e.IsDeleted)
@@ -136,7 +136,7 @@ Medium
 
 ### Target
 
-Beginning of Milestone 3.
+Reassess after Milestone 3; this is not a requirement to extract lifecycle behavior from `AppDbContext`.
 
 ---
 

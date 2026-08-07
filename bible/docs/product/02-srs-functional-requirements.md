@@ -14,8 +14,8 @@ Requirement labels:
 
 ### 2.1 Identity and access
 
-- `V1` The system shall require authentication for all personal app pages.
-- `V1` The system shall support a seeded single-user setup.
+- `Current` The system shall use `ICurrentUserService` to scope all personal app workflows; the development implementation supplies the configured development user.
+- `Future Identity milestone` The system shall require authentication for all personal app pages without bypassing `ICurrentUserService`.
 - `V1` The system shall store a `UserId` on every user-owned entity.
 - `V1` The system shall ensure all service queries are scoped to the current user.
 - `Future` The system shall support multiple users without requiring destructive schema redesign.
@@ -33,7 +33,7 @@ Requirement labels:
 - `V1` The system shall store true instants in UTC.
 - `V1` The system shall store calendar-only values as date-only values.
 - `V1` The system shall store user time zone as an IANA time zone ID, such as `Europe/Bucharest`.
-- `V1` The system shall configure the user's time zone before reminders are enabled.
+- `Milestone 6` The system shall configure the user's time zone before reminders are enabled.
 - `V1` The system shall convert user-entered local reminder times to UTC using the user's configured time zone.
 - `V1` The system shall not treat an unspecified local `datetime-local` input as UTC.
 - `V1` The system shall use a date/time abstraction rather than hard-coding current time throughout business logic.
@@ -54,25 +54,28 @@ Requirement labels:
 - `V1` A task may have a description or notes.
 - `V1` A task may have a due date.
 - `V1` A task may have a due time.
+- `V1` A due time shall require a due date.
 - `V1` Task due dates and due times shall be treated as planning fields in the user's local time zone.
-- `V1` Reminder delivery for a task shall be represented by a Reminder record, not by ad hoc task due-time logic.
+- `Milestone 6` Reminder delivery for a task shall be represented by a Reminder record, not by ad hoc task due-time logic.
 - `V1` A task may have a priority.
 - `V1` A task may have a category or domain.
 - `V1` A task may have estimated time.
 - `V1` A task may have friction level.
-- `V1` The system shall allow editing task fields.
+- `V1` The system shall allow editing active task fields.
+- `V1` Completed and archived tasks shall be read-only.
 
 ### 3.2 Task completion
 
 - `V1` The system shall allow the user to mark a task complete.
 - `V1` Completing a task shall set completion timestamp and completed date.
-- `V1` Completing a task may award quest XP through the XP service.
-- `V1` Completing the same task more than once shall not award duplicate XP.
+- `Milestone 3` Completing the same task more than once shall be a successful no-op and shall not overwrite the original completion timestamp or completed date.
+- `Milestone 5` Completing a task may award quest XP through the XP service.
 - `V1` The system shall allow completed tasks to be displayed separately from active tasks.
 
 ### 3.3 Task deletion and archiving
 
-- `V1` The system shall allow a task to be archived or soft-deleted.
+- `V1` The system shall allow a task to be archived or soft-deleted; these are distinct operations.
+- `V1` Archiving shall change `TaskItemStatus` to `Archived` without setting `IsDeleted`.
 - `V1` Soft-deleted tasks shall not appear in normal task lists.
 - `V1` Soft-deleting a task shall not remove historical XP transactions.
 
@@ -81,6 +84,7 @@ Requirement labels:
 - `V1` The system shall display today's tasks.
 - `V1` The system shall display overdue tasks.
 - `V1` The system shall display active tasks.
+- `Milestone 3` Active task views shall classify tasks as Overdue, Today, Upcoming, and Unscheduled. Unscheduled means no due date.
 - `V1` The system shall provide basic filtering by status and due date.
 - `Future` The system shall provide backlog, tag, and domain-specific views.
 - `Future` The system shall provide time-block or calendar planning.
@@ -166,7 +170,7 @@ Requirement labels:
 ### 6.2 Quest XP
 
 - `V1` The system shall calculate quest XP from estimated time and friction level.
-- `V1` Time base values shall be: `Under15m = 50 XP`, `Min15To30 = 100 XP`, `Min30To60 = 150 XP`, `Over60 = 200 XP`.
+- `V1` Time base values shall be: `Under15Minutes = 50 XP`, `Between15And30Minutes = 100 XP`, `Between30And60Minutes = 150 XP`, `Over60Minutes = 200 XP`.
 - `V1` Friction multipliers shall be: `Low = 1.0`, `Medium = 1.5`, `High = 2.0`.
 - `V1` Quest XP shall be rounded to the nearest whole XP value after multiplication.
 - `V1` The daily quest XP cap shall be 500 XP per user per user-local date.

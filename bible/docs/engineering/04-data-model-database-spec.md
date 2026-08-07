@@ -58,21 +58,21 @@ Fields:
 
 ### 3.3 ApplicationUser
 
-Decision: V1 uses ASP.NET Identity with Guid keys.
+Future Identity integration will use Guid keys. `ApplicationUser` is not part of the current implementation and must not contain user-preference fields.
 
 Fields:
 
 - inherits from `IdentityUser<Guid>`;
 - `DisplayName`;
-- `TimeZoneId` - IANA time zone ID, for example `Europe/Bucharest`;
-- `DefaultCurrency`;
-- `CreatedAtUtc`;
-- `UpdatedAtUtc`;
-- optional `IsDeleted` or account deactivation flag if needed later.
+- identity/account fields only as decided with the Identity milestone.
 
 Constraints:
 
 - Identity uniqueness constraints for email/username.
+
+### 3.4 UserSettings
+
+`UserSettings` is a separate `UserOwnedEntity`, with one row per user. It currently stores `TimeZoneId`, an IANA time zone ID such as `Europe/Bucharest`. Future preferences, such as currency or theme, belong here rather than on `ApplicationUser`.
 
 ## 4. V1 entities
 
@@ -84,14 +84,14 @@ Fields:
 
 - `Id`;
 - `UserId`;
-- `Title` required;
-- `Description` nullable;
+- `Title` required, maximum 200 characters;
+- `Description` nullable, maximum 2,000 characters;
 - `DueDate` nullable date-only;
 - `DueTime` nullable time-only;
 - `Priority` enum: Low, Medium, High, Critical;
-- `Status` enum: Active, Completed, Archived;
-- `Category` enum or string: Personal, School, Health, Finance, Admin, Work, Fitness, Misc;
-- `EstimatedTime` enum: Under15m, Min15To30, Min30To60, Over60;
+- `Status` enum: `TaskItemStatus` (Active = 0, Completed = 1, Archived = 2);
+- `Category` enum: Personal, School, Health, Finance, Admin, Work, Fitness, Miscellaneous;
+- `EstimatedTime` enum: Under15Minutes, Between15And30Minutes, Between30And60Minutes, Over60Minutes;
 - `FrictionLevel` enum: Low, Medium, High;
 - `CompletedAtUtc` nullable UTC instant;
 - `CompletedDate` nullable date-only in the user's local time zone;
@@ -106,7 +106,8 @@ Indexes:
 Notes:
 
 - Due date and due time are planning fields in the user's local time zone.
-- Reminder delivery is represented by `Reminder`, not by task due-time shortcuts.
+- DueTime requires DueDate. Past due dates are valid and represent overdue tasks; DueTime is for display and sorting only.
+- Reminder delivery is a later Milestone 6 concern and is not represented by task due-time shortcuts in Milestone 3.
 - Recurrence fields are future scope.
 - Snooze fields are future scope.
 
@@ -419,13 +420,12 @@ Notes:
 
 Recommended migration sequence:
 
-1. Identity and application user settings.
-2. Base entities and DbContext configuration.
-3. Tasks.
-4. Habits and HabitLogs with unique constraint.
-5. XPTransaction and UserProgression.
-6. Notifications and Reminders.
-7. Finance categories, transactions, monthly plan.
+1. Base entities, UserSettings, and DbContext configuration.
+2. Tasks.
+3. Habits and HabitLogs with unique constraint.
+4. XPTransaction and UserProgression.
+5. Notifications and Reminders.
+6. Finance categories, transactions, monthly plan.
 
 ## 4.13 Seed data
 
@@ -936,13 +936,13 @@ The following uniqueness rules apply:
 
 ## Archive & Soft-Delete Behavior
 
-LifeOS uses soft deletion for V1. Records are never permanently removed through normal user actions.
+Archive and soft delete are distinct concepts. `AppDbContext` converts normal EF deletion of a `BaseEntity` into a soft delete. Records are not physically removed through normal user actions.
 
 ### Cascade Rules
 
 | Entity | Cascade Behavior |
 |---------|------------------|
-| Task | Associated reminders are archived. Notification history is retained. |
+| Task | Archiving changes `TaskItemStatus` to `Archived`; it does not set `IsDeleted`. Soft deletion sets `IsDeleted` and `DeletedAtUtc`. Associated reminder behavior is future Milestone 6 scope. |
 | Habit | Habit logs are retained. Archived habits cannot create new logs. |
 | Reminder | Notification history is retained. |
 | Finance Category | Cannot be archived while referenced by existing transactions. |
@@ -950,7 +950,7 @@ LifeOS uses soft deletion for V1. Records are never permanently removed through 
 
 ### General Rules
 
-- Archived records are excluded from normal application views.
+- Archived task records remain available through explicit archived-task views. Soft-deleted records are hidden by query filters where implemented.
 - Historical records remain available for reporting and audit purposes.
 - Relationships must remain valid after an entity is archived.
 - Permanent deletion is reserved for maintenance or account removal operations.

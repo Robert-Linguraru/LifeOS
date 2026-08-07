@@ -4,9 +4,9 @@
 
 # 1. Purpose
 
-This document defines every public Application Service used by LifeOS.
+This document defines public service contracts used by LifeOS.
 
-It represents the contract between the Presentation Layer and the Application Layer.
+It represents the contract between the Presentation Layer and Core service contracts. Contracts and DTOs live in `LifeOS.Core`; Infrastructure provides EF-backed implementations. There is no separate Application project.
 
 This document intentionally defines:
 
@@ -56,7 +56,7 @@ Every service shall:
 - perform validation before persistence;
 - enforce business rules;
 - remain user-scoped;
-- throw domain-specific exceptions when required;
+- throw the established application exceptions when required;
 - never expose EF Core entities.
 
 Services should be stateless.
@@ -105,7 +105,7 @@ unless their purpose is immediately obvious.
 
 # 5. DTO Conventions
 
-DTOs belong exclusively to the Application Layer.
+DTOs belong in `LifeOS.Core` with the service contracts they support.
 
 Every feature should use the following DTO pattern.
 
@@ -189,7 +189,7 @@ Never trusted.
 
 Stage 2
 
-Application Service
+Service implementation
 
 Business validation.
 
@@ -197,7 +197,7 @@ Examples
 
 - duplicate habit
 - invalid reminder
-- archive completed item
+- invalid task state
 - duplicate XP
 
 This is the authoritative validation layer.
@@ -222,18 +222,16 @@ Database constraints are the final safety net.
 
 # 7. Error Handling
 
-Business rule violations should throw domain exceptions.
+Business rule violations should use the existing `LifeOSException` hierarchy.
 
 Examples
 
 ```
-TaskAlreadyCompletedException
+ValidationException
 
-DuplicateHabitCompletionException
+ResourceNotFoundException
 
-ReminderAlreadyTriggeredException
-
-DailyQuestCapReachedException
+CurrentUserUnavailableException
 ```
 
 Unexpected failures should never expose raw infrastructure exceptions to the UI.
@@ -276,7 +274,7 @@ Every service in this document follows this format.
 
 ## Purpose
 
-DashboardService aggregates information from every active module into a single DashboardDto.
+At Milestone 3, DashboardService aggregates task information into a DashboardDto.
 
 DashboardService owns no business rules.
 
@@ -296,20 +294,10 @@ Its responsibility is orchestration only.
 
 ## Dependencies
 
-DashboardService may depend on
+At Milestone 3, DashboardService may depend on
 
 ```
 ITaskService
-
-IHabitService
-
-IReminderService
-
-INotificationService
-
-IXPService
-
-IFinanceService
 ```
 
 DashboardService must never access repositories directly.
@@ -322,14 +310,6 @@ DashboardService must never access repositories directly.
 Task<DashboardDto> GetDashboardAsync();
 
 Task<DashboardTaskWidgetDto> GetTaskWidgetAsync();
-
-Task<DashboardHabitWidgetDto> GetHabitWidgetAsync();
-
-Task<DashboardFinanceWidgetDto> GetFinanceWidgetAsync();
-
-Task<DashboardProgressWidgetDto> GetProgressWidgetAsync();
-
-Task<DashboardReminderWidgetDto> GetReminderWidgetAsync();
 ```
 
 ---
@@ -355,14 +335,10 @@ DashboardDto
 Containing
 
 - Today's Tasks
-- Today's Habits
-- XP Summary
-- Notifications
-- Reminders
-- Finance Snapshot
-- Quick Actions
+- Task summary
+- Task quick action
 
-Future modules extend DashboardDto.
+Future module slices may extend DashboardDto only when their owning services exist.
 
 ---
 
@@ -381,7 +357,7 @@ DashboardService must never
 
 ## Future Expansion
 
-DashboardService will later aggregate
+DashboardService may later aggregate
 
 - Sleep
 - Fitness
@@ -545,8 +521,6 @@ TaskService is responsible for:
 - Filtering Tasks
 - Calculating Task statistics
 - Validating Task ownership
-- Triggering Quest XP when appropriate
-- Creating Task reminders when requested
 
 TaskService is the only service allowed to modify TaskItem entities.
 
@@ -558,10 +532,6 @@ TaskService depends on:
 
 ```text
 ITaskRepository
-
-IXPService
-
-IReminderService
 
 ICurrentUserService
 
@@ -616,13 +586,7 @@ Updates an existing Task.
 Task CompleteTaskAsync(Guid taskId);
 ```
 
-Marks a Task as completed.
-
-If eligible:
-
-- awards Quest XP;
-- updates UserProgression;
-- creates XPTransaction.
+Marks a Task as completed. Completing an already-completed task is a successful no-op that preserves its original completion values.
 
 ---
 
@@ -647,16 +611,6 @@ Task DeleteTaskAsync(Guid taskId);
 Soft deletes a Task.
 
 Historical XP must remain unaffected.
-
----
-
-## Restore
-
-```csharp
-Task RestoreTaskAsync(Guid taskId);
-```
-
-Restores a previously archived or deleted Task.
 
 ---
 
@@ -703,6 +657,16 @@ Task<IEnumerable<TaskSummaryDto>> GetOverdueTasksAsync();
 ```
 
 Returns overdue Tasks.
+
+---
+
+## Get Unscheduled
+
+```csharp
+Task<IEnumerable<TaskSummaryDto>> GetUnscheduledTasksAsync();
+```
+
+Returns active Tasks with no due date.
 
 ---
 
@@ -797,9 +761,7 @@ TaskService owns the following rules.
 
 The current user must own the Task.
 
-Archived Tasks cannot be modified.
-
-Completed Tasks may update notes only.
+Completed and archived Tasks are read-only.
 
 ---
 
@@ -810,12 +772,7 @@ Completing a Task:
 - stores CompletedAtUtc;
 - stores CompletedDate;
 - changes Status to Completed;
-- awards Quest XP if eligible.
-
-Completing the same Task twice:
-
-- must not create duplicate XP;
-- must not create duplicate XPTransactions.
+Completing the same Task twice succeeds without changing `CompletedAtUtc` or `CompletedDate`.
 
 ---
 
@@ -825,7 +782,7 @@ Archived Tasks:
 
 - disappear from active views;
 - remain in history;
-- retain XP associations.
+- have `TaskItemStatus.Archived` and do not set `IsDeleted`.
 
 ---
 
@@ -835,9 +792,7 @@ Delete performs a Soft Delete.
 
 Delete never removes:
 
-- XPTransactions
-- Notifications
-- Reminder history
+- existing historical records associated with the task.
 
 Future administrative hard delete is outside V1 scope.
 
@@ -862,9 +817,9 @@ TaskService validates:
 - due dates;
 - completion status;
 - archive state;
-- reminder ownership;
-- reminder date;
-- duplicate completion.
+- DueTime requires DueDate;
+- title maximum of 200 characters;
+- description maximum of 2,000 characters.
 
 Validation occurs before persistence.
 
@@ -875,80 +830,20 @@ Validation occurs before persistence.
 TaskService may throw:
 
 ```text
-TaskNotFoundException
+ResourceNotFoundException
 
-TaskAlreadyCompletedException
+ValidationException
 
-TaskAlreadyArchivedException
-
-TaskOwnershipException
-
-TaskValidationException
-
-ReminderValidationException
+CurrentUserUnavailableException
 ```
 
 Infrastructure exceptions should never escape directly.
 
 ---
 
-# XP Integration
+## Future integrations
 
-TaskService never calculates XP.
-
-TaskService requests XP through:
-
-```text
-IXPService
-```
-
-Flow
-
-```text
-Task Completed
-
-↓
-
-TaskService
-
-↓
-
-IXPService.AwardQuestXPAsync()
-
-↓
-
-XPTransaction
-
-↓
-
-UserProgression
-
-↓
-
-NotificationService
-```
-
----
-
-# Reminder Integration
-
-TaskService never schedules reminders directly.
-
-Reminder creation is delegated to:
-
-```text
-IReminderService
-```
-
-If a Task contains reminder information:
-
-TaskService passes the reminder request to ReminderService.
-
-ReminderService owns:
-
-- UTC conversion;
-- scheduling;
-- reminder persistence.
+XP integration belongs to Milestone 5 and reminder integration belongs to Milestone 6. Milestone 3 does not depend on `IXPService`, `IReminderService`, feature flags, placeholder implementations, XP transactions, or reminder fields. Later slices may integrate through their own established services without changing the Task completion semantics.
 
 ---
 

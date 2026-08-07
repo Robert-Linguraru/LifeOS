@@ -25,9 +25,9 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 - `V1` Navigation layout.
 - `V1` PostgreSQL setup.
 - `V1` EF Core migrations.
-- `V1` ASP.NET Identity.
-- `V1` Seeded development user.
-- `V1` Protected pages.
+- `Current` DevelopmentCurrentUserService.
+- `Future` ASP.NET Identity implementation behind ICurrentUserService.
+- `Future` Protected pages with Identity authorization.
 - `V1` User settings with time zone and currency.
 - `V1` BaseEntity.
 - `V1` Current user service.

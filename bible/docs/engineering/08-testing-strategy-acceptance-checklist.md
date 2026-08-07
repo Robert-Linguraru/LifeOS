@@ -76,7 +76,7 @@ Future AI features need qualitative review plus structured checks for:
 - Database connection works.
 - Migrations apply from a clean database.
 - Seed user is created idempotently.
-- Protected pages require login.
+- Development current-user service returns the configured user.
 - User settings include time zone.
 - Current user service returns correct user.
 - Base audit fields are populated.
@@ -92,6 +92,8 @@ Future AI features need qualitative review plus structured checks for:
 - Missing title shows validation error.
 - Due date saves correctly.
 - Due time saves correctly if provided.
+- Due time cannot be saved without a due date.
+- Past due dates remain valid and appear as overdue when active.
 - Priority saves correctly.
 - Category saves correctly.
 - Estimated time and friction save correctly.
@@ -100,23 +102,24 @@ Future AI features need qualitative review plus structured checks for:
 
 ### 5.2 Task editing
 
-- User can edit title, notes, date, priority, category, estimated time, and friction.
+- User can edit title, notes, date, priority, category, estimated time, and friction on active tasks.
 - Changes persist after refresh.
 - User cannot edit another user's task.
+- Completed and archived tasks cannot be edited.
 
 ### 5.3 Task completion
 
 - User can mark task complete.
 - Completed timestamp is stored.
 - Completed task leaves active list or moves to completed section.
-- Completing task triggers XP only once if XP service is active.
-- Re-clicking complete does not duplicate XP.
+- Re-clicking complete is a successful no-op and preserves the original completion timestamp and date.
 
 ### 5.4 Task deletion/archive
 
 - User can archive or soft-delete a task.
-- Archived/deleted task no longer appears in active dashboard.
-- Historical XP transaction remains intact.
+- Archived tasks are available in the archived-task view and do not appear in active views.
+- Soft-deleted tasks do not appear in normal task or dashboard queries.
+- Archive does not set `IsDeleted`; delete uses EF deletion and `AppDbContext` applies the soft-delete lifecycle.
 
 ## 6. Habit acceptance checklist
 
@@ -150,10 +153,10 @@ Future AI features need qualitative review plus structured checks for:
 
 ### 7.1 XP calculation
 
-- Under15m low friction gives 50 XP.
-- Min15To30 medium friction gives 150 XP.
-- Min30To60 high friction gives 300 XP.
-- Over60 high friction gives 400 XP.
+- Under15Minutes low friction gives 50 XP.
+- Between15And30Minutes medium friction gives 150 XP.
+- Between30And60Minutes high friction gives 300 XP.
+- Over60Minutes high friction gives 400 XP.
 - Daily quest XP cap prevents excess XP.
 - Completing after cap still completes the task/habit but awards no extra quest XP.
 
@@ -243,7 +246,7 @@ Future AI features need qualitative review plus structured checks for:
 
 ## 11. Security and privacy acceptance checklist
 
-- Anonymous user cannot access protected pages.
+- `ICurrentUserService` is used to scope every feature workflow; authorization coverage is added with the future Identity milestone.
 - User A cannot view User B records through services.
 - User A cannot edit User B records by changing IDs.
 - Sensitive settings are not committed to repository.

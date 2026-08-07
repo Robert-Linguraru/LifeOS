@@ -64,15 +64,12 @@ Scope:
 - add basic navigation;
 - configure PostgreSQL;
 - configure EF Core;
-- configure Identity;
-- create seeded development user;
-- protect app routes.
+- configure the development current-user implementation;
 
 Done when:
 
 - app runs locally;
-- authenticated user can access dashboard placeholder;
-- unauthenticated user cannot access protected pages;
+- development user can access dashboard placeholder through `ICurrentUserService`;
 - clean database migration succeeds;
 - build passes.
 
@@ -114,9 +111,9 @@ Scope:
 - task service;
 - task list page;
 - add/edit task;
-- complete task without XP initially or with XP feature flag if XP service exists;
+- complete task with no XP integration;
 - delete/archive task;
-- dashboard task widget;
+- task dashboard widget through DashboardService, limited to task data;
 - basic tests.
 
 Done when:
@@ -125,6 +122,9 @@ Done when:
 - user cannot access another user's tasks;
 - due/today/overdue display is correct;
 - soft delete works;
+- completing an already-completed task is a successful no-op that preserves the original completion timestamps;
+- completed and archived tasks are read-only;
+- active task lists classify tasks as Overdue, Today, Upcoming, or Unscheduled;
 - build/tests pass.
 
 ## Milestone 4 - Habits vertical slice

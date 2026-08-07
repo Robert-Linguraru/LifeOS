@@ -18,10 +18,10 @@ All enums shall be defined in **LifeOS.Core/Enums**.
 
 # Task Enums
 
-## TaskStatus
+## TaskItemStatus
 
 ```csharp
-public enum TaskStatus
+public enum TaskItemStatus
 {
     Active = 0,
     Completed = 1,

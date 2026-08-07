@@ -4,7 +4,7 @@
 
 The Dashboard is the primary entry point into LifeOS.
 
-It acts as the user's daily command center by surfacing the most important information across all active modules.
+It acts as the user's daily command center by surfacing information from modules that have been implemented.
 
 The dashboard should answer one question:
 
@@ -37,14 +37,10 @@ Priority is always given to **today's actionable information** over historical a
 --------------------------------------------------------------
  Header
 --------------------------------------------------------------
- Logo        Search        XP      Notifications     Profile
+ Logo        Profile
 --------------------------------------------------------------
 
-Today's Tasks      Today's Habits      XP Progress
-
---------------------------------------------------------------
-
-Reminders          Finance Snapshot    Quick Actions
+Today's Tasks      Quick Actions
 
 --------------------------------------------------------------
 
@@ -71,8 +67,8 @@ Contains
 - Application logo
 - Current page title
 - Search (future)
-- XP display
-- Notification bell
+- XP display (Milestone 5)
+- Notification bell (Milestone 6)
 - User profile
 - Settings shortcut
 
@@ -110,7 +106,11 @@ Enjoy the clear board or add a new task.
 
 ---
 
-## Today's Habits
+## Future widgets
+
+The following sections are introduced only with their owning module milestones. They are not current DashboardService responsibilities and must not be predeclared as methods before those slices begin.
+
+### Today's Habits
 
 Purpose
 
@@ -254,7 +254,7 @@ Future modules should refresh only their affected widgets.
 
 # Dashboard Data Source
 
-Dashboard data is aggregated exclusively by **DashboardService**.
+At Milestone 3, Dashboard data is aggregated exclusively by **DashboardService** from task data only.
 
 ```
 Dashboard
@@ -267,17 +267,7 @@ DashboardService
 
         │
 
-        ├──────── TaskService
-
-        ├──────── HabitService
-
-        ├──────── ReminderService
-
-        ├──────── NotificationService
-
-        ├──────── FinanceService
-
-        └──────── XPService
+        └──────── TaskService
 
                 │
 
@@ -297,14 +287,9 @@ DashboardService returns a single DashboardDto.
 The DashboardDto should contain:
 
 - Today's Tasks
-- Today's Habits
-- XP Summary
-- Reminder Summary
-- Notification Summary
-- Finance Summary
-- Quick Statistics
+- Task summary
 
-Future modules extend DashboardDto without modifying existing widgets.
+Future module slices may extend DashboardDto and DashboardService when their underlying service exists.
 
 ---
 

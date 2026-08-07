@@ -24,13 +24,10 @@ Created
     │
     ▼
 Active
- ├───────────────┐
- │               │
- ▼               ▼
-Completed    Archived
- │
- ▼
-(Read Only)
+ ├───────────────┬───────────────┐
+ │               │               │
+ ▼               ▼               ▼
+Completed    Archived      Soft Deleted
 ```
 
 ### Rules
@@ -39,9 +36,11 @@ Completed    Archived
 - Saving the task moves it to **Active**.
 - Active tasks may be completed.
 - Active tasks may be archived.
-- Completed tasks cannot be completed again.
-- Archived tasks are hidden from normal views.
-- V1 does not support reopening archived tasks.
+- Completing an already-completed task is a successful no-op; it does not overwrite `CompletedAtUtc` or `CompletedDate`.
+- Completed and archived tasks are read-only.
+- Archiving changes `TaskItemStatus` to `Archived`; archived tasks are available through explicit archived-task views and are hidden from active views.
+- Deletion performs EF deletion that `AppDbContext` converts into a soft delete; soft-deleted tasks are hidden by normal query filters.
+- Milestone 3 does not support restore or reopening: completed and archived tasks cannot return to Active.
 - Recurring tasks introduce additional states in a future version.
 
 ---
