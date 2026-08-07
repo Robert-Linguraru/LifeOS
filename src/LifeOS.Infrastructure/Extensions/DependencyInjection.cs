@@ -1,11 +1,12 @@
 ﻿using LifeOS.Core.Abstractions;
+using LifeOS.Core.Abstractions.Tasks;
+using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Repositories;
 using LifeOS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using LifeOS.Core.Services;
-using LifeOS.Infrastructure.Repositories;
 
 
 namespace LifeOS.Infrastructure.Extensions;
@@ -31,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUserSettingsService,
             UserSettingsService>();
+        services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
