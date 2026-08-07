@@ -106,39 +106,12 @@ Reassess when task mappings create meaningful duplication. This does not require
 
 ---
 
-## TD-003 — Global soft delete convention
+TD-003 — Global soft-delete query filter
+Status: Completed — Milestone 3
 
-### Current implementation
-
-Soft delete query filters are configured individually.
-
-Currently only `UserSettings` requires one.
-
-### Future improvement
-
-When multiple soft-deletable entities make individual filters error-prone, replace per-entity filters with a reusable convention that automatically applies:
-
-```csharp
-HasQueryFilter(e => !e.IsDeleted)
-```
-
-to every entity deriving from `BaseEntity`.
-
-### Benefits
-
-- Eliminates duplicated configuration.
-- Prevents developers forgetting query filters.
-- Keeps soft delete consistent across all modules.
-
-### Priority
-
-Medium
-
-### Target
-
-Reassess after Milestone 3; this is not a requirement to extract lifecycle behavior from `AppDbContext`.
-
----
+Originally, soft-delete filtering was configured specifically for UserSettings.
+As part of the Tasks vertical slice, AppDbContext was updated to apply the
+IsDeleted == false query filter automatically to all mapped BaseEntity types.
 
 # Authentication
 

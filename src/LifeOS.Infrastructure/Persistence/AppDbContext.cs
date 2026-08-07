@@ -1,8 +1,8 @@
-﻿using System.Reflection.Emit;
-using LifeOS.Core.Abstractions;
+﻿using LifeOS.Core.Abstractions;
 using LifeOS.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Linq.Expressions;
 
 namespace LifeOS.Infrastructure.Persistence;
 
@@ -15,15 +15,14 @@ public class AppDbContext : DbContext
     {
         _dateTimeProvider = dateTimeProvider;
     }
-    public DbSet<UserSettings> UserSettings =>
-    Set<UserSettings>();
-
+    public DbSet<UserSettings> UserSettings => Set<UserSettings>();
+    public DbSet<TaskItem> Tasks => Set<TaskItem>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
-        builder.Entity<UserSettings>().HasQueryFilter(settings => !settings.IsDeleted);
+        ApplySoftDeleteQueryFilters(builder);
     }
 
     public override int SaveChanges()
@@ -32,6 +31,30 @@ public class AppDbContext : DbContext
 
         return base.SaveChanges();
     }
+
+    private static void ApplySoftDeleteQueryFilters(ModelBuilder builder)
+    {
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            var parameter = Expression.Parameter(entityType.ClrType, "entity");
+
+            var isDeletedProperty = Expression.Property(
+                parameter,
+                nameof(BaseEntity.IsDeleted));
+
+            var notDeleted = Expression.Not(isDeletedProperty);
+
+            var filter = Expression.Lambda(notDeleted, parameter);
+
+            entityType.SetQueryFilter(filter);
+        }
+    }
+
     public override Task<int> SaveChangesAsync(
     CancellationToken cancellationToken = default)
     {
