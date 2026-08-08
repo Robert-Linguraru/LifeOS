@@ -1,0 +1,371 @@
+﻿@page "/tasks/new"
+@page "/tasks/{TaskId:guid}/edit"
+
+@inject ITaskService TaskService
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="task-editor">
+    <div class="task-editor__header">
+        <div>
+            <h1>@HeadingText</h1>
+            <p>@DescriptionText</p>
+        </div>
+
+        <button type="button"
+                class="secondary-button"
+                disabled="@_isSaving"
+                @onclick="NavigateToTasks">
+            Cancel
+        </button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p>Loading task...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">
+            @_loadError
+        </div>
+
+        <button type="button"
+                class="secondary-button"
+                @onclick="NavigateToTasks">
+            Back to tasks
+        </button>
+    }
+    else
+    {
+        <EditForm Model="_model"
+                  OnValidSubmit="HandleValidSubmitAsync">
+            <DataAnnotationsValidator />
+
+            @if (_saveError is not null)
+            {
+                <div class="error-message" role="alert">
+                    @_saveError
+                </div>
+            }
+
+            <div class="form-field">
+                <label for="task-title">Title</label>
+
+                <InputText id="task-title"
+                           class="form-control"
+                           @bind-Value="_model.Title"
+                           disabled="@_isSaving" />
+
+                <ValidationMessage For="() => _model.Title" />
+            </div>
+
+            <div class="form-field">
+                <label for="task-description">
+                    Description
+                </label>
+
+                <InputTextArea id="task-description"
+                               class="form-control"
+                               @bind-Value="_model.Description"
+                               disabled="@_isSaving" />
+
+                <ValidationMessage For="() => _model.Description" />
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="task-due-date">
+                        Due date
+                    </label>
+
+                    <InputDate id="task-due-date"
+                               class="form-control"
+                               @bind-Value="_model.DueDate"
+                               disabled="@_isSaving" />
+                </div>
+
+                <div class="form-field">
+                    <label for="task-due-time">
+                        Due time
+                    </label>
+
+                    <InputDate id="task-due-time"
+                               class="form-control"
+                               Type="InputDateType.Time"
+                               @bind-Value="_model.DueTime"
+                               disabled="@_isSaving" />
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="task-priority">
+                        Priority
+                    </label>
+
+                    <InputSelect id="task-priority"
+                                 class="form-control"
+                                 @bind-Value="_model.Priority"
+                                 disabled="@_isSaving">
+                        @foreach (var priority in
+                                            Enum.GetValues<TaskPriority>())
+                        {
+                            <option value="@priority">
+                                @priority
+                            </option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-field">
+                    <label for="task-category">
+                        Category
+                    </label>
+
+                    <InputSelect id="task-category"
+                                 class="form-control"
+                                 @bind-Value="_model.Category"
+                                 disabled="@_isSaving">
+                        @foreach (var category in
+                                            Enum.GetValues<TaskCategory>())
+                        {
+                            <option value="@category">
+                                @category
+                            </option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="task-estimated-time">
+                        Estimated time
+                    </label>
+
+                    <InputSelect id="task-estimated-time"
+                                 class="form-control"
+                                 @bind-Value="_model.EstimatedTime"
+                                 disabled="@_isSaving">
+                        @foreach (var estimatedTime in
+                                            Enum.GetValues<EstimatedTime>())
+                        {
+                            <option value="@estimatedTime">
+                                @GetEstimatedTimeLabel(
+                                estimatedTime)
+                    </option>
+                                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-field">
+                    <label for="task-friction">
+                        Friction level
+                    </label>
+
+                    <InputSelect id="task-friction"
+                                 class="form-control"
+                                 @bind-Value="_model.FrictionLevel"
+                                 disabled="@_isSaving">
+                        @foreach (var frictionLevel in
+                                            Enum.GetValues<FrictionLevel>())
+                        {
+                            <option value="@frictionLevel">
+                                @frictionLevel
+                            </option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit"
+                        class="primary-button"
+                        disabled="@_isSaving">
+                    @(_isSaving ? "Saving..." : SaveButtonText)
+                </button>
+
+                <button type="button"
+                        class="secondary-button"
+                        disabled="@_isSaving"
+                        @onclick="NavigateToTasks">
+                    Cancel
+                </button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? TaskId { get; set; }
+
+    private TaskFormModel _model = new();
+    private bool _isLoading;
+    private bool _isSaving;
+    private string? _loadError;
+    private string? _saveError;
+
+    private bool IsEditMode => TaskId.HasValue;
+
+    private string PageTitleText =>
+        IsEditMode ? "Edit Task" : "New Task";
+
+    private string HeadingText =>
+        IsEditMode ? "Edit task" : "Add task";
+
+    private string DescriptionText =>
+        IsEditMode
+            ? "Update the details for this task."
+            : "Add a task to your LifeOS.";
+
+    private string SaveButtonText =>
+        IsEditMode ? "Save changes" : "Create task";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loadError = null;
+        _saveError = null;
+
+        if (!IsEditMode)
+        {
+            _model = new TaskFormModel();
+            _isLoading = false;
+            return;
+        }
+
+        _isLoading = true;
+
+        try
+        {
+            var task =
+                await TaskService.GetTaskByIdAsync(
+                    TaskId!.Value);
+
+            _model = new TaskFormModel
+            {
+                Title = task.Title,
+                Description = task.Description,
+                DueDate = task.DueDate,
+                DueTime = task.DueTime,
+                Priority = task.Priority,
+                Category = task.Category,
+                EstimatedTime = task.EstimatedTime,
+                FrictionLevel = task.FrictionLevel
+            };
+        }
+        catch (ResourceNotFoundException)
+        {
+            _loadError =
+                "The task could not be found.";
+        }
+        catch (Exception)
+        {
+            _loadError =
+                "Something went wrong while loading the task.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _saveError = null;
+        _isSaving = true;
+
+        try
+        {
+            if (IsEditMode)
+            {
+                await TaskService.UpdateTaskAsync(
+                    TaskId!.Value,
+                    new UpdateTaskDto
+                    {
+                        Title = _model.Title,
+                        Description = _model.Description,
+                        DueDate = _model.DueDate,
+                        DueTime = _model.DueTime,
+                        Priority = _model.Priority,
+                        Category = _model.Category,
+                        EstimatedTime = _model.EstimatedTime,
+                        FrictionLevel = _model.FrictionLevel
+                    });
+            }
+            else
+            {
+                await TaskService.CreateTaskAsync(
+                    new CreateTaskDto
+                    {
+                        Title = _model.Title,
+                        Description = _model.Description,
+                        DueDate = _model.DueDate,
+                        DueTime = _model.DueTime,
+                        Priority = _model.Priority,
+                        Category = _model.Category,
+                        EstimatedTime = _model.EstimatedTime,
+                        FrictionLevel = _model.FrictionLevel
+                    });
+            }
+
+            Navigation.NavigateTo("/tasks");
+        }
+        catch (ValidationException exception)
+        {
+            _saveError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _saveError =
+                "The task could not be found.";
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _saveError =
+                "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _saveError =
+                "Something went wrong while saving the task.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void NavigateToTasks()
+    {
+        Navigation.NavigateTo("/tasks");
+    }
+
+    private static string GetEstimatedTimeLabel(
+        EstimatedTime estimatedTime)
+    {
+        return estimatedTime switch
+        {
+            EstimatedTime.Under15Minutes =>
+                "Under 15 minutes",
+
+            EstimatedTime.Between15And30Minutes =>
+                "15–30 minutes",
+
+            EstimatedTime.Between30And60Minutes =>
+                "30–60 minutes",
+
+            EstimatedTime.Over60Minutes =>
+                "Over 60 minutes",
+
+            _ => estimatedTime.ToString()
+        };
+    }
+}

@@ -1,7 +1,21 @@
 ﻿@page "/tasks"
 
+@inject NavigationManager Navigation
+
 <PageTitle>Tasks</PageTitle>
 
 <h1>Tasks</h1>
 
-<p>Coming soon...</p>
+<button type="button"
+        @onclick="NavigateToNewTask">
+    Add task
+</button>
+
+<p>The full task list is coming in the next step.</p>
+
+@code {
+    private void NavigateToNewTask()
+    {
+        Navigation.NavigateTo("/tasks/new");
+    }
+}
