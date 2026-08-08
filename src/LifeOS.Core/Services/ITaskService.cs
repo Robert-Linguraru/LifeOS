@@ -19,4 +19,16 @@ public interface ITaskService
 
     Task<TaskListDto> GetTaskListAsync(
         CancellationToken cancellationToken = default);
+
+    Task<TaskDetailsDto> CompleteTaskAsync(
+        Guid taskId,
+        CancellationToken cancellationToken = default);
+
+    Task<TaskDetailsDto> ArchiveTaskAsync(
+        Guid taskId,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteTaskAsync(
+        Guid taskId,
+        CancellationToken cancellationToken = default);
 }

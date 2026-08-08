@@ -327,4 +327,123 @@ public sealed class TaskService : ITaskService
             .ThenByDescending(task => task.Priority)
             .ThenBy(task => task.Title);
     }
+
+    public async Task<TaskDetailsDto> CompleteTaskAsync(
+    Guid taskId,
+    CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var task = await _repository.GetByIdAsync(
+            userId,
+            taskId,
+            cancellationToken);
+
+        if (task is null)
+        {
+            throw new ResourceNotFoundException(
+                "Task was not found.");
+        }
+
+        if (task.Status == TaskItemStatus.Completed)
+        {
+            return task.ToDetailsDto();
+        }
+
+        if (task.Status != TaskItemStatus.Active)
+        {
+            throw new ValidationException(
+                "Only active tasks can be completed.");
+        }
+
+        var settings =
+            await _userSettingsService.GetCurrentUserSettingsAsync(
+                cancellationToken);
+
+        task.Status = TaskItemStatus.Completed;
+        task.CompletedAtUtc = _dateTimeProvider.UtcNow;
+        task.CompletedDate =
+            _dateTimeProvider.GetCurrentDate(
+                settings.TimeZoneId);
+
+        await _repository.UpdateAsync(
+            task,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Completed task {TaskId} for user {UserId}",
+            task.Id,
+            userId);
+
+        return task.ToDetailsDto();
+    }
+
+    public async Task<TaskDetailsDto> ArchiveTaskAsync(
+    Guid taskId,
+    CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var task = await _repository.GetByIdAsync(
+            userId,
+            taskId,
+            cancellationToken);
+
+        if (task is null)
+        {
+            throw new ResourceNotFoundException(
+                "Task was not found.");
+        }
+
+        if (task.Status == TaskItemStatus.Archived)
+        {
+            return task.ToDetailsDto();
+        }
+
+        if (task.Status != TaskItemStatus.Active)
+        {
+            throw new ValidationException(
+                "Only active tasks can be archived.");
+        }
+
+        task.Status = TaskItemStatus.Archived;
+
+        await _repository.UpdateAsync(
+            task,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Archived task {TaskId} for user {UserId}",
+            task.Id,
+            userId);
+
+        return task.ToDetailsDto();
+    }
+
+    public async Task DeleteTaskAsync(
+    Guid taskId,
+    CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var task = await _repository.GetByIdAsync(
+            userId,
+            taskId,
+            cancellationToken);
+
+        if (task is null)
+        {
+            throw new ResourceNotFoundException(
+                "Task was not found.");
+        }
+
+        await _repository.DeleteAsync(
+            task,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Deleted task {TaskId} for user {UserId}",
+            task.Id,
+            userId);
+    }
 }

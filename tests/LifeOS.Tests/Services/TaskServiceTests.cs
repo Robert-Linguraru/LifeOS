@@ -461,4 +461,350 @@ public sealed class TaskServiceTests
                     Title = "Task"
                 }));
     }
+
+    [Fact]
+    public async Task CompleteTaskAsync_ActiveTask_CompletesTask()
+    {
+        var taskId = Guid.NewGuid();
+        var utcNow =
+            new DateTimeOffset(
+                2026,
+                8,
+                8,
+                22,
+                30,
+                0,
+                TimeSpan.Zero);
+
+        var localDate =
+            new DateOnly(2026, 8, 9);
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Complete me",
+            Status = TaskItemStatus.Active
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        _userSettingsService
+            .Setup(x => x.GetCurrentUserSettingsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserSettingsDto
+            {
+                UserId = UserId,
+                TimeZoneId = "Europe/Bucharest"
+            });
+
+        _dateTimeProvider
+            .Setup(x => x.UtcNow)
+            .Returns(utcNow);
+
+        _dateTimeProvider
+            .Setup(x => x.GetCurrentDate(
+                "Europe/Bucharest"))
+            .Returns(localDate);
+
+        var service = CreateService();
+
+        var result =
+            await service.CompleteTaskAsync(taskId);
+
+        Assert.Equal(
+            TaskItemStatus.Completed,
+            result.Status);
+
+        Assert.Equal(
+            utcNow,
+            result.CompletedAtUtc);
+
+        Assert.Equal(
+            localDate,
+            result.CompletedDate);
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                task,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_AlreadyCompleted_IsIdempotent()
+    {
+        var taskId = Guid.NewGuid();
+
+        var originalCompletedAtUtc =
+            new DateTimeOffset(
+                2026,
+                8,
+                7,
+                18,
+                30,
+                0,
+                TimeSpan.Zero);
+
+        var originalCompletedDate =
+            new DateOnly(2026, 8, 7);
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Already completed",
+            Status = TaskItemStatus.Completed,
+            CompletedAtUtc = originalCompletedAtUtc,
+            CompletedDate = originalCompletedDate
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        var service = CreateService();
+
+        var result =
+            await service.CompleteTaskAsync(taskId);
+
+        Assert.Equal(
+            originalCompletedAtUtc,
+            result.CompletedAtUtc);
+
+        Assert.Equal(
+            originalCompletedDate,
+            result.CompletedDate);
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<TaskItem>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _userSettingsService.Verify(
+            x => x.GetCurrentUserSettingsAsync(
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_ArchivedTask_ThrowsValidationException()
+    {
+        var taskId = Guid.NewGuid();
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Archived task",
+            Status = TaskItemStatus.Archived
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.CompleteTaskAsync(taskId));
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<TaskItem>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_TaskMissing_ThrowsResourceNotFoundException()
+    {
+        var taskId = Guid.NewGuid();
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TaskItem?)null);
+
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<ResourceNotFoundException>(
+            () => service.CompleteTaskAsync(taskId));
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<TaskItem>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchiveTaskAsync_ActiveTask_ArchivesTask()
+    {
+        var taskId = Guid.NewGuid();
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Archive me",
+            Status = TaskItemStatus.Active
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        var service = CreateService();
+
+        var result =
+            await service.ArchiveTaskAsync(taskId);
+
+        Assert.Equal(
+            TaskItemStatus.Archived,
+            result.Status);
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                task,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ArchiveTaskAsync_AlreadyArchived_IsIdempotent()
+    {
+        var taskId = Guid.NewGuid();
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Already archived",
+            Status = TaskItemStatus.Archived
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        var service = CreateService();
+
+        var result =
+            await service.ArchiveTaskAsync(taskId);
+
+        Assert.Equal(
+            TaskItemStatus.Archived,
+            result.Status);
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<TaskItem>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchiveTaskAsync_CompletedTask_ThrowsValidationException()
+    {
+        var taskId = Guid.NewGuid();
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Completed task",
+            Status = TaskItemStatus.Completed
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.ArchiveTaskAsync(taskId));
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<TaskItem>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData(TaskItemStatus.Active)]
+    [InlineData(TaskItemStatus.Completed)]
+    [InlineData(TaskItemStatus.Archived)]
+    public async Task DeleteTaskAsync_OwnedTask_DeletesTask(
+    TaskItemStatus status)
+    {
+        var taskId = Guid.NewGuid();
+
+        var task = new TaskItem
+        {
+            UserId = UserId,
+            Title = "Delete me",
+            Status = status
+        };
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+
+        var service = CreateService();
+
+        await service.DeleteTaskAsync(taskId);
+
+        _repository.Verify(
+            x => x.DeleteAsync(
+                task,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteTaskAsync_TaskMissing_ThrowsResourceNotFoundException()
+    {
+        var taskId = Guid.NewGuid();
+
+        _repository
+            .Setup(x => x.GetByIdAsync(
+                UserId,
+                taskId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TaskItem?)null);
+
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<ResourceNotFoundException>(
+            () => service.DeleteTaskAsync(taskId));
+
+        _repository.Verify(
+            x => x.DeleteAsync(
+                It.IsAny<TaskItem>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
