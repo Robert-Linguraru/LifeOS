@@ -1,21 +1,347 @@
 ﻿@page "/tasks"
 
+@inject ITaskService TaskService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Tasks</PageTitle>
 
-<h1>Tasks</h1>
+<div class="tasks-page">
+    <div class="tasks-page__header">
+        <div>
+            <h1>Tasks</h1>
+            <p>Plan, prioritize, and finish what matters.</p>
+        </div>
 
-<button type="button"
-        @onclick="NavigateToNewTask">
-    Add task
-</button>
+        <button type="button"
+                class="primary-button"
+                disabled="@_isBusy"
+                @onclick="NavigateToNewTask">
+            Add task
+        </button>
+    </div>
 
-<p>The full task list is coming in the next step.</p>
+    @if (_isLoading)
+    {
+        <p>Loading tasks...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">
+            <p>@_loadError</p>
+
+            <button type="button"
+                    disabled="@_isBusy"
+                    @onclick="LoadTasksAsync">
+                Try again
+            </button>
+        </div>
+    }
+    else if (_taskList is not null)
+    {
+        <div class="task-toolbar">
+            <label for="category-filter">
+                Category
+            </label>
+
+            <select id="category-filter"
+                    value="@GetSelectedCategoryValue()"
+                    @onchange="HandleCategoryChanged"
+                    disabled="@_isBusy">
+                <option value="">All categories</option>
+
+                @foreach (var category in
+                            Enum.GetValues<TaskCategory>())
+                {
+                    <option value="@category">
+                        @category
+                    </option>
+                }
+            </select>
+        </div>
+
+        @if (_actionError is not null)
+        {
+            <div class="error-message" role="alert">
+                @_actionError
+            </div>
+        }
+
+        <TaskListSection Title="Overdue"
+                         Tasks="@FilterTasks(_taskList.Overdue)"
+                         EmptyMessage="No overdue tasks."
+                         IsBusy="@_isBusy"
+                         OnComplete="CompleteTaskAsync"
+                         OnEdit="EditTask"
+                         OnArchive="ArchiveTaskAsync"
+                         OnDelete="DeleteTaskAsync" />
+
+        <TaskListSection Title="Today"
+                         Tasks="@FilterTasks(_taskList.Today)"
+                         EmptyMessage="Nothing due today."
+                         IsBusy="@_isBusy"
+                         OnComplete="CompleteTaskAsync"
+                         OnEdit="EditTask"
+                         OnArchive="ArchiveTaskAsync"
+                         OnDelete="DeleteTaskAsync" />
+
+        <TaskListSection Title="Upcoming"
+                         Tasks="@FilterTasks(_taskList.Upcoming)"
+                         EmptyMessage="No upcoming tasks."
+                         IsBusy="@_isBusy"
+                         OnComplete="CompleteTaskAsync"
+                         OnEdit="EditTask"
+                         OnArchive="ArchiveTaskAsync"
+                         OnDelete="DeleteTaskAsync" />
+
+        <TaskListSection Title="Unscheduled"
+                         Tasks="@FilterTasks(_taskList.Unscheduled)"
+                         EmptyMessage="No unscheduled tasks."
+                         IsBusy="@_isBusy"
+                         OnComplete="CompleteTaskAsync"
+                         OnEdit="EditTask"
+                         OnArchive="ArchiveTaskAsync"
+                         OnDelete="DeleteTaskAsync" />
+
+        <TaskListSection Title="Completed"
+                         Tasks="@FilterTasks(_taskList.Completed)"
+                         EmptyMessage="No completed tasks."
+                         Collapsible="true"
+                         InitiallyExpanded="false"
+                         IsBusy="@_isBusy"
+                         OnDelete="DeleteTaskAsync" />
+
+        <TaskListSection Title="Archived"
+                         Tasks="@FilterTasks(_taskList.Archived)"
+                         EmptyMessage="No archived tasks."
+                         Collapsible="true"
+                         InitiallyExpanded="false"
+                         IsBusy="@_isBusy"
+                         OnDelete="DeleteTaskAsync" />
+    }
+</div>
 
 @code {
+    private TaskListDto? _taskList;
+    private TaskCategory? _selectedCategory;
+
+    private bool _isLoading = true;
+    private bool _isBusy;
+
+    private string? _loadError;
+    private string? _actionError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasksAsync();
+    }
+
+    private async Task LoadTasksAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _taskList =
+                await TaskService.GetTaskListAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError =
+                "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError =
+                "Something went wrong while loading tasks.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private IReadOnlyList<TaskSummaryDto> FilterTasks(
+        IReadOnlyList<TaskSummaryDto> tasks)
+    {
+        if (!_selectedCategory.HasValue)
+        {
+            return tasks;
+        }
+
+        return tasks
+            .Where(task =>
+                task.Category == _selectedCategory.Value)
+            .ToList();
+    }
+
+    private void HandleCategoryChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _selectedCategory = null;
+            return;
+        }
+
+        _selectedCategory =
+            Enum.TryParse<TaskCategory>(
+                value,
+                out var category)
+                ? category
+                : null;
+    }
+
+    private string GetSelectedCategoryValue()
+    {
+        return _selectedCategory?.ToString()
+            ?? string.Empty;
+    }
+
     private void NavigateToNewTask()
     {
         Navigation.NavigateTo("/tasks/new");
+    }
+
+    private Task EditTask(TaskSummaryDto task)
+    {
+        Navigation.NavigateTo(
+            $"/tasks/{task.Id}/edit");
+
+        return Task.CompletedTask;
+    }
+
+    private async Task CompleteTaskAsync(
+        TaskSummaryDto task)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            await TaskService.CompleteTaskAsync(
+                task.Id);
+
+            await RefreshTasksAsync();
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError =
+                "The task could not be found.";
+
+            await RefreshTasksAsync();
+        }
+        catch (Exception)
+        {
+            _actionError =
+                "Something went wrong while completing the task.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task ArchiveTaskAsync(
+        TaskSummaryDto task)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            await TaskService.ArchiveTaskAsync(
+                task.Id);
+
+            await RefreshTasksAsync();
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError =
+                "The task could not be found.";
+
+            await RefreshTasksAsync();
+        }
+        catch (Exception)
+        {
+            _actionError =
+                "Something went wrong while archiving the task.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task DeleteTaskAsync(
+        TaskSummaryDto task)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        var confirmed =
+            await JSRuntime.InvokeAsync<bool>(
+                "confirm",
+                $"Delete \"{task.Title}\"?");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            await TaskService.DeleteTaskAsync(
+                task.Id);
+
+            await RefreshTasksAsync();
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError =
+                "The task could not be found.";
+
+            await RefreshTasksAsync();
+        }
+        catch (Exception)
+        {
+            _actionError =
+                "Something went wrong while deleting the task.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task RefreshTasksAsync()
+    {
+        _taskList =
+            await TaskService.GetTaskListAsync();
     }
 }

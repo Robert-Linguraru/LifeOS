@@ -1,0 +1,121 @@
+﻿.task-section {
+    margin-bottom: 1.5rem;
+}
+
+.task-section__header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: default;
+}
+
+.task-section__count {
+    display: inline-flex;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid #b8b8b8;
+    font-size: 0.8rem;
+}
+
+.task-section__toggle {
+    margin-left: auto;
+}
+
+.task-section__empty {
+    margin: 0;
+    padding: 1rem;
+    border: 1px dashed #b8b8b8;
+    border-radius: 0.5rem;
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.task-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 0.5rem;
+}
+
+.task-card__content {
+    min-width: 0;
+    flex: 1;
+}
+
+.task-card__title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+    .task-card__title-row h3 {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+
+.task-card__priority {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.task-card__metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.task-card__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+    .task-card__actions button {
+        padding: 0.45rem 0.7rem;
+        border: 1px solid #b8b8b8;
+        border-radius: 0.35rem;
+        cursor: pointer;
+    }
+
+        .task-card__actions button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+.danger-button {
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .task-card {
+        flex-direction: column;
+    }
+
+    .task-card__actions {
+        align-items: stretch;
+    }
+
+        .task-card__actions button {
+            flex: 1;
+        }
+}

@@ -1,0 +1,194 @@
+﻿<section class="task-section">
+    <button type="button"
+            class="task-section__header"
+            @onclick="ToggleExpanded"
+            aria-expanded="@IsExpanded">
+        <span>@Title</span>
+        <span class="task-section__count">@Tasks.Count</span>
+
+        @if (Collapsible)
+        {
+            <span class="task-section__toggle">
+                @(IsExpanded ? "−" : "+")
+            </span>
+        }
+    </button>
+
+    @if (IsExpanded)
+    {
+        @if (Tasks.Count == 0)
+        {
+            <p class="task-section__empty">@EmptyMessage</p>
+        }
+        else
+        {
+            <div class="task-list">
+                @foreach (var task in Tasks)
+                {
+                    <article class="task-card">
+                        <div class="task-card__content">
+                            <div class="task-card__title-row">
+                                <h3>@task.Title</h3>
+
+                                <span class="task-card__priority">
+                                    @task.Priority
+                                </span>
+                            </div>
+
+                            <div class="task-card__metadata">
+                                @if (task.DueDate.HasValue)
+                                {
+                                    <span>
+                                        @FormatDueDate(task)
+                                    </span>
+                                }
+
+                                <span>@task.Category</span>
+
+                                <span>
+                                    @GetEstimatedTimeLabel(
+                                    task.EstimatedTime)
+                    </span>
+
+                    <span>
+                        Friction: @task.FrictionLevel
+                    </span>
+                </div>
+            </div>
+
+            <div class="task-card__actions">
+                @if (task.Status ==
+                                TaskItemStatus.Active)
+                            {
+                                <button type="button"
+                                        disabled="@IsBusy"
+                                        @onclick="() =>
+                                        OnComplete.InvokeAsync(task)">
+                    Complete
+                </button>
+
+                                <button type="button"
+                                        disabled="@IsBusy"
+                                        @onclick="() =>
+                                                                    OnEdit.InvokeAsync(task)">
+                    Edit
+                </button>
+
+                                <button type="button"
+                                        disabled="@IsBusy"
+                                        @onclick="() =>
+                                                                    OnArchive.InvokeAsync(task)">
+                    Archive
+                </button>
+                                }
+
+                            <button type="button"
+                                    class="danger-button"
+                                    disabled="@IsBusy"
+                                    @onclick="() =>
+                                    OnDelete.InvokeAsync(task)">
+                    Delete
+                </button>
+            </div>
+        </article>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TaskSummaryDto> Tasks { get; set; } =
+        Array.Empty<TaskSummaryDto>();
+
+    [Parameter]
+    public string EmptyMessage { get; set; } =
+        "No tasks here.";
+
+    [Parameter]
+    public bool Collapsible { get; set; }
+
+    [Parameter]
+    public bool InitiallyExpanded { get; set; } = true;
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<TaskSummaryDto> OnComplete { get; set; }
+
+    [Parameter]
+    public EventCallback<TaskSummaryDto> OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback<TaskSummaryDto> OnArchive { get; set; }
+
+    [Parameter]
+    public EventCallback<TaskSummaryDto> OnDelete { get; set; }
+
+    private bool _isExpanded;
+    private bool _initialized;
+
+    private bool IsExpanded =>
+        !Collapsible || _isExpanded;
+
+    protected override void OnParametersSet()
+    {
+        if (_initialized)
+        {
+            return;
+        }
+
+        _isExpanded = InitiallyExpanded;
+        _initialized = true;
+    }
+
+    private void ToggleExpanded()
+    {
+        if (Collapsible)
+        {
+            _isExpanded = !_isExpanded;
+        }
+    }
+
+    private static string FormatDueDate(
+        TaskSummaryDto task)
+    {
+        if (!task.DueDate.HasValue)
+        {
+            return string.Empty;
+        }
+
+        var date =
+            task.DueDate.Value.ToString("dd MMM yyyy");
+
+        return task.DueTime.HasValue
+            ? $"{date} at {task.DueTime.Value:HH\\:mm}"
+            : date;
+    }
+
+    private static string GetEstimatedTimeLabel(
+        EstimatedTime estimatedTime)
+    {
+        return estimatedTime switch
+        {
+            EstimatedTime.Under15Minutes =>
+                "Under 15 min",
+
+            EstimatedTime.Between15And30Minutes =>
+                "15–30 min",
+
+            EstimatedTime.Between30And60Minutes =>
+                "30–60 min",
+
+            EstimatedTime.Over60Minutes =>
+                "Over 60 min",
+
+            _ => estimatedTime.ToString()
+        };
+    }
+}
