@@ -158,3 +158,26 @@ Technical debt should only be addressed when there is a measurable improvement i
 - developer productivity.
 
 Avoid introducing abstractions before they are justified by the application.
+
+## TD-005 — Task list queries load all user tasks into memory
+
+Status: Open
+Priority: Low for V1; revisit as task volume grows
+Introduced: Milestone 3
+
+TaskService.GetTaskListAsync currently loads all non-deleted tasks for the
+current user and performs status classification, date grouping, and sorting
+in memory.
+
+This is intentional for the initial Tasks vertical slice because it keeps
+the repository contract and query behavior simple.
+
+As task history grows, replace this with targeted database queries,
+projections, and/or pagination so completed and archived task history does
+not need to be loaded for every task-list request.
+
+Revisit when:
+- task volume begins affecting task-list latency or memory usage;
+- pagination is introduced;
+- completed/archived history becomes large;
+- database-side filtering is otherwise required.

@@ -1,0 +1,330 @@
+﻿using LifeOS.Core.Abstractions;
+using LifeOS.Core.Abstractions.Tasks;
+using LifeOS.Core.Constants;
+using LifeOS.Core.DTOs.Tasks;
+using LifeOS.Core.Entities;
+using LifeOS.Core.Enums.Tasks;
+using LifeOS.Core.Exceptions;
+using LifeOS.Core.Mappings;
+using LifeOS.Core.Services;
+using Microsoft.Extensions.Logging;
+
+namespace LifeOS.Infrastructure.Services;
+
+public sealed class TaskService : ITaskService
+{
+    private readonly ITaskRepository _repository;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IUserSettingsService _userSettingsService;
+    private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ILogger<TaskService> _logger;
+
+    public TaskService(
+        ITaskRepository repository,
+        ICurrentUserService currentUser,
+        IUserSettingsService userSettingsService,
+        IDateTimeProvider dateTimeProvider,
+        ILogger<TaskService> logger)
+    {
+        _repository = repository;
+        _currentUser = currentUser;
+        _userSettingsService = userSettingsService;
+        _dateTimeProvider = dateTimeProvider;
+        _logger = logger;
+    }
+
+    public async Task<TaskDetailsDto> CreateTaskAsync(
+        CreateTaskDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        var userId = GetCurrentUserId();
+
+        var normalized = ValidateAndNormalize(
+            dto.Title,
+            dto.Description,
+            dto.DueDate,
+            dto.DueTime,
+            dto.Priority,
+            dto.Category,
+            dto.EstimatedTime,
+            dto.FrictionLevel);
+
+        var task = new TaskItem
+        {
+            UserId = userId,
+            Title = normalized.Title,
+            Description = normalized.Description,
+            DueDate = dto.DueDate,
+            DueTime = dto.DueTime,
+            Priority = dto.Priority,
+            Category = dto.Category,
+            EstimatedTime = dto.EstimatedTime,
+            FrictionLevel = dto.FrictionLevel,
+            Status = TaskItemStatus.Active
+        };
+
+        await _repository.AddAsync(
+            task,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Created task {TaskId} for user {UserId}",
+            task.Id,
+            userId);
+
+        return task.ToDetailsDto();
+    }
+
+    public async Task<TaskDetailsDto> UpdateTaskAsync(
+        Guid taskId,
+        UpdateTaskDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        var userId = GetCurrentUserId();
+
+        var task = await _repository.GetByIdAsync(
+            userId,
+            taskId,
+            cancellationToken);
+
+        if (task is null)
+        {
+            throw new ResourceNotFoundException(
+                "Task was not found.");
+        }
+
+        if (task.Status != TaskItemStatus.Active)
+        {
+            throw new ValidationException(
+                "Only active tasks can be edited.");
+        }
+
+        var normalized = ValidateAndNormalize(
+            dto.Title,
+            dto.Description,
+            dto.DueDate,
+            dto.DueTime,
+            dto.Priority,
+            dto.Category,
+            dto.EstimatedTime,
+            dto.FrictionLevel);
+
+        task.Title = normalized.Title;
+        task.Description = normalized.Description;
+        task.DueDate = dto.DueDate;
+        task.DueTime = dto.DueTime;
+        task.Priority = dto.Priority;
+        task.Category = dto.Category;
+        task.EstimatedTime = dto.EstimatedTime;
+        task.FrictionLevel = dto.FrictionLevel;
+
+        await _repository.UpdateAsync(
+            task,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Updated task {TaskId} for user {UserId}",
+            task.Id,
+            userId);
+
+        return task.ToDetailsDto();
+    }
+
+    public async Task<TaskDetailsDto> GetTaskByIdAsync(
+        Guid taskId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var task = await _repository.GetByIdAsync(
+            userId,
+            taskId,
+            cancellationToken);
+
+        if (task is null)
+        {
+            throw new ResourceNotFoundException(
+                "Task was not found.");
+        }
+
+        return task.ToDetailsDto();
+    }
+
+    public async Task<TaskListDto> GetTaskListAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var settings =
+            await _userSettingsService.GetCurrentUserSettingsAsync(
+                cancellationToken);
+
+        var currentDate =
+            _dateTimeProvider.GetCurrentDate(settings.TimeZoneId);
+
+        var tasks = await _repository.GetAllByUserIdAsync(
+            userId,
+            cancellationToken);
+
+        var activeTasks = tasks
+            .Where(task => task.Status == TaskItemStatus.Active)
+            .ToList();
+
+        var overdue = OrderDatedTasks(
+                activeTasks.Where(
+                    task =>
+                        task.DueDate.HasValue &&
+                        task.DueDate.Value < currentDate))
+            .Select(task => task.ToSummaryDto())
+            .ToList();
+
+        var today = OrderDatedTasks(
+                activeTasks.Where(
+                    task => task.DueDate == currentDate))
+            .Select(task => task.ToSummaryDto())
+            .ToList();
+
+        var upcoming = OrderDatedTasks(
+                activeTasks.Where(
+                    task =>
+                        task.DueDate.HasValue &&
+                        task.DueDate.Value > currentDate))
+            .Select(task => task.ToSummaryDto())
+            .ToList();
+
+        var unscheduled = activeTasks
+            .Where(task => !task.DueDate.HasValue)
+            .OrderByDescending(task => task.Priority)
+            .ThenBy(task => task.Title)
+            .Select(task => task.ToSummaryDto())
+            .ToList();
+
+        var completed = tasks
+            .Where(task => task.Status == TaskItemStatus.Completed)
+            .OrderByDescending(task => task.CompletedAtUtc)
+            .ThenBy(task => task.Title)
+            .Select(task => task.ToSummaryDto())
+            .ToList();
+
+        var archived = tasks
+            .Where(task => task.Status == TaskItemStatus.Archived)
+            .OrderByDescending(task => task.UpdatedAtUtc)
+            .ThenBy(task => task.Title)
+            .Select(task => task.ToSummaryDto())
+            .ToList();
+
+        return new TaskListDto
+        {
+            CurrentDate = currentDate,
+            Overdue = overdue,
+            Today = today,
+            Upcoming = upcoming,
+            Unscheduled = unscheduled,
+            Completed = completed,
+            Archived = archived
+        };
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        if (!_currentUser.IsAuthenticated ||
+            _currentUser.UserId == Guid.Empty)
+        {
+            throw new CurrentUserUnavailableException();
+        }
+
+        return _currentUser.UserId;
+    }
+
+    private static (
+        string Title,
+        string? Description)
+        ValidateAndNormalize(
+            string title,
+            string? description,
+            DateOnly? dueDate,
+            TimeOnly? dueTime,
+            TaskPriority priority,
+            TaskCategory category,
+            EstimatedTime estimatedTime,
+            FrictionLevel frictionLevel)
+    {
+        var normalizedTitle = title?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            throw new ValidationException(
+                "Task title is required.");
+        }
+
+        if (normalizedTitle.Length >
+            TaskConstants.TitleMaxLength)
+        {
+            throw new ValidationException(
+                $"Task title cannot exceed " +
+                $"{TaskConstants.TitleMaxLength} characters.");
+        }
+
+        var normalizedDescription =
+            string.IsNullOrWhiteSpace(description)
+                ? null
+                : description.Trim();
+
+        if (normalizedDescription?.Length >
+            TaskConstants.DescriptionMaxLength)
+        {
+            throw new ValidationException(
+                $"Task description cannot exceed " +
+                $"{TaskConstants.DescriptionMaxLength} characters.");
+        }
+
+        if (dueTime.HasValue && !dueDate.HasValue)
+        {
+            throw new ValidationException(
+                "A due date is required when a due time is provided.");
+        }
+
+        if (!Enum.IsDefined(priority))
+        {
+            throw new ValidationException(
+                "Task priority is invalid.");
+        }
+
+        if (!Enum.IsDefined(category))
+        {
+            throw new ValidationException(
+                "Task category is invalid.");
+        }
+
+        if (!Enum.IsDefined(estimatedTime))
+        {
+            throw new ValidationException(
+                "Estimated time is invalid.");
+        }
+
+        if (!Enum.IsDefined(frictionLevel))
+        {
+            throw new ValidationException(
+                "Friction level is invalid.");
+        }
+
+        return (
+            normalizedTitle,
+            normalizedDescription);
+    }
+
+    private static IOrderedEnumerable<TaskItem> OrderDatedTasks(
+        IEnumerable<TaskItem> tasks)
+    {
+        return tasks
+            .OrderBy(task => task.DueDate)
+            .ThenBy(task => task.DueTime.HasValue ? 0 : 1)
+            .ThenBy(task => task.DueTime)
+            .ThenByDescending(task => task.Priority)
+            .ThenBy(task => task.Title);
+    }
+}
