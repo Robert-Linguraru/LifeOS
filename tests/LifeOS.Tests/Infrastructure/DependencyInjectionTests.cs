@@ -113,4 +113,42 @@ public sealed class DependencyInjectionTests
             descriptor.Lifetime);
     }
 
+    [Fact]
+    public void AddInfrastructure_ShouldRegisterDashboardService()
+    {
+        // Arrange
+        var configurationValues =
+            new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] =
+                    "Host=localhost;Port=5433;Database=lifeos;" +
+                    "Username=lifeos;Password=test"
+            };
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationValues)
+            .Build();
+
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddInfrastructure(configuration);
+
+        var descriptor = services.SingleOrDefault(
+            service =>
+                service.ServiceType == typeof(IDashboardService));
+
+        // Assert
+        Assert.NotNull(descriptor);
+        Assert.Equal(
+            typeof(DashboardService),
+            descriptor.ImplementationType);
+        Assert.Equal(
+            ServiceLifetime.Scoped,
+            descriptor.Lifetime);
+    }
+
+
+
+
 }

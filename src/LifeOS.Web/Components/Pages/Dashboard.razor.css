@@ -1,0 +1,21 @@
+﻿.dashboard-page {
+    max-width: 1100px;
+}
+
+.dashboard-page__header {
+    margin-bottom: 1.5rem;
+}
+
+    .dashboard-page__header h1 {
+        margin-bottom: 0.25rem;
+    }
+
+    .dashboard-page__header p {
+        margin: 0;
+    }
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr));
+    gap: 1rem;
+}

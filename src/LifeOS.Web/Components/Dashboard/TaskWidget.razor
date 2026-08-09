@@ -1,0 +1,213 @@
+﻿@inject IDashboardService DashboardService
+@inject ITaskService TaskService
+@inject NavigationManager Navigation
+
+<section class="task-widget">
+    <div class="task-widget__header">
+        <div>
+            <h2>Tasks</h2>
+
+            @if (_widget is not null)
+            {
+                <p>
+                    @_widget.CurrentDate.ToString("dd MMM yyyy")
+                </p>
+            }
+        </div>
+
+        <div class="task-widget__header-actions">
+            <button type="button"
+                    disabled="@_isBusy"
+                    @onclick="NavigateToTasks">
+                View all
+            </button>
+
+            <button type="button"
+                    disabled="@_isBusy"
+                    @onclick="NavigateToNewTask">
+                Add task
+            </button>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p>Loading tasks...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="task-widget__error"
+             role="alert">
+            <p>@_loadError</p>
+
+            <button type="button"
+                    disabled="@_isBusy"
+                    @onclick="LoadWidgetAsync">
+                Try again
+            </button>
+        </div>
+    }
+    else if (_widget is not null)
+    {
+        @if (_actionError is not null)
+        {
+            <div class="task-widget__error"
+                 role="alert">
+                @_actionError
+            </div>
+        }
+
+        @if (_widget.Overdue.Count == 0 &&
+             _widget.Today.Count == 0)
+        {
+            <div class="task-widget__empty">
+                <p>No overdue tasks and nothing due today.</p>
+
+                <button type="button"
+                        disabled="@_isBusy"
+                        @onclick="NavigateToNewTask">
+                    Add a task
+                </button>
+            </div>
+        }
+        else
+        {
+            @if (_widget.Overdue.Count > 0)
+            {
+                <div class="task-widget__group">
+                    <h3>
+                        Overdue
+                        <span>
+                            @_widget.Overdue.Count
+                        </span>
+                    </h3>
+
+                    @foreach (var task in _widget.Overdue)
+                    {
+                        <TaskWidgetItem
+                            Task="@task"
+                            IsBusy="@_isBusy"
+                            OnComplete="CompleteTaskAsync" />
+                    }
+                </div>
+            }
+
+            @if (_widget.Today.Count > 0)
+            {
+                <div class="task-widget__group">
+                    <h3>
+                        Today
+                        <span>
+                            @_widget.Today.Count
+                        </span>
+                    </h3>
+
+                    @foreach (var task in _widget.Today)
+                    {
+                        <TaskWidgetItem
+                            Task="@task"
+                            IsBusy="@_isBusy"
+                            OnComplete="CompleteTaskAsync" />
+                    }
+                </div>
+            }
+        }
+    }
+</section>
+
+@code {
+    private DashboardTaskWidgetDto? _widget;
+
+    private bool _isLoading = true;
+    private bool _isBusy;
+
+    private string? _loadError;
+    private string? _actionError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWidgetAsync();
+    }
+
+    private async Task LoadWidgetAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _widget =
+                await DashboardService.GetTaskWidgetAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError =
+                "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError =
+                "Something went wrong while loading tasks.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CompleteTaskAsync(
+        TaskSummaryDto task)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            await TaskService.CompleteTaskAsync(
+                task.Id);
+
+            await RefreshWidgetAsync();
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError =
+                "The task could not be found.";
+
+            await RefreshWidgetAsync();
+        }
+        catch (Exception)
+        {
+            _actionError =
+                "Something went wrong while completing the task.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task RefreshWidgetAsync()
+    {
+        _widget =
+            await DashboardService.GetTaskWidgetAsync();
+    }
+
+    private void NavigateToTasks()
+    {
+        Navigation.NavigateTo("/tasks");
+    }
+
+    private void NavigateToNewTask()
+    {
+        Navigation.NavigateTo("/tasks/new");
+    }
+}

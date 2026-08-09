@@ -27,11 +27,14 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString);
         });
 
+        services.AddScoped<IDashboardService, DashboardService>();
+
         services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
         services.AddScoped<IUserSettingsService, UserSettingsService>();
         
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<ITaskService, TaskService>();
+
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();

@@ -1,0 +1,46 @@
+﻿.task-widget-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+    .task-widget-item:last-child {
+        border-bottom: 0;
+    }
+
+.task-widget-item__content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+    .task-widget-item__content strong {
+        overflow-wrap: anywhere;
+    }
+
+    .task-widget-item__content span {
+        font-size: 0.85rem;
+    }
+
+.task-widget-item button {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #b8b8b8;
+    border-radius: 0.35rem;
+    cursor: pointer;
+}
+
+    .task-widget-item button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+@media (max-width: 500px) {
+    .task-widget-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

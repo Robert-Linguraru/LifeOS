@@ -1,0 +1,39 @@
+﻿<div class="task-widget-item">
+    <div class="task-widget-item__content">
+        <strong>@Task.Title</strong>
+
+        <span>
+            @FormatDueValue(Task)
+        </span>
+    </div>
+
+    <button type="button"
+            disabled="@IsBusy"
+            @onclick="() => OnComplete.InvokeAsync(Task)">
+        Complete
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskSummaryDto Task { get; set; } = default!;
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<TaskSummaryDto> OnComplete { get; set; }
+
+    private static string FormatDueValue(
+        TaskSummaryDto task)
+    {
+        if (!task.DueTime.HasValue)
+        {
+            return task.DueDate?.ToString("dd MMM")
+                ?? string.Empty;
+        }
+
+        return $"{task.DueDate:dd MMM} " +
+               $"{task.DueTime.Value:HH\\:mm}";
+    }
+}
