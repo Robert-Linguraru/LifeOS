@@ -106,12 +106,7 @@ Reassess when task mappings create meaningful duplication. This does not require
 
 ---
 
-TD-003 — Global soft-delete query filter
-Status: Completed — Milestone 3
 
-Originally, soft-delete filtering was configured specifically for UserSettings.
-As part of the Tasks vertical slice, AppDbContext was updated to apply the
-IsDeleted == false query filter automatically to all mapped BaseEntity types.
 
 # Authentication
 
@@ -181,3 +176,14 @@ Revisit when:
 - pagination is introduced;
 - completed/archived history becomes large;
 - database-side filtering is otherwise required.
+
+
+
+
+
+## TD-003 — Global soft-delete query filter
+**Status: Completed — Milestone 3**
+
+Originally, soft-delete filtering was configured specifically for UserSettings.
+As part of the Tasks vertical slice, AppDbContext was updated to apply the
+IsDeleted == false query filter automatically to all mapped BaseEntity types.
