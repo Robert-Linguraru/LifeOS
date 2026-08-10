@@ -16,6 +16,37 @@ All enums shall be defined in **LifeOS.Core/Enums**.
 
 ---
 
+# Shared Effort Enums
+
+These enums are shared domain concepts used by Tasks and future Habits. They live directly under `LifeOS.Core.Enums`, not under the Task-specific namespace.
+
+## EstimatedTime
+
+```csharp
+public enum EstimatedTime
+{
+    Under15Minutes = 0,
+    Between15And30Minutes = 1,
+    Between30And60Minutes = 2,
+    Over60Minutes = 3
+}
+```
+
+## FrictionLevel
+
+```csharp
+public enum FrictionLevel
+{
+    Low = 0,
+    Medium = 1,
+    High = 2
+}
+```
+
+The numeric values are stable and must not be reordered because they are persisted by EF Core as integers.
+
+---
+
 # Task Enums
 
 ## TaskItemStatus
@@ -58,33 +89,6 @@ public enum TaskCategory
     Work = 5,
     Fitness = 6,
     Miscellaneous = 7
-}
-```
-
----
-
-## EstimatedTime
-
-```csharp
-public enum EstimatedTime
-{
-    Under15Minutes = 0,
-    Between15And30Minutes = 1,
-    Between30And60Minutes = 2,
-    Over60Minutes = 3
-}
-```
-
----
-
-## FrictionLevel
-
-```csharp
-public enum FrictionLevel
-{
-    Low = 0,
-    Medium = 1,
-    High = 2
 }
 ```
 

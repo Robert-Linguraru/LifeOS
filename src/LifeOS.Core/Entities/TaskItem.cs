@@ -1,4 +1,5 @@
 ﻿using LifeOS.Core.Enums.Tasks;
+using LifeOS.Core.Enums;
 
 namespace LifeOS.Core.Entities;
 

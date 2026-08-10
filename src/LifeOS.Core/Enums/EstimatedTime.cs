@@ -1,4 +1,4 @@
-﻿namespace LifeOS.Core.Enums.Tasks;
+namespace LifeOS.Core.Enums;
 
 public enum EstimatedTime
 {
