@@ -1151,9 +1151,12 @@ HabitLogDto
 ## Creation
 
 - Name is required.
+- Name is limited to 200 characters.
+- Description is optional and limited to 2,000 characters.
 - Frequency defaults to Daily and only Daily is accepted in Milestone 4.
 - TargetType defaults to Binary.
 - Target quantity and unit are optional definition metadata.
+- TargetUnit is optional and limited to 50 characters.
 - EstimatedTime defaults to Under15Minutes.
 - Friction defaults to Low.
 - New Habits begin active.

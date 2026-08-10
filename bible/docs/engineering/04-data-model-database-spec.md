@@ -121,12 +121,12 @@ Fields:
 
 - `Id`;
 - `UserId`;
-- `Name` required;
-- `Description` nullable;
+- `Name` required, maximum 200 characters;
+- `Description` nullable, maximum 2,000 characters;
 - `Frequency` enum: Daily;
 - `TargetType` enum: Binary, Quantity;
 - `TargetQuantity` nullable decimal;
-- `TargetUnit` nullable string;
+- `TargetUnit` nullable string, maximum 50 characters;
 - `IsActive` bool;
 - `EstimatedTime` enum;
 - `FrictionLevel` enum;
