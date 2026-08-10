@@ -135,22 +135,32 @@ Scope:
 
 - Habit entity;
 - HabitLog entity;
-- frequency and target enums;
+- frequency and target enums, with Daily as the only supported frequency;
 - unique constraint on `(UserId, HabitId, CompletionDate)`;
-- habit service;
-- habit list page;
-- add/edit habit;
-- complete today's habit;
-- duplicate completion protection;
-- basic streak calculation;
-- dashboard habit widget;
-- tests.
+- HabitService implemented in Infrastructure behind Core contracts;
+- create, read, update, and archive workflows;
+- Habit editor and habit management/today-completion UI;
+- complete today's habit using the user's local date;
+- immutable binary HabitLog completion events;
+- idempotent duplicate completion and PostgreSQL race-safety;
+- basic current daily streak calculation;
+- simple newest-first completion history for active and archived habits;
+- widget-specific DashboardService Habit capability with completion progress;
+- unit, model, service, repository, and PostgreSQL integration tests.
+
+Milestone 4 HabitService dependencies are `IHabitRepository`, `ICurrentUserService`, `IUserSettingsService`, `IDateTimeProvider`, and `ILogger<HabitService>`. XP belongs to Milestone 5; reminders and notifications belong to Milestone 6.
+
+Milestone 4 does not include restore/reactivate, user-facing Habit deletion or soft deletion, multiple daily completions, quantity achievement entry, XP preview or awarding, reminder scheduling, or broad Habit statistics.
 
 Done when:
 
 - habits can be created and completed;
-- duplicate habit logs cannot be created through UI, service, or database;
-- streak display is correct for basic daily habits;
+- active habits can be edited and archived habits are read-only;
+- archived habits remain available for history and cannot be completed;
+- duplicate completion is a successful no-op and duplicate logs cannot be created through UI, service, or database;
+- streak display follows the documented current daily streak rules;
+- history is user-scoped and ordered newest-first;
+- dashboard Habit widget shows active daily completion progress;
 - build/tests pass.
 
 ## Milestone 5 - XP and progression core

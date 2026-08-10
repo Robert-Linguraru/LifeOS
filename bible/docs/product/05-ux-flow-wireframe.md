@@ -180,7 +180,7 @@ Purpose: manage habit definitions.
 Sections:
 
 - Active habits
-- Inactive/archived habits
+- Archived habits
 
 Actions:
 
@@ -189,12 +189,14 @@ Actions:
 - Archive habit
 - View history
 
+Archived habits remain visible in history, are read-only, and cannot be completed. Milestone 4 does not provide restore/reactivate or delete actions.
+
 ### 7.2 Today habits card
 
 Each habit row:
 
 ```text
-[checkbox] Habit name | streak | XP preview | target info
+[checkbox] Habit name | streak | completion state | target info
 ```
 
 Interaction:
@@ -202,7 +204,8 @@ Interaction:
 - clicking checkbox logs today's completion;
 - duplicate click does not create duplicate log;
 - completed state is visually clear;
-- XP updates if eligible.
+- completion remains binary even when the Habit definition has a quantity target;
+- users do not enter an achieved quantity during completion.
 
 ### 7.3 Add/edit habit form
 
@@ -212,10 +215,9 @@ Fields:
 - Description
 - Frequency: Daily in V1
 - Target type: binary or quantity
-- Target quantity and unit
+- Optional target quantity and unit metadata
 - Estimated time
 - Friction level
-- Active status
 
 Empty state:
 

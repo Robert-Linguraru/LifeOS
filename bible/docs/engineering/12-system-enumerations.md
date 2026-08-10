@@ -104,6 +104,8 @@ public enum HabitFrequency
 }
 ```
 
+The numeric values are stable and must not be reordered. Milestone 4 accepts only `Daily`; `SelectedDays`, `Weekly`, and `Monthly` are reserved for future schedule behavior and must not be exposed as active Milestone 4 options.
+
 ---
 
 ## HabitTargetType
@@ -115,6 +117,8 @@ public enum HabitTargetType
     Quantity = 1
 }
 ```
+
+Milestone 4 uses `HabitTargetType` as definition metadata. A `Quantity` target does not add achieved-quantity entry to the binary completion event.
 
 ---
 

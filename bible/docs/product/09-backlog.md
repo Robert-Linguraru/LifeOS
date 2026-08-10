@@ -50,37 +50,39 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 
 ### Habits
 
-- `V1` Habit CRUD.
-- `V1` Active/inactive status.
-- `V1` Daily habits only.
-- `V1` Binary completion.
-- `V1` HabitLog.
-- `V1` Unique habit/date/user constraint.
-- `V1` Basic streak.
-- `V1` Dashboard habit widget.
+- `Milestone 4` Habit create, read, update, and archive workflows.
+- `Milestone 4` Active/archive lifecycle using `IsActive`; no restore/reactivate or user-facing delete.
+- `Milestone 4` Daily habits only.
+- `Milestone 4` Binary completion with optional quantity-target metadata and no achieved-quantity entry.
+- `Milestone 4` Immutable HabitLog.
+- `Milestone 4` Unique `(UserId, HabitId, CompletionDate)` constraint with idempotent duplicate completion.
+- `Milestone 4` Basic current daily streak and newest-first completion history.
+- `Milestone 4` Dashboard Habit widget with completion progress.
+- `Milestone 5` Habit completion XP integration.
+- `Milestone 6` Habit reminder integration.
 
 ### XP and gamification
 
 - `V1` XPTransaction.
 - `V1` UserProgression.
-- `V1` Quest XP.
-- `V1` Daily quest XP cap.
-- `V1` Level calculation.
-- `V1` Echelon calculation.
-- `V1` XP dashboard display.
-- `V1` Basic level-up notification.
+- `Milestone 5` Quest XP.
+- `Milestone 5` Daily quest XP cap.
+- `Milestone 5` Level calculation.
+- `Milestone 5` Echelon calculation.
+- `Milestone 5` XP dashboard display.
+- `Milestone 5` Basic level-up notification.
 - `Future` DailyScore engine.
 - `Future` Streak bonus XP job.
 
 ### Reminders and notifications
 
-- `V1` Reminder entity.
-- `V1` Notification entity.
-- `V1` One-time reminders.
-- `V1` Local-time to UTC conversion.
-- `V1` Due reminder background job.
-- `V1` In-app notification bell.
-- `V1` Mark read/dismiss.
+- `Milestone 6` Reminder entity.
+- `Milestone 6` Notification entity.
+- `Milestone 6` One-time reminders.
+- `Milestone 6` Local-time to UTC conversion.
+- `Milestone 6` Due reminder background job.
+- `Milestone 6` In-app notification bell.
+- `Milestone 6` Mark read/dismiss.
 
 ### Simple finance
 

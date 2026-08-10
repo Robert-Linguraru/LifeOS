@@ -106,22 +106,23 @@ Enjoy the clear board or add a new task.
 
 ---
 
-## Future widgets
+## Module widgets
 
-The following sections are introduced only with their owning module milestones. They are not current DashboardService responsibilities and must not be predeclared as methods before those slices begin.
+The following sections are introduced with their owning module milestones. They are not responsibilities of unrelated widgets and must not be predeclared as methods before those slices begin.
 
 ### Today's Habits
 
 Purpose
 
-Display habits due today.
+Display active daily Habits and completion progress for today.
 
 Displays
 
 - Habit name
 - Current streak
 - Completion state
-- Estimated XP
+- Active completion count and total active count
+- Target metadata
 
 Actions
 
@@ -136,6 +137,8 @@ No habits configured.
 
 Start with one habit you can realistically complete today.
 ```
+
+Milestone 4 Habit data is provided through a widget-specific DashboardService capability. The widget consumes DTOs and does not include XP preview, XP awarding, reminder scheduling, or notification behavior.
 
 ---
 
@@ -254,42 +257,42 @@ Future modules should refresh only their affected widgets.
 
 # Dashboard Data Source
 
-At Milestone 3, Dashboard data is aggregated exclusively by **DashboardService** from task data only.
+At Milestone 3, Dashboard data is provided through the task-specific `GetTaskWidgetAsync` capability of `DashboardService`. Milestone 4 adds a separate Habit-widget capability; it does not require a composite dashboard DTO or a dashboard-wide refactor.
 
 ```
-Dashboard
-
+Dashboard TaskWidget
         │
-
         ▼
-
-DashboardService
-
+DashboardService.GetTaskWidgetAsync()
         │
+        ▼
+TaskService
 
-        └──────── TaskService
-
-                │
-
-                ▼
-
-           DashboardDto
+Dashboard HabitWidget
+        │
+        ▼
+DashboardService Habit-widget capability
+        │
+        ▼
+HabitService
 ```
 
 Dashboard pages must never query repositories or DbContext directly.
 
 ---
 
-# Dashboard DTO
+# Dashboard DTOs and widgets
 
-DashboardService returns a single DashboardDto.
+DashboardService exposes widget-specific DTOs and capabilities. The existing Task widget remains task-specific. Milestone 4 adds a Habit widget DTO containing, as appropriate:
 
-The DashboardDto should contain:
+- current user-local date;
+- active daily Habits;
+- completed count and total active count;
+- per-Habit completion state;
+- per-Habit current streak;
+- target metadata.
 
-- Today's Tasks
-- Task summary
-
-Future module slices may extend DashboardDto and DashboardService when their underlying service exists.
+Future module slices may add their own widget-specific capabilities when their owning services exist. They must not require a composite dashboard call or direct repository access from Web.
 
 ---
 
@@ -419,8 +422,8 @@ Future widgets appear below the core modules.
 
 # Dashboard Performance Rules
 
-- Initial load should require a single DashboardService call.
-- Widgets should not independently query the database.
+- Each page/widget should use its appropriate DashboardService capability; a composite dashboard call is not required.
+- Widgets should not independently query repositories or the DbContext.
 - Dashboard should minimize unnecessary refreshes.
 - Heavy analytics are future scope and should be loaded separately.
 
@@ -433,4 +436,4 @@ Future widgets appear below the core modules.
 - Dashboard aggregates information only.
 - Dashboard never writes directly to the database.
 - Dashboard always consumes DTOs.
-- Future modules integrate by extending DashboardService and DashboardDto, never by querying the database directly from the UI.
+- Future modules integrate by adding widget-specific DashboardService capabilities and DTOs, never by querying the database directly from the UI.

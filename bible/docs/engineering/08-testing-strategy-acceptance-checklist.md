@@ -28,12 +28,17 @@ Use for:
 - finance summary calculation;
 - date/time conversion helpers.
 
+For Milestone 4 Habits, unit tests also cover domain defaults, Daily-only validation, target metadata validation, idempotent completion behavior, local-date completion, and current streak calculation.
+
 ### 3.2 Service tests
 
 Use for:
 
 - task create/edit/complete;
-- habit completion;
+- Habit create/update/get/list/complete/archive/history;
+- Habit current-user validation and user ownership isolation;
+- Habit archive read-only behavior;
+- Habit completion idempotency and archived-habit rejection;
 - XP award idempotency;
 - reminder creation;
 - notification creation;
@@ -47,7 +52,9 @@ Use for:
 - migrations;
 - user isolation;
 - query filters;
-- database-backed service flows.
+- database-backed service flows;
+- Habit EF model configuration and PostgreSQL persistence;
+- PostgreSQL uniqueness for `(UserId, HabitId, CompletionDate)` and concurrent duplicate completion behavior.
 
 ### 3.4 Manual acceptance tests
 
@@ -127,27 +134,41 @@ Future AI features need qualitative review plus structured checks for:
 
 - User can create a habit.
 - Name is required.
-- Frequency saves correctly.
-- Active status saves correctly.
-- Target quantity/unit saves correctly when used.
+- Daily is the only accepted Milestone 4 frequency.
+- New habits begin active.
+- Active habits can be edited; archived habits are read-only.
+- Archive sets `IsActive = false` and does not provide restore/reactivate.
+- Target type and optional quantity/unit metadata save correctly when used.
+- Quantity metadata does not create an achieved-quantity completion field.
 - Estimated time and friction save correctly.
+- User can reuse a Habit name; no `(UserId, Name)` uniqueness is required.
 
 ### 6.2 Habit completion
 
-- User can complete today's habit.
-- Habit log stores user, habit, completion date, and completed timestamp.
+- User can complete today's active habit using the user's local date.
+- HabitLog stores user, habit, local completion date, UTC completion instant, and inherited lifecycle fields only.
+- HabitLog does not require quantity, notes, or XP fields in Milestone 4.
 - Today's habit shows completed immediately.
 - Page refresh still shows completed.
-- Duplicate completion attempt does not create duplicate log.
-- Database unique constraint prevents duplicate log.
-- Duplicate completion attempt does not award duplicate XP.
+- Duplicate completion attempt is a successful no-op and does not create a duplicate log.
+- Database unique constraint prevents duplicate log, including concurrent requests.
+- XP preview and XP awarding are outside Milestone 4 and are tested in Milestone 5.
 
 ### 6.3 Streaks
 
 - One completion today gives streak of 1 for a new habit.
-- Consecutive daily completions increase streak.
-- Missing a day breaks basic daily streak.
-- Streak calculation uses user's local date.
+- If today is incomplete and yesterday is complete, yesterday anchors the streak.
+- If both today and yesterday are incomplete, current streak is 0.
+- Consecutive distinct local completion dates increase the streak.
+- The calculation stops at the first missing date and ignores future dates.
+- Streak calculation uses the user's local date.
+
+### 6.4 Habit history and dashboard
+
+- History is scoped to one user and one Habit.
+- History is available for active and archived Habits.
+- History is immutable, ordered newest-first, and is not a calendar heatmap or statistics API.
+- Dashboard projection tests cover active daily Habits, completed count, total count, per-Habit completion state, streak, and target metadata.
 
 ## 7. XP acceptance checklist
 

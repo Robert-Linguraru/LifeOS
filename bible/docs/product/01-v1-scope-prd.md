@@ -89,22 +89,21 @@ V1 includes:
 
 - create habit;
 - edit habit;
-- archive or soft-delete habit;
-- active/inactive status;
+- archive habit; new habits begin active and archived habits are read-only;
 - daily frequency only;
-- binary completion;
-- optional measurable target field;
-- completion for today;
-- habit completion log;
-- duplicate completion prevention;
-- basic streak display;
-- completion history list or simple calendar.
+- binary completion event;
+- optional quantity-target metadata without quantity entry during completion;
+- completion for today in the user's local time zone;
+- immutable habit completion log;
+- idempotent duplicate completion with a unique user/habit/date constraint;
+- basic current streak with defined consecutive-local-date semantics;
+- simple newest-first completion history list for active and archived habits.
 
-V1 does not include selected-day habits, weekly/monthly habit views, multiple completions per day, momentum streaks, or weekly streaks.
+V1 does not include habit restore/reactivate, user-facing habit deletion or soft deletion, selected-day habits, weekly/monthly habit views, multiple completions per day, quantity achievement entry, momentum streaks, or weekly streaks.
 
 ### 5.4 Reminders and notifications
 
-V1 includes:
+Milestone 6 includes:
 
 - one-time reminder attached to a task or habit;
 - reminder date/time entry;
@@ -119,7 +118,7 @@ V1 does not include browser push, email, mobile push, recurring reminders, snooz
 
 ### 5.5 Gamification core
 
-V1 includes:
+Milestone 5 includes:
 
 - XP transaction log;
 - user progression record;
@@ -136,14 +135,12 @@ V1 does not include the full DailyScore engine. DailyScore is a future feature b
 
 ### 5.6 Dashboard
 
-V1 includes:
+V1 dashboard capabilities arrive with their owning milestones:
 
-- today tasks;
-- due/overdue tasks;
-- today habits;
-- habit completion progress;
-- XP/level summary;
-- active notifications/reminders;
+- Milestone 3: today's and due/overdue tasks;
+- Milestone 4: today's Habits and Habit completion progress;
+- Milestone 5: XP/level summary;
+- Milestone 6: active notifications/reminders;
 - simple finance snapshot;
 - quick-add actions.
 

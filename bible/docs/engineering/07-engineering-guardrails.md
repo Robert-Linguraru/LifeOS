@@ -66,7 +66,11 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 
 ## 7. Habit guardrails
 
-- Habit completion must be duplicate-safe.
+- Milestone 4 Habits are Daily-only; future frequency values must not be exposed until their schedule model exists.
+- Habit completion is binary and duplicate-safe; quantity targets are definition metadata only.
+- Habit names are reusable; no user/name uniqueness constraint is required for Milestone 4.
+- New Habits begin active. Archive sets `IsActive = false`; archived Habits are read-only and cannot be completed.
+- Milestone 4 does not provide restore/reactivate, user-facing Habit deletion/soft deletion, XP, or reminders.
 - Streak calculations should use the user's local date.
 - Do not implement momentum streaks until daily streaks are tested.
 - Do not implement weekly streaks until weekly schedules are modeled clearly.

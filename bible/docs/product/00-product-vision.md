@@ -143,7 +143,7 @@ Long-term habit capabilities include:
 - charts and calendar views;
 - XP through quest completion and streak bonuses.
 
-V1 includes daily habit creation, completion, logging, basic streak display, and duplicate prevention. Selected-day, weekly, monthly, momentum, and multi-completion habits are preserved as future scope.
+Milestone 4 includes daily Habit creation, editing, archive lifecycle, binary completion logging, optional quantity-target metadata, basic current streak, newest-first history, and idempotent duplicate prevention. Selected-day, weekly, monthly, momentum, multi-completion, quantity-achievement entry, and restore/reactivate behavior are preserved as future scope. Habit XP integration belongs to Milestone 5.
 
 ### 6.4 Reminders and notifications
 
@@ -207,7 +207,7 @@ Long-term system elements include:
 - weekly XP summaries;
 - AI explanations of XP sources.
 
-V1 includes XP transactions, user progression, task/habit quest XP, a daily quest XP cap, levels, echelons, and basic level-up notification. The full DailyScore engine should wait until more life-domain modules exist; V1 should not create misleading zero-based daily scores for modules that are not implemented.
+Milestone 5 includes XP transactions, user progression, task/habit quest XP, a daily quest XP cap, levels, echelons, and basic level-up notification. The full DailyScore engine should wait until more life-domain modules exist; V1 should not create misleading zero-based daily scores for modules that are not implemented.
 
 ### 6.7 Sleep and health
 

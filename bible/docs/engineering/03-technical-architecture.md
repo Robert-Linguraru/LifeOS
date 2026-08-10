@@ -237,12 +237,11 @@ All personal records must have `UserId`, including:
 
 ### 7.3 Soft delete
 
-All `BaseEntity` types support soft deletion. `AppDbContext` currently applies audit timestamps and converts EF delete operations into soft deletes. It currently has an explicit soft-delete query filter for `UserSettings`; a reusable global convention for all `BaseEntity` types is planned technical debt, not a prerequisite architecture extraction.
+All `BaseEntity` types support soft deletion. `AppDbContext` currently applies audit timestamps, converts EF delete operations into soft deletes, and applies a global query filter to mapped `BaseEntity` types. User-facing lifecycle operations should still distinguish archive from soft deletion; Milestone 4 Habits use archive only and do not expose independent user-facing deletion.
 
-Use soft delete for:
+Use soft delete where the entity has a valid deletion lifecycle, for example:
 
 - tasks;
-- habits;
 - finance transactions if summaries need historical integrity;
 - reminders if audit/history matters;
 - future study/project records where history matters.
@@ -482,12 +481,15 @@ Required capabilities:
 Required capabilities:
 
 - list active daily habits for current user;
-- create daily habit;
-- update habit;
-- archive or soft-delete habit;
-- log completion for a user-local date idempotently;
+- create daily Habit;
+- update active Habit;
+- archive Habit by setting `IsActive = false`;
+- log binary completion for a user-local date idempotently;
 - calculate basic current streak;
-- return dashboard habit summary.
+- return newest-first history;
+- return a widget-specific dashboard Habit summary.
+
+Milestone 4 does not include restore/reactivate, user-facing Habit deletion or soft deletion, quantity achievement entry, XP integration, or reminder integration.
 
 ### 15.3 XP service
 

@@ -982,9 +982,9 @@ These features should extend the existing contract without changing current beha
 
 ## Purpose
 
-HabitService owns the complete lifecycle of Habits and HabitLogs.
+HabitService owns the Milestone 4 lifecycle of Habits and immutable HabitLogs.
 
-It is responsible for defining recurring behaviours, recording completions, maintaining streaks, and exposing habit-related information to the application.
+It defines daily habits, records one binary completion event per user-local date, calculates the basic current streak, and exposes habit history and dashboard data.
 
 HabitService is the only service allowed to create HabitLogs.
 
@@ -995,15 +995,14 @@ HabitService is the only service allowed to create HabitLogs.
 HabitService is responsible for:
 
 - Creating Habits
-- Updating Habits
+- Updating active Habits
 - Archiving Habits
-- Completing Habits
-- Creating HabitLogs
-- Preventing duplicate completions
-- Calculating streaks
-- Retrieving history
-- Returning dashboard information
-- Triggering Quest XP when appropriate
+- Completing active daily Habits
+- Creating immutable HabitLogs
+- Preventing duplicate completions idempotently
+- Calculating the current daily streak
+- Retrieving newest-first history
+- Returning dashboard data through DTOs
 
 ---
 
@@ -1014,11 +1013,9 @@ HabitService depends on
 ```text
 IHabitRepository
 
-IXPService
-
-IReminderService
-
 ICurrentUserService
+
+IUserSettingsService
 
 IDateTimeProvider
 
@@ -1032,10 +1029,14 @@ DashboardService
 
 FinanceService
 
-WorkoutService
+IXPService
 
-AIService
+IReminderService
+
+Notification services
 ```
+
+XP integration belongs to Milestone 5. Reminder and notification integration belongs to Milestone 6.
 
 ---
 
@@ -1044,110 +1045,80 @@ AIService
 ## Create
 
 ```csharp
-Task<Guid> CreateHabitAsync(CreateHabitDto dto);
+Task<HabitDetailsDto> CreateHabitAsync(
+    CreateHabitDto dto,
+    CancellationToken cancellationToken = default);
 ```
 
----
+Creates an active daily Habit for the current user.
 
 ## Update
 
 ```csharp
-Task UpdateHabitAsync(UpdateHabitDto dto);
+Task<HabitDetailsDto> UpdateHabitAsync(
+    Guid habitId,
+    UpdateHabitDto dto,
+    CancellationToken cancellationToken = default);
 ```
 
----
+Updates an active Habit. Archived Habits are read-only.
+
+## Get By Id
+
+```csharp
+Task<HabitDetailsDto> GetHabitByIdAsync(
+    Guid habitId,
+    CancellationToken cancellationToken = default);
+```
+
+## List
+
+```csharp
+Task<HabitListDto> GetHabitListAsync(
+    CancellationToken cancellationToken = default);
+```
+
+Returns the current user's active and archived Habit views as defined by the UI contract.
+
+## Complete Today
+
+```csharp
+Task<HabitDetailsDto> CompleteHabitTodayAsync(
+    Guid habitId,
+    CancellationToken cancellationToken = default);
+```
+
+Completes an active daily Habit for the current user's local date. A duplicate call is a successful no-op and returns the authoritative completed state.
 
 ## Archive
 
 ```csharp
-Task ArchiveHabitAsync(Guid habitId);
+Task<HabitDetailsDto> ArchiveHabitAsync(
+    Guid habitId,
+    CancellationToken cancellationToken = default);
 ```
 
----
+Sets `IsActive = false`. Archived Habits remain persisted, are read-only, and cannot be completed. Milestone 4 exposes no restore/reactivate or delete operations.
 
-## Restore
+## History
 
 ```csharp
-Task RestoreHabitAsync(Guid habitId);
+Task<IReadOnlyList<HabitLogDto>> GetHabitHistoryAsync(
+    Guid habitId,
+    CancellationToken cancellationToken = default);
 ```
 
----
+Returns immutable completion logs for one user-owned Habit, ordered newest-first. History is available for active and archived Habits.
 
-## Complete
+## Current Streak
 
 ```csharp
-Task CompleteHabitAsync(Guid habitId);
+Task<int> GetCurrentStreakAsync(
+    Guid habitId,
+    CancellationToken cancellationToken = default);
 ```
 
-Creates today's HabitLog.
-
-Awards Quest XP if eligible.
-
----
-
-## Undo Completion (Future)
-
-```csharp
-Task UndoCompletionAsync(Guid habitLogId);
-```
-
-Future feature.
-
----
-
-## Get Habit
-
-```csharp
-Task<HabitDetailsDto?> GetHabitByIdAsync(Guid habitId);
-```
-
----
-
-## Get Today's Habits
-
-```csharp
-Task<IEnumerable<HabitSummaryDto>> GetTodayHabitsAsync();
-```
-
----
-
-## Get Active Habits
-
-```csharp
-Task<IEnumerable<HabitSummaryDto>> GetActiveHabitsAsync();
-```
-
----
-
-## Get Archived Habits
-
-```csharp
-Task<IEnumerable<HabitSummaryDto>> GetArchivedHabitsAsync();
-```
-
----
-
-## Get History
-
-```csharp
-Task<IEnumerable<HabitHistoryDto>> GetHabitHistoryAsync(Guid habitId);
-```
-
----
-
-## Calculate Streak
-
-```csharp
-Task<StreakDto> GetCurrentStreakAsync(Guid habitId);
-```
-
----
-
-## Statistics
-
-```csharp
-Task<HabitStatisticsDto> GetHabitStatisticsAsync();
-```
+Uses distinct local completion dates. If today is complete it anchors today; otherwise yesterday may anchor the streak. If neither is complete the result is zero. It walks backward through consecutive dates, stops at the first missing date, and ignores future dates.
 
 ---
 
@@ -1168,13 +1139,9 @@ HabitSummaryDto
 
 HabitDetailsDto
 
-HabitHistoryDto
+HabitListDto
 
-HabitDashboardDto
-
-HabitStatisticsDto
-
-StreakDto
+HabitLogDto
 ```
 
 ---
@@ -1184,134 +1151,79 @@ StreakDto
 ## Creation
 
 - Name is required.
-- Frequency defaults to Daily.
+- Frequency defaults to Daily and only Daily is accepted in Milestone 4.
 - TargetType defaults to Binary.
+- Target quantity and unit are optional definition metadata.
 - EstimatedTime defaults to Under15Minutes.
 - Friction defaults to Low.
-- Habits begin Active.
+- New Habits begin active.
+- Habit names are not unique per user.
 
----
+## Update and archive
+
+- Only the current user's active Habit can be updated.
+- Archiving sets `IsActive = false`.
+- Archived Habits remain persisted and available for history.
+- Archived Habits are read-only and cannot be completed.
+- Milestone 4 has no restore/reactivate or user-facing delete/soft-delete operation.
 
 ## Completion
 
-Completing a Habit
+- Completion is binary, even when the Habit definition has a quantity target.
+- Users do not enter an achieved quantity during completion.
+- Completing an active daily Habit creates exactly one immutable HabitLog.
+- The log records `UserId`, `HabitId`, the user's local `CompletionDate`, and the UTC completion instant.
+- The database enforces uniqueness on `(UserId, HabitId, CompletionDate)`.
+- Completing the same Habit more than once for the same local day is a successful no-op. The original log remains authoritative and no second log is created.
+- Concurrent duplicate requests resolve to the authoritative completed state rather than becoming a normal user-visible duplicate-completion exception.
 
-- creates exactly one HabitLog;
-- records CompletionDate;
-- records CompletedAtUtc;
-- awards Quest XP;
-- updates streak.
+## Streak rules
 
----
-
-Duplicate completion
-
-The same Habit cannot be completed more than once for the same local day.
-
-This rule must be enforced by:
-
-- Service validation
-- Database constraint
-
----
-
-## Streak Rules
-
-V1 supports
-
-- Daily streaks only.
-
-Future
-
-- Weekly streaks
-- Momentum streaks
-
-Streak calculations always use the user's local date.
-
----
+- Use distinct local `CompletionDate` values.
+- If today is complete, anchor the streak on today.
+- Otherwise, if yesterday is complete, anchor the streak on yesterday.
+- Otherwise, current streak is zero.
+- Walk backward through consecutive local dates and stop at the first missing date.
+- Future dates do not contribute.
+- Weekly streaks, momentum streaks, streak freezes, grace days, and best-streak statistics are outside Milestone 4.
 
 ## Ownership
 
-Every Habit belongs to exactly one User.
-
-Every HabitLog belongs to exactly one Habit.
-
-Every HabitLog belongs to exactly one User.
+Every Habit and HabitLog belongs to exactly one user. Every service operation obtains or validates the current user through `ICurrentUserService`.
 
 ---
 
 # Validation Rules
 
-HabitService validates
+HabitService validates:
 
-- required Name;
-- ownership;
-- duplicate completion;
-- active status;
-- frequency;
-- target quantity.
+- required name;
+- current-user availability and ownership;
+- Daily-only frequency;
+- valid target type;
+- valid quantity target metadata;
+- active-only update and completion;
+- archive lifecycle state.
 
 ---
 
 # Exception Contracts
 
 ```text
-HabitNotFoundException
+ResourceNotFoundException
 
-HabitAlreadyArchivedException
+ValidationException
 
-HabitCompletionException
-
-DuplicateHabitCompletionException
-
-HabitOwnershipException
+CurrentUserUnavailableException
 ```
+
+Milestone 4 does not require a Habit-specific exception hierarchy.
 
 ---
 
-# XP Integration
+# Later Integrations
 
-HabitService never calculates XP.
-
-It requests XP through
-
-```text
-IXPService
-```
-
-Flow
-
-```text
-Habit Completed
-
-↓
-
-HabitService
-
-↓
-
-XPService
-
-↓
-
-XPTransaction
-
-↓
-
-UserProgression
-```
-
----
-
-# Reminder Integration
-
-Habit reminders are created through
-
-```text
-IReminderService
-```
-
-HabitService never schedules reminders directly.
+Habit completion is intentionally a clean integration point for later milestones. XP belongs to Milestone 5; reminders, notifications, and background scheduling belong to Milestone 6. None are Milestone 4 HabitService dependencies or acceptance requirements.
 
 ---
 
@@ -1326,79 +1238,66 @@ Update
 
 Archive
 
-Restore
-
 GetById
 
-GetToday
+GetList
 
 GetHistory
 
-GetActive
+AddCompletion
 
-GetArchived
+GetCurrentStreak
 ```
 
-Repositories never calculate streaks.
+Repositories perform persistence and query execution only. They do not calculate streaks or own Habit business workflows.
 
 ---
 
 # Return Contracts
 
-Queries always return DTOs.
-
-Mutations return
-
-```text
-Task
-
-or
-
-Guid
-```
-
-Never entities.
+Queries return DTOs or read-only DTO collections. Mutations return DTOs. Habit entities are never exposed to Web.
 
 ---
 
 # Logging
 
-Log
+Log useful lifecycle events such as:
 
 - Habit Created
 - Habit Updated
 - Habit Completed
 - Habit Archived
-- Duplicate Completion
 - Unexpected Failure
+
+Do not log private Habit notes or sensitive user data.
 
 ---
 
 # Forbidden Responsibilities
 
-HabitService must never
+HabitService must never:
 
-- calculate XP;
+- award XP in Milestone 4;
+- schedule reminders or create notifications;
 - calculate finance;
-- build dashboard;
-- access UI;
+- access UI components;
 - perform AI analysis.
 
 ---
 
 # Future Expansion
 
-Future versions may extend HabitService with
+Future versions may add:
 
-- Weekly Habits
-- Monthly Habits
-- Multiple Daily Completions
-- Scheduled Days
-- Habit Templates
-- AI Habit Suggestions
-- Habit Categories
-- Friction Tracking
-- Missed-Day Reasons
+- Selected-day, weekly, and monthly schedules;
+- multiple daily completions;
+- restore/reactivate if separately approved;
+- quantity achievement entry;
+- Habit templates;
+- Habit categories;
+- XP integration in Milestone 5;
+- reminder integration in Milestone 6;
+- advanced statistics and streak features.
 
 ---
 
@@ -2823,4 +2722,3 @@ ImportSleepAsync()
 ImportWorkoutAsync()
 
 ImportRecoveryAsync()
-```

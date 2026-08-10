@@ -128,7 +128,6 @@ Fields:
 - `TargetQuantity` nullable decimal;
 - `TargetUnit` nullable string;
 - `IsActive` bool;
-- `StartDate` date-only nullable;
 - `EstimatedTime` enum;
 - `FrictionLevel` enum;
 - audit fields.
@@ -140,8 +139,11 @@ Indexes:
 
 Notes:
 
-- V1 supports daily habits only.
-- Selected-day, weekly, monthly, and multi-completion habits are future scope.
+- Milestone 4 accepts `Daily` as the only frequency. Other stable enum values are reserved for future behavior.
+- New habits begin active. Archiving sets `IsActive = false`; archived habits remain persisted, are read-only, and cannot be completed. Milestone 4 has no restore/reactivate or user-facing delete/soft-delete operation.
+- `TargetType = Quantity` describes optional goal metadata only. Completion remains binary and does not record an achieved quantity.
+- Habit names are not unique per user in Milestone 4; names may be reused, including after archiving.
+- Selected-day, weekly, monthly, and multiple-completion behavior are future scope.
 
 ### 4.3 HabitLog
 
@@ -154,14 +156,11 @@ Fields:
 - `HabitId`;
 - `CompletionDate` date-only in the user's local time zone;
 - `CompletedAtUtc` UTC instant;
-- `QuantityValue` nullable decimal;
-- `Notes` nullable;
-- `XPAwarded` nullable int or derived through XP transaction reference;
 - audit fields.
 
 Constraints:
 
-- unique `(UserId, HabitId, CompletionDate)` for V1.
+- unique `(UserId, HabitId, CompletionDate)` for Milestone 4. Duplicate completion calls are idempotent success; a concurrent uniqueness conflict resolves to the authoritative completed state.
 
 Indexes:
 
@@ -873,7 +872,6 @@ The following uniqueness rules apply:
 | Entity | Constraint |
 |---------|------------|
 | User | Email |
-| Habit | (UserId, Name) |
 | FinanceCategory | (UserId, Name) |
 | UserSettings | UserId (one settings record per user) |
 
@@ -892,7 +890,8 @@ The following uniqueness rules apply:
 #### Habit
 
 - UserId
-- Archived
+- IsActive
+- IsDeleted
 
 #### HabitLog
 
@@ -945,7 +944,7 @@ Archive and soft delete are distinct concepts. `AppDbContext` converts normal EF
 | Entity | Cascade Behavior |
 |---------|------------------|
 | Task | Archiving changes `TaskItemStatus` to `Archived`; it does not set `IsDeleted`. Soft deletion sets `IsDeleted` and `DeletedAtUtc`. Associated reminder behavior is future Milestone 6 scope. |
-| Habit | Habit logs are retained. Archived habits cannot create new logs. |
+| Habit | Archiving sets `IsActive = false`; the habit and its immutable logs remain persisted. Archived habits are read-only and cannot create new logs. User-facing habit deletion/soft deletion is not a Milestone 4 operation. |
 | Reminder | Notification history is retained. |
 | Finance Category | Cannot be archived while referenced by existing transactions. |
 | User | All user-owned data follows the account deletion policy. |

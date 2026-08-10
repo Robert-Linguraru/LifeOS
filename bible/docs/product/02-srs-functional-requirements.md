@@ -105,26 +105,26 @@ Requirement labels:
 - `V1` A habit may have a description.
 - `V1` A habit shall have a frequency.
 - `V1` V1 shall support Daily as the only active habit frequency.
-- `V1` A habit shall have active/inactive status.
+- `Milestone 4` New habits shall begin active. Archiving sets `IsActive = false`; archived habits are read-only and cannot be completed. Milestone 4 does not support restore/reactivate or user-facing habit deletion/soft deletion.
 - `V1` A habit may have estimated time.
 - `V1` A habit may have friction level.
-- `V1` A habit may have a target quantity and unit.
-- `V1` The system shall allow editing habit fields.
-- `Future` The system shall support selected-day, weekly, and monthly habit schedules.
+- `Milestone 4` A habit may have target metadata: `TargetType = Binary`, or `TargetType = Quantity` with an optional target quantity and unit. Completion remains binary; users do not enter an achieved quantity.
+- `Milestone 4` The system shall allow editing active habit fields. Archived habits are read-only.
+- `Future` The system shall support selected-day, weekly, and monthly habit schedules. Future frequency enum values remain reserved and are not active Milestone 4 behavior.
 
 ### 4.2 Habit completion
 
-- `V1` The system shall allow the user to log a habit completion for a date.
-- `V1` The default completion date shall be today in the user's time zone.
-- `V1` The system shall prevent more than one completion log for the same user, habit, and date unless the habit explicitly supports multiple completions in a future version.
-- `V1` Completing a habit may award quest XP through the XP service.
-- `V1` Completing the same habit/date more than once shall not award duplicate XP.
+- `Milestone 4` The system shall allow the user to complete an active daily habit for today's date in the user's time zone.
+- `Milestone 4` A completion shall create one immutable HabitLog containing the user, habit, local completion date, and UTC completion instant.
+- `Milestone 4` Completing the same habit/date more than once shall be a successful no-op. No second log is created.
+- `Milestone 4` The database shall enforce uniqueness for `(UserId, HabitId, CompletionDate)` so concurrent duplicate requests resolve to the authoritative completed state rather than a user-visible duplicate-completion failure.
+- `Milestone 5` Habit completion may award quest XP through the XP service. XP is not part of the Milestone 4 HabitService contract.
 
 ### 4.3 Habit streaks and statistics
 
-- `V1` The system shall display a basic current streak for daily habits.
-- `V1` The system shall display whether today's habit is completed.
-- `V1` Streak calculation shall use the user's local date.
+- `Milestone 4` The system shall display a basic current streak for daily habits.
+- `Milestone 4` The system shall display whether today's habit is completed.
+- `Milestone 4` Streak calculation shall use distinct local completion dates. If today is complete, it anchors on today; otherwise yesterday may anchor the streak. If neither today nor yesterday is complete, the streak is zero. The calculation walks backward through consecutive dates, stops at the first missing date, and ignores future dates.
 - `Future` The system shall calculate completion rate over selected periods.
 - `Future` The system shall support momentum streaks.
 - `Future` The system shall support weekly streaks.
@@ -135,12 +135,12 @@ Requirement labels:
 
 ### 5.1 One-time reminders
 
-- `V1` The system shall allow the user to create a one-time reminder for a task or habit.
-- `V1` A reminder shall have a local date/time entered by the user.
-- `V1` The system shall convert the local date/time to UTC for storage.
-- `V1` The system shall display reminder times back in the user's local time.
-- `V1` A due reminder shall create an in-app notification.
-- `V1` A reminder shall not create duplicate notifications if the reminder job retries.
+- `Milestone 6` The system shall allow the user to create a one-time reminder for a task or habit.
+- `Milestone 6` A reminder shall have a local date/time entered by the user.
+- `Milestone 6` The system shall convert the local date/time to UTC for storage.
+- `Milestone 6` The system shall display reminder times back in the user's local time.
+- `Milestone 6` A due reminder shall create an in-app notification.
+- `Milestone 6` A reminder shall not create duplicate notifications if the reminder job retries.
 
 ### 5.2 Notifications
 
@@ -174,9 +174,9 @@ Requirement labels:
 - `V1` Friction multipliers shall be: `Low = 1.0`, `Medium = 1.5`, `High = 2.0`.
 - `V1` Quest XP shall be rounded to the nearest whole XP value after multiplication.
 - `V1` The daily quest XP cap shall be 500 XP per user per user-local date.
-- `V1` The system shall award quest XP when eligible tasks or habits are completed.
-- `V1` The system shall not award duplicate quest XP for the same completion event.
-- `V1` The system shall store an idempotency key for each XP award that represents a completion event.
+- `Milestone 5` The system shall award quest XP when eligible tasks or habits are completed.
+- `Milestone 5` The system shall not award duplicate quest XP for the same completion event.
+- `Milestone 5` The system shall store an idempotency key for each XP award that represents a completion event.
 
 ### 6.3 User progression
 
@@ -199,12 +199,10 @@ Requirement labels:
 
 ## 7. Dashboard requirements
 
-- `V1` The dashboard shall display today's tasks.
-- `V1` The dashboard shall display overdue tasks.
-- `V1` The dashboard shall display today's habits.
-- `V1` The dashboard shall display habit completion progress.
-- `V1` The dashboard shall display current XP, level, and echelon.
-- `V1` The dashboard shall display unread notifications.
+- `Milestone 3` The dashboard shall display today's tasks and overdue tasks.
+- `Milestone 4` The dashboard shall display today's habits and habit completion progress through a widget-specific capability.
+- `Milestone 5` The dashboard shall display current XP, level, and echelon.
+- `Milestone 6` The dashboard shall display unread notifications.
 - `V1` The dashboard shall display a simple finance monthly summary.
 - `V1` The dashboard shall provide quick-add actions.
 - `Future` The dashboard shall support sleep, workout, nutrition, study, wellbeing, and AI insight widgets.

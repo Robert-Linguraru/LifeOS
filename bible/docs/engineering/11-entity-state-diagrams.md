@@ -54,38 +54,38 @@ Created
 Active
     │
     ▼
-Completed Today
-    │
-    ▼
-Waiting For Next Day
-    │
-    └──────────────► Active
+Archived
 ```
 
 ### Rules
 
-- Habits remain active indefinitely until archived.
-- Completing a habit creates a HabitLog.
-- A daily habit may only be completed once per day.
-- At the beginning of the next local day, the habit becomes available again.
-- Future measurable habits may support multiple completions.
+- New Habits begin **Active**.
+- Active Habits may be updated, completed for the current user-local date, or archived.
+- Archiving sets `IsActive = false`.
+- Archived Habits remain persisted and available for history.
+- Archived Habits are read-only and cannot be completed.
+- Milestone 4 has no restore/reactivate transition and no user-facing Habit delete or soft-delete operation.
+- Future account/admin lifecycle behavior is outside Milestone 4.
 
 ---
 
 # Habit Log Lifecycle
 
 ```
-Created
-    │
-    ▼
-Stored
+Completion Requested
+        │
+        ▼
+Stored Once
 ```
 
 ### Rules
 
-- Habit logs are immutable after creation.
-- Editing a completion is future scope.
-- Deleting a completion is administrative only.
+- A completion is a binary event for one Habit and one user-local `CompletionDate`.
+- HabitLogs are immutable after creation.
+- The unique key `(UserId, HabitId, CompletionDate)` prevents duplicate rows.
+- Repeating the same completion is a successful no-op that preserves the original log.
+- Concurrent duplicate requests resolve to the authoritative stored completion.
+- Editing, deleting, backdating, quantity entry, and XP metadata are outside Milestone 4.
 
 ---
 
