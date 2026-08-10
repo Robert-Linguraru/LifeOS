@@ -389,6 +389,8 @@ Settings affect application behaviour but are not business data.
 - Store user preferences
 - Manage application configuration per user
 
+`SettingsService` exposes no independent delete operation for `UserSettings`. Settings are one per user for the lifetime of that user; resetting preferences must not be implemented by deleting the settings row. Default settings are created only when no settings row genuinely exists.
+
 ---
 
 ## Dependencies

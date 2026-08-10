@@ -165,14 +165,16 @@ public sealed class TaskPersistenceIntegrationTests
     }
 
     [Fact]
-    public async Task UserSettings_Delete_ShouldUseGlobalSoftDeleteFilter()
+    public async Task UserSettings_ShouldRejectDuplicateUserId()
     {
         // Arrange
         await ResetDatabaseAsync();
 
+        var userId = Guid.NewGuid();
+
         var settings = new UserSettings
         {
-            UserId = Guid.NewGuid(),
+            UserId = userId,
             TimeZoneId = "UTC"
         };
 
@@ -184,41 +186,20 @@ public sealed class TaskPersistenceIntegrationTests
             await context.SaveChangesAsync();
         }
 
-        // Act
+        var duplicateSettings = new UserSettings
+        {
+            UserId = userId,
+            TimeZoneId = "Europe/Bucharest"
+        };
+
         await using (var context =
             _fixture.CreateDbContext())
         {
-            var settingsToDelete =
-                await context.UserSettings
-                    .SingleAsync(
-                        item =>
-                            item.Id == settings.Id);
+            context.UserSettings.Add(duplicateSettings);
 
-            context.UserSettings.Remove(
-                settingsToDelete);
-
-            await context.SaveChangesAsync();
-        }
-
-        // Assert
-        await using (var context =
-            _fixture.CreateDbContext())
-        {
-            Assert.Null(
-                await context.UserSettings
-                    .SingleOrDefaultAsync(
-                        item =>
-                            item.Id == settings.Id));
-
-            var deletedSettings =
-                await context.UserSettings
-                    .IgnoreQueryFilters()
-                    .SingleAsync(
-                        item =>
-                            item.Id == settings.Id);
-
-            Assert.True(
-                deletedSettings.IsDeleted);
+            // Assert
+            await Assert.ThrowsAsync<DbUpdateException>(
+                () => context.SaveChangesAsync());
         }
     }
 

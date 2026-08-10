@@ -221,7 +221,7 @@ No new abstraction is necessary. I would not create some CurrentUserValidator, b
 
 Priority: Do before next milestone.
 
-2. UserSettings soft-delete contradiction — KEEP and resolve now
+2. UserSettings soft-delete contradiction — RESOLVED — Milestone 4 Ticket 2
 
 M-002 is the most important finding in the report.
 
@@ -281,13 +281,13 @@ There is currently no DeleteUserSettingsAsync, so we're already close to that mo
 
 Pre-Milestone Ticket B — Define UserSettings lifecycle
 
-This ticket should:
+This ticket established:
 
 document that UserSettings cannot be independently deleted;
 preserve the unique UserId index;
 ensure application APIs expose no settings deletion;
-decide whether the integration test should test the global filter another way rather than implying deletion is supported;
-potentially add an explicit comment/configuration/test protecting the one-settings-per-user invariant.
+replace the integration test that implied independent deletion with PostgreSQL uniqueness coverage;
+add model coverage protecting the one-settings-per-user invariant.
 
 Do not remove BaseEntity inheritance just to solve this. That would be a larger architecture change than necessary.
 

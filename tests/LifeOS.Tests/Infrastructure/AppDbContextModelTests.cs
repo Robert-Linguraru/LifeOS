@@ -72,6 +72,23 @@ public sealed class AppDbContextModelTests
     }
 
     [Fact]
+    public void Model_ShouldConfigureUserSettingsUserIdIndexAsUnique()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserSettings));
+
+        Assert.NotNull(entityType);
+
+        var index = entityType.GetIndexes()
+            .Single(index => index.Properties
+                .Select(property => property.Name)
+                .SequenceEqual([nameof(UserSettings.UserId)]));
+
+        Assert.True(index.IsUnique);
+    }
+
+    [Fact]
     public void Model_ShouldApplySoftDeleteFilterToAllBaseEntities()
     {
         using var context = CreateContext();

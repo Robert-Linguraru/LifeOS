@@ -72,7 +72,9 @@ Constraints:
 
 ### 3.4 UserSettings
 
-`UserSettings` is a separate `UserOwnedEntity`, with one row per user. It currently stores `TimeZoneId`, an IANA time zone ID such as `Europe/Bucharest`. Future preferences, such as currency or theme, belong here rather than on `ApplicationUser`.
+`UserSettings` is a separate `UserOwnedEntity`, with exactly one row per user enforced by a unique `UserId` constraint. It currently stores `TimeZoneId`, an IANA time zone ID such as `Europe/Bucharest`. Future preferences, such as currency or theme, belong here rather than on `ApplicationUser`.
+
+`UserSettings` has no independent application-level delete lifecycle. Settings must not be reset or removed by deleting the row. Default settings are created only when a user genuinely has no settings row. Future account deletion may handle settings as part of the user/account lifecycle, but that is outside the current scope. Generic soft-delete infrastructure remains applicable to entities with a valid independent delete lifecycle.
 
 ## 4. V1 entities
 
