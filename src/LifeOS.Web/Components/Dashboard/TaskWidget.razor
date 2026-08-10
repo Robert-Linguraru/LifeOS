@@ -168,26 +168,34 @@
 
         try
         {
-            await TaskService.CompleteTaskAsync(
-                task.Id);
+            try
+            {
+                await TaskService.CompleteTaskAsync(
+                    task.Id);
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+                return;
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError =
+                    "The task could not be found.";
 
-            await RefreshWidgetAsync();
-        }
-        catch (ValidationException exception)
-        {
-            _actionError = exception.Message;
-        }
-        catch (ResourceNotFoundException)
-        {
-            _actionError =
-                "The task could not be found.";
+                await TryRefreshWidgetAsync(
+                    "The task could not be found, and the latest task data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while completing the task.";
+                return;
+            }
 
-            await RefreshWidgetAsync();
-        }
-        catch (Exception)
-        {
-            _actionError =
-                "Something went wrong while completing the task.";
+            await TryRefreshWidgetAsync(
+                "The task was completed, but the latest task data could not be reloaded. Please refresh the page.");
         }
         finally
         {
@@ -199,6 +207,19 @@
     {
         _widget =
             await DashboardService.GetTaskWidgetAsync();
+    }
+
+    private async Task TryRefreshWidgetAsync(
+        string refreshFailureMessage)
+    {
+        try
+        {
+            await RefreshWidgetAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = refreshFailureMessage;
+        }
     }
 
     private void NavigateToTasks()

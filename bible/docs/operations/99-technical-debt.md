@@ -293,7 +293,7 @@ Do not remove BaseEntity inheritance just to solve this. That would be a larger 
 
 Priority: Do before next milestone.
 
-3. Misleading UI error after successful action — KEEP as debt
+3. Misleading UI error after successful action — RESOLVED — Milestone 4 Ticket 3
 
 L-001 is real.
 

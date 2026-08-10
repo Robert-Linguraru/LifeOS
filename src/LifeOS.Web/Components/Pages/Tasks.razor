@@ -226,26 +226,34 @@
 
         try
         {
-            await TaskService.CompleteTaskAsync(
-                task.Id);
+            try
+            {
+                await TaskService.CompleteTaskAsync(
+                    task.Id);
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+                return;
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError =
+                    "The task could not be found.";
 
-            await RefreshTasksAsync();
-        }
-        catch (ValidationException exception)
-        {
-            _actionError = exception.Message;
-        }
-        catch (ResourceNotFoundException)
-        {
-            _actionError =
-                "The task could not be found.";
+                await TryRefreshTasksAsync(
+                    "The task could not be found, and the latest task data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while completing the task.";
+                return;
+            }
 
-            await RefreshTasksAsync();
-        }
-        catch (Exception)
-        {
-            _actionError =
-                "Something went wrong while completing the task.";
+            await TryRefreshTasksAsync(
+                "The task was completed, but the latest task data could not be reloaded. Please refresh the page.");
         }
         finally
         {
@@ -266,26 +274,34 @@
 
         try
         {
-            await TaskService.ArchiveTaskAsync(
-                task.Id);
+            try
+            {
+                await TaskService.ArchiveTaskAsync(
+                    task.Id);
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+                return;
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError =
+                    "The task could not be found.";
 
-            await RefreshTasksAsync();
-        }
-        catch (ValidationException exception)
-        {
-            _actionError = exception.Message;
-        }
-        catch (ResourceNotFoundException)
-        {
-            _actionError =
-                "The task could not be found.";
+                await TryRefreshTasksAsync(
+                    "The task could not be found, and the latest task data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while archiving the task.";
+                return;
+            }
 
-            await RefreshTasksAsync();
-        }
-        catch (Exception)
-        {
-            _actionError =
-                "Something went wrong while archiving the task.";
+            await TryRefreshTasksAsync(
+                "The task was archived, but the latest task data could not be reloaded. Please refresh the page.");
         }
         finally
         {
@@ -316,22 +332,29 @@
 
         try
         {
-            await TaskService.DeleteTaskAsync(
-                task.Id);
+            try
+            {
+                await TaskService.DeleteTaskAsync(
+                    task.Id);
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError =
+                    "The task could not be found.";
 
-            await RefreshTasksAsync();
-        }
-        catch (ResourceNotFoundException)
-        {
-            _actionError =
-                "The task could not be found.";
+                await TryRefreshTasksAsync(
+                    "The task could not be found, and the latest task data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while deleting the task.";
+                return;
+            }
 
-            await RefreshTasksAsync();
-        }
-        catch (Exception)
-        {
-            _actionError =
-                "Something went wrong while deleting the task.";
+            await TryRefreshTasksAsync(
+                "The task was deleted, but the latest task data could not be reloaded. Please refresh the page.");
         }
         finally
         {
@@ -343,5 +366,18 @@
     {
         _taskList =
             await TaskService.GetTaskListAsync();
+    }
+
+    private async Task TryRefreshTasksAsync(
+        string refreshFailureMessage)
+    {
+        try
+        {
+            await RefreshTasksAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = refreshFailureMessage;
+        }
     }
 }
