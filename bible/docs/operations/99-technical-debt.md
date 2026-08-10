@@ -331,7 +331,7 @@ post-success refresh failure so persisted success is represented accurately.
 
 This becomes more valuable once Habits/Finance/etc. start implementing similar UI mutations.
 
-4. Non-collapsible headers are buttons — KEEP, very small fix
+4. Non-collapsible headers are buttons — RESOLVED — Milestone 4 Ticket 4
 
 L-002 is also legitimate accessibility feedback.
 
@@ -344,9 +344,8 @@ Unscheduled
 
 cannot collapse, their headers shouldn't be <button> elements that do nothing.
 
-This is probably a 5–10 minute fix, not really architectural debt.
-
-I'd bundle it into a small UI-polish ticket rather than giving it its own major TD entry:
+Ticket 4 separates the semantic heading used by fixed sections from the
+interactive button used by collapsible sections:
 
 Collapsible section
     → button + aria-expanded

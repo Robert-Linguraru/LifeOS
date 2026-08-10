@@ -1,18 +1,25 @@
 ﻿<section class="task-section">
-    <button type="button"
-            class="task-section__header"
-            @onclick="ToggleExpanded"
-            aria-expanded="@IsExpanded">
-        <span>@Title</span>
-        <span class="task-section__count">@Tasks.Count</span>
-
+    <h2 class="task-section__header">
         @if (Collapsible)
         {
-            <span class="task-section__toggle">
-                @(IsExpanded ? "−" : "+")
-            </span>
+            <button type="button"
+                    class="task-section__header-button"
+                    @onclick="ToggleExpanded"
+                    aria-expanded="@IsExpanded">
+                <span>@Title</span>
+                <span class="task-section__count">@Tasks.Count</span>
+
+                <span class="task-section__toggle">
+                    @(IsExpanded ? "−" : "+")
+                </span>
+            </button>
         }
-    </button>
+        else
+        {
+            <span>@Title</span>
+            <span class="task-section__count">@Tasks.Count</span>
+        }
+    </h2>
 
     @if (IsExpanded)
     {
