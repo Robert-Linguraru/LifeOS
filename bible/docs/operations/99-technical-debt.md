@@ -179,6 +179,222 @@ Revisit when:
 
 
 
+1. UserSettings current-user guard — KEEP
+
+M-001 is valid.
+
+TaskService establishes the stronger convention:
+
+IsAuthenticated == true
+UserId != Guid.Empty
+
+whereas UserSettingsService apparently uses UserId directly. That means the two application services disagree about what constitutes a valid current user.
+
+This matters because TaskService itself depends on:
+
+IUserSettingsService
+
+for timezone-aware behavior.
+
+I would fix this now, while the application is small.
+
+Pre-Milestone Ticket A — Standardize current-user validation
+
+Goal: Make UserSettingsService enforce the same current-user contract as TaskService.
+
+Likely files:
+
+src/LifeOS.Infrastructure/Services/UserSettingsService.cs
+tests/LifeOS.Tests/Services/UserSettingsServiceTests.cs
+
+Expected behavior:
+
+Unauthenticated
+        ↓
+CurrentUserUnavailableException
+
+Guid.Empty
+        ↓
+CurrentUserUnavailableException
+
+No new abstraction is necessary. I would not create some CurrentUserValidator, base service, middleware, etc. Two services do not justify that yet.
+
+Priority: Do before next milestone.
+
+2. UserSettings soft-delete contradiction — KEEP and resolve now
+
+M-002 is the most important finding in the report.
+
+The current combination is:
+
+UserSettings.UserId
+        ↓
+UNIQUE INDEX
+
++
+
+UserSettings : BaseEntity
+        ↓
+soft deletion
+
++
+
+GetCurrentUserSettingsAsync()
+        ↓
+can't find deleted settings
+        ↓
+creates defaults
+
+That produces the deterministic failure Copilot identified:
+
+soft-delete UserSettings
+        ↓
+global filter hides row
+        ↓
+service thinks settings don't exist
+        ↓
+INSERT new UserSettings with same UserId
+        ↓
+UNIQUE constraint violation
+
+The audit correctly says we first need to decide what the lifecycle means rather than blindly changing the index.
+
+My recommendation
+
+UserSettings should not be independently deletable.
+
+Conceptually, there should be exactly one settings record for a user. Settings aren't historical business records like Tasks.
+
+Therefore I would not solve this with a partial unique index allowing multiple deleted settings rows.
+
+Instead, establish:
+
+UserSettings has no independent delete lifecycle. It exists for the lifetime of the user. Future user-account deletion can deal with settings as part of that account lifecycle.
+
+That preserves:
+
+UNIQUE(UserId)
+
+which is exactly the invariant we actually want.
+
+There is currently no DeleteUserSettingsAsync, so we're already close to that model. The integration test that manually deletes settings was useful for proving the generic soft-delete infrastructure, but it accidentally demonstrated a lifecycle that the application doesn't actually support.
+
+Pre-Milestone Ticket B — Define UserSettings lifecycle
+
+This ticket should:
+
+document that UserSettings cannot be independently deleted;
+preserve the unique UserId index;
+ensure application APIs expose no settings deletion;
+decide whether the integration test should test the global filter another way rather than implying deletion is supported;
+potentially add an explicit comment/configuration/test protecting the one-settings-per-user invariant.
+
+Do not remove BaseEntity inheritance just to solve this. That would be a larger architecture change than necessary.
+
+Priority: Do before next milestone.
+
+3. Misleading UI error after successful action — KEEP as debt
+
+L-001 is real.
+
+Right now:
+
+Complete Task succeeds
+       ↓
+database committed
+       ↓
+RefreshTasksAsync fails
+       ↓
+catch Exception
+       ↓
+"Something went wrong while completing the task"
+
+The Task actually was completed.
+
+That's misleading.
+
+It's not important enough to delay the next milestone, but I'd record it because the same pattern could get copied into future vertical slices.
+
+TD candidate — Separate mutation failures from refresh failures
+Status: Open
+Priority: Low
+Introduced: Milestone 3
+
+Task and Dashboard lifecycle handlers currently execute the persisted
+mutation and subsequent UI refresh inside the same error boundary.
+
+If persistence succeeds but the refresh fails, the UI can incorrectly
+report that the lifecycle operation itself failed.
+
+Future UI action handling should distinguish mutation failure from
+post-success refresh failure so persisted success is represented accurately.
+
+This becomes more valuable once Habits/Finance/etc. start implementing similar UI mutations.
+
+4. Non-collapsible headers are buttons — KEEP, very small fix
+
+L-002 is also legitimate accessibility feedback.
+
+If:
+
+Overdue
+Today
+Upcoming
+Unscheduled
+
+cannot collapse, their headers shouldn't be <button> elements that do nothing.
+
+This is probably a 5–10 minute fix, not really architectural debt.
+
+I'd bundle it into a small UI-polish ticket rather than giving it its own major TD entry:
+
+Collapsible section
+    → button + aria-expanded
+
+Fixed section
+    → heading/non-interactive header
+
+Priority: Fix when convenient. Doesn't block anything.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ## TD-003 — Global soft-delete query filter

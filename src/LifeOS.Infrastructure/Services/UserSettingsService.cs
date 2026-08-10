@@ -29,15 +29,17 @@ public sealed class UserSettingsService : IUserSettingsService
     public async Task<UserSettingsDto> GetCurrentUserSettingsAsync(
         CancellationToken cancellationToken = default)
     {
+        var userId = GetCurrentUserId();
+
         var settings = await _repository.GetByUserIdAsync(
-            _currentUser.UserId,
+            userId,
             cancellationToken);
 
         if (settings is null)
         {
             settings = new UserSettings
             {
-                UserId = _currentUser.UserId,
+                UserId = userId,
                 TimeZoneId = "UTC"
             };
 
@@ -61,6 +63,8 @@ public sealed class UserSettingsService : IUserSettingsService
         string timeZoneId,
         CancellationToken cancellationToken = default)
     {
+        var userId = GetCurrentUserId();
+
         if (!_dateTimeProvider.IsValidTimeZone(timeZoneId))
         {
             throw new ValidationException(
@@ -68,7 +72,7 @@ public sealed class UserSettingsService : IUserSettingsService
         }
 
         var settings = await _repository.GetByUserIdAsync(
-            _currentUser.UserId,
+            userId,
             cancellationToken);
 
         if (settings is null)
@@ -87,6 +91,17 @@ public sealed class UserSettingsService : IUserSettingsService
             "Updated time zone for user {UserId} to {TimeZoneId}",
             settings.UserId,
             settings.TimeZoneId);
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        if (!_currentUser.IsAuthenticated ||
+            _currentUser.UserId == Guid.Empty)
+        {
+            throw new CurrentUserUnavailableException();
+        }
+
+        return _currentUser.UserId;
     }
 
 }

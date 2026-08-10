@@ -78,6 +78,36 @@ public sealed class UserSettingsServiceTests
     }
 
     [Fact]
+    public async Task GetCurrentUserSettingsAsync_UnauthenticatedUser_ThrowsAndDoesNotAccessRepository()
+    {
+        var service = CreateService();
+
+        _currentUser
+            .Setup(x => x.IsAuthenticated)
+            .Returns(false);
+
+        await Assert.ThrowsAsync<CurrentUserUnavailableException>(
+            () => service.GetCurrentUserSettingsAsync());
+
+        VerifyRepositoryNotCalled();
+    }
+
+    [Fact]
+    public async Task GetCurrentUserSettingsAsync_EmptyUserId_ThrowsAndDoesNotAccessRepository()
+    {
+        var service = CreateService();
+
+        _currentUser
+            .Setup(x => x.UserId)
+            .Returns(Guid.Empty);
+
+        await Assert.ThrowsAsync<CurrentUserUnavailableException>(
+            () => service.GetCurrentUserSettingsAsync());
+
+        VerifyRepositoryNotCalled();
+    }
+
+    [Fact]
     public async Task UpdateTimeZoneAsync_UpdatesTimeZone()
     {
         var settings = new UserSettings
@@ -103,6 +133,36 @@ public sealed class UserSettingsServiceTests
         _repository.Verify(
             x => x.UpdateAsync(settings, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateTimeZoneAsync_UnauthenticatedUser_ThrowsAndDoesNotAccessRepository()
+    {
+        var service = CreateService();
+
+        _currentUser
+            .Setup(x => x.IsAuthenticated)
+            .Returns(false);
+
+        await Assert.ThrowsAsync<CurrentUserUnavailableException>(
+            () => service.UpdateTimeZoneAsync("Europe/Bucharest"));
+
+        VerifyRepositoryNotCalled();
+    }
+
+    [Fact]
+    public async Task UpdateTimeZoneAsync_EmptyUserId_ThrowsAndDoesNotAccessRepository()
+    {
+        var service = CreateService();
+
+        _currentUser
+            .Setup(x => x.UserId)
+            .Returns(Guid.Empty);
+
+        await Assert.ThrowsAsync<CurrentUserUnavailableException>(
+            () => service.UpdateTimeZoneAsync("Europe/Bucharest"));
+
+        VerifyRepositoryNotCalled();
     }
 
     [Fact]
@@ -139,5 +199,26 @@ public sealed class UserSettingsServiceTests
 
         await Assert.ThrowsAsync<ResourceNotFoundException>(
             () => service.UpdateTimeZoneAsync("Europe/Bucharest"));
+    }
+
+    private void VerifyRepositoryNotCalled()
+    {
+        _repository.Verify(
+            x => x.GetByUserIdAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _repository.Verify(
+            x => x.AddAsync(
+                It.IsAny<UserSettings>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<UserSettings>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }
