@@ -37,6 +37,11 @@ public interface IHabitRepository
         Guid habitId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<(Guid HabitId, DateOnly CompletionDate)>>
+        GetCompletionDatesByUserIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default);
+
     Task<bool> TryAddLogAsync(
         HabitLog habitLog,
         CancellationToken cancellationToken = default);

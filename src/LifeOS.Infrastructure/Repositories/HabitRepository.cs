@@ -121,6 +121,29 @@ public sealed class HabitRepository : IHabitRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<(Guid HabitId, DateOnly CompletionDate)>>
+        GetCompletionDatesByUserIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+    {
+        await using var context =
+            await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var completionDates = await context.HabitLogs
+            .AsNoTracking()
+            .Where(log => log.UserId == userId)
+            .Select(log => new
+            {
+                log.HabitId,
+                log.CompletionDate
+            })
+            .ToListAsync(cancellationToken);
+
+        return completionDates
+            .Select(item => (item.HabitId, item.CompletionDate))
+            .ToList();
+    }
+
     public async Task<bool> TryAddLogAsync(
         HabitLog habitLog,
         CancellationToken cancellationToken = default)

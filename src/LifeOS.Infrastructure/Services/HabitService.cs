@@ -19,15 +19,21 @@ public sealed class HabitService : IHabitService
 
     private readonly IHabitRepository _repository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IUserSettingsService _userSettingsService;
+    private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<HabitService> _logger;
 
     public HabitService(
         IHabitRepository repository,
         ICurrentUserService currentUser,
+        IUserSettingsService userSettingsService,
+        IDateTimeProvider dateTimeProvider,
         ILogger<HabitService> logger)
     {
         _repository = repository;
         _currentUser = currentUser;
+        _userSettingsService = userSettingsService;
+        _dateTimeProvider = dateTimeProvider;
         _logger = logger;
     }
 
@@ -180,6 +186,178 @@ public sealed class HabitService : IHabitService
         return habit.ToDetailsDto();
     }
 
+    public async Task<HabitListDto> GetHabitListAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+        var (currentDate, _) = await GetCurrentUserDateAsync(
+            cancellationToken);
+
+        var habits = await _repository.GetAllByUserIdAsync(
+            userId,
+            cancellationToken);
+
+        var completionDates = habits.Count == 0
+            ? Array.Empty<(Guid HabitId, DateOnly CompletionDate)>()
+            : await _repository.GetCompletionDatesByUserIdAsync(
+                userId,
+                cancellationToken);
+
+        var completionDatesByHabit = completionDates
+            .GroupBy(item => item.HabitId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.CompletionDate));
+
+        var active = habits
+            .Where(habit => habit.IsActive)
+            .Select(habit =>
+            {
+                completionDatesByHabit.TryGetValue(
+                    habit.Id,
+                    out var dates);
+
+                var habitDates = dates ?? Enumerable.Empty<DateOnly>();
+
+                return habit.ToSummaryDto(
+                    habitDates.Contains(currentDate),
+                    CalculateCurrentStreak(habitDates, currentDate));
+            })
+            .OrderBy(summary => summary.IsCompletedToday ? 1 : 0)
+            .ThenBy(summary => summary.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var archived = habits
+            .Where(habit => !habit.IsActive)
+            .OrderByDescending(habit => habit.UpdatedAtUtc)
+            .ThenBy(habit => habit.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(habit => habit.ToSummaryDto(false, 0))
+            .ToList();
+
+        return new HabitListDto
+        {
+            CurrentDate = currentDate,
+            Active = active,
+            Archived = archived
+        };
+    }
+
+    public async Task<HabitSummaryDto> CompleteHabitAsync(
+        Guid habitId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var habit = await _repository.GetByIdAsync(
+            userId,
+            habitId,
+            cancellationToken);
+
+        if (habit is null)
+        {
+            throw new ResourceNotFoundException(
+                "Habit was not found.");
+        }
+
+        if (!habit.IsActive)
+        {
+            throw new ValidationException(
+                "Archived habits cannot be completed.");
+        }
+
+        var (currentDate, utcNow) = await GetCurrentUserDateAsync(
+            cancellationToken);
+
+        var existingLog = await _repository.GetLogByDateAsync(
+            userId,
+            habitId,
+            currentDate,
+            cancellationToken);
+
+        if (existingLog is not null)
+        {
+            var existingDates = await _repository.GetCompletionDatesAsync(
+                userId,
+                habitId,
+                cancellationToken);
+
+            return habit.ToSummaryDto(
+                true,
+                CalculateCurrentStreak(existingDates, currentDate));
+        }
+
+        var habitLog = new HabitLog
+        {
+            UserId = userId,
+            HabitId = habitId,
+            CompletionDate = currentDate,
+            CompletedAtUtc = utcNow
+        };
+
+        var inserted = await _repository.TryAddLogAsync(
+            habitLog,
+            cancellationToken);
+
+        if (!inserted)
+        {
+            var authoritativeLog = await _repository.GetLogByDateAsync(
+                userId,
+                habitId,
+                currentDate,
+                cancellationToken);
+
+            if (authoritativeLog is null)
+            {
+                throw new ResourceNotFoundException(
+                    "The completed Habit state could not be retrieved.");
+            }
+        }
+
+        var completionDates = await _repository.GetCompletionDatesAsync(
+            userId,
+            habitId,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Completed habit {HabitId} for user {UserId}",
+            habitId,
+            userId);
+
+        return habit.ToSummaryDto(
+            true,
+            CalculateCurrentStreak(completionDates, currentDate));
+    }
+
+    public async Task<HabitHistoryDto> GetHabitHistoryAsync(
+        Guid habitId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        var habit = await _repository.GetByIdAsync(
+            userId,
+            habitId,
+            cancellationToken);
+
+        if (habit is null)
+        {
+            throw new ResourceNotFoundException(
+                "Habit was not found.");
+        }
+
+        var logs = await _repository.GetLogsByHabitIdAsync(
+            userId,
+            habitId,
+            cancellationToken);
+
+        var orderedLogs = logs
+            .OrderByDescending(log => log.CompletionDate)
+            .ThenByDescending(log => log.CompletedAtUtc)
+            .ToList();
+
+        return habit.ToHistoryDto(orderedLogs);
+    }
+
     private Guid GetCurrentUserId()
     {
         if (!_currentUser.IsAuthenticated ||
@@ -189,6 +367,57 @@ public sealed class HabitService : IHabitService
         }
 
         return _currentUser.UserId;
+    }
+
+    private async Task<(DateOnly CurrentDate, DateTimeOffset UtcNow)>
+        GetCurrentUserDateAsync(
+            CancellationToken cancellationToken)
+    {
+        var settings = await _userSettingsService
+            .GetCurrentUserSettingsAsync(cancellationToken);
+
+        var utcNow = _dateTimeProvider.UtcNow;
+        var currentDate = _dateTimeProvider.GetCurrentDate(
+            settings.TimeZoneId);
+
+        return (currentDate, utcNow);
+    }
+
+    private static int CalculateCurrentStreak(
+        IEnumerable<DateOnly> completionDates,
+        DateOnly currentDate)
+    {
+        var dates = completionDates
+            .Where(date => date <= currentDate)
+            .ToHashSet();
+
+        DateOnly anchorDate;
+
+        if (dates.Contains(currentDate))
+        {
+            anchorDate = currentDate;
+        }
+        else
+        {
+            var yesterday = currentDate.AddDays(-1);
+
+            if (!dates.Contains(yesterday))
+            {
+                return 0;
+            }
+
+            anchorDate = yesterday;
+        }
+
+        var streak = 0;
+
+        while (dates.Contains(anchorDate))
+        {
+            streak++;
+            anchorDate = anchorDate.AddDays(-1);
+        }
+
+        return streak;
     }
 
     private static NormalizedHabit ValidateAndNormalize(

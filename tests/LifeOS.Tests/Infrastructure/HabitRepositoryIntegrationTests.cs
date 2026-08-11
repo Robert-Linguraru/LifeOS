@@ -160,6 +160,70 @@ public sealed class HabitRepositoryIntegrationTests
         Assert.False(duplicate);
     }
 
+    [Fact]
+    public async Task GetCompletionDatesByUserIdAsync_ReturnsUserScopedProjection()
+    {
+        await ResetDatabaseAsync();
+
+        var userOne = Guid.NewGuid();
+        var userTwo = Guid.NewGuid();
+        var firstHabit = new Habit
+        {
+            UserId = userOne,
+            Name = "Read"
+        };
+        var secondHabit = new Habit
+        {
+            UserId = userOne,
+            Name = "Walk"
+        };
+        var otherUserHabit = new Habit
+        {
+            UserId = userTwo,
+            Name = "Other"
+        };
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Habits.AddRange(
+                firstHabit,
+                secondHabit,
+                otherUserHabit);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.HabitLogs.AddRange(
+                CreateLog(
+                    userOne,
+                    firstHabit.Id,
+                    new DateOnly(2026, 8, 10)),
+                CreateLog(
+                    userOne,
+                    secondHabit.Id,
+                    new DateOnly(2026, 8, 11)),
+                CreateLog(
+                    userTwo,
+                    otherUserHabit.Id,
+                    new DateOnly(2026, 8, 12)));
+            await context.SaveChangesAsync();
+        }
+
+        var completionDates = await CreateRepository()
+            .GetCompletionDatesByUserIdAsync(userOne);
+
+        Assert.Equal(2, completionDates.Count);
+        Assert.Contains(
+            completionDates,
+            item => item.HabitId == firstHabit.Id &&
+                item.CompletionDate == new DateOnly(2026, 8, 10));
+        Assert.Contains(
+            completionDates,
+            item => item.HabitId == secondHabit.Id &&
+                item.CompletionDate == new DateOnly(2026, 8, 11));
+    }
+
     private HabitRepository CreateRepository()
     {
         return new HabitRepository(

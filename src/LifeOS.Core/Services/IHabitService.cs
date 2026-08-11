@@ -20,4 +20,15 @@ public interface IHabitService
     Task<HabitDetailsDto> ArchiveHabitAsync(
         Guid habitId,
         CancellationToken cancellationToken = default);
+
+    Task<HabitListDto> GetHabitListAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<HabitSummaryDto> CompleteHabitAsync(
+        Guid habitId,
+        CancellationToken cancellationToken = default);
+
+    Task<HabitHistoryDto> GetHabitHistoryAsync(
+        Guid habitId,
+        CancellationToken cancellationToken = default);
 }
