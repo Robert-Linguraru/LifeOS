@@ -125,7 +125,7 @@ Fields:
 - `Description` nullable, maximum 2,000 characters;
 - `Frequency` enum: Daily;
 - `TargetType` enum: Binary, Quantity;
-- `TargetQuantity` nullable decimal;
+- `TargetQuantity` nullable decimal, precision 18, scale 2;
 - `TargetUnit` nullable string, maximum 50 characters;
 - `IsActive` bool;
 - `EstimatedTime` enum;

@@ -89,6 +89,123 @@ public sealed class AppDbContextModelTests
     }
 
     [Fact]
+    public void Model_ShouldMapHabitWithDocumentedProperties()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(Habit));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Habits", entityType.GetTableName());
+
+        var name = entityType.FindProperty(nameof(Habit.Name));
+        var description = entityType.FindProperty(nameof(Habit.Description));
+        var targetQuantity = entityType.FindProperty(nameof(Habit.TargetQuantity));
+        var targetUnit = entityType.FindProperty(nameof(Habit.TargetUnit));
+
+        Assert.NotNull(name);
+        Assert.NotNull(description);
+        Assert.NotNull(targetQuantity);
+        Assert.NotNull(targetUnit);
+
+        Assert.True(name.IsNullable == false);
+        Assert.Equal(HabitConstants.NameMaxLength, name.GetMaxLength());
+        Assert.True(description.IsNullable);
+        Assert.Equal(
+            HabitConstants.DescriptionMaxLength,
+            description.GetMaxLength());
+        Assert.True(targetQuantity.IsNullable);
+        Assert.Equal(18, targetQuantity.GetPrecision());
+        Assert.Equal(2, targetQuantity.GetScale());
+        Assert.True(targetUnit.IsNullable);
+        Assert.Equal(
+            HabitConstants.TargetUnitMaxLength,
+            targetUnit.GetMaxLength());
+    }
+
+    [Fact]
+    public void Model_ShouldConfigureHabitIndexesWithoutNameUniqueness()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(Habit));
+
+        Assert.NotNull(entityType);
+
+        var indexes = entityType.GetIndexes().ToList();
+
+        Assert.Contains(
+            indexes,
+            index => index.Properties.Select(property => property.Name)
+                .SequenceEqual(
+                    [nameof(Habit.UserId), nameof(Habit.IsActive)]));
+
+        Assert.Contains(
+            indexes,
+            index => index.Properties.Select(property => property.Name)
+                .SequenceEqual(
+                    [nameof(Habit.UserId), nameof(Habit.IsDeleted)]));
+
+        Assert.DoesNotContain(
+            indexes,
+            index => index.Properties.Select(property => property.Name)
+                .SequenceEqual([nameof(Habit.UserId), nameof(Habit.Name)]));
+    }
+
+    [Fact]
+    public void Model_ShouldMapHabitLogWithUniqueCompletionIndexAndSupportingIndexes()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(HabitLog));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("HabitLogs", entityType.GetTableName());
+
+        var indexes = entityType.GetIndexes().ToList();
+
+        var uniqueCompletionIndex = indexes.Single(
+            index => index.Properties.Select(property => property.Name)
+                .SequenceEqual(
+                    [
+                        nameof(HabitLog.UserId),
+                        nameof(HabitLog.HabitId),
+                        nameof(HabitLog.CompletionDate)
+                    ]));
+
+        Assert.True(uniqueCompletionIndex.IsUnique);
+
+        Assert.Contains(
+            indexes,
+            index => index.Properties.Select(property => property.Name)
+                .SequenceEqual(
+                    [nameof(HabitLog.UserId), nameof(HabitLog.CompletionDate)]));
+
+        Assert.Contains(
+            indexes,
+            index => index.Properties.Select(property => property.Name)
+                .SequenceEqual(
+                    [nameof(HabitLog.HabitId), nameof(HabitLog.CompletionDate)]));
+    }
+
+    [Fact]
+    public void Model_ShouldConfigureHabitLogForeignKeyWithoutCascadeDelete()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(HabitLog));
+
+        Assert.NotNull(entityType);
+
+        var foreignKey = entityType.GetForeignKeys().Single(
+            key => key.Properties.Select(property => property.Name)
+                .SequenceEqual([nameof(HabitLog.HabitId)]));
+
+        Assert.Equal(typeof(Habit), foreignKey.PrincipalEntityType.ClrType);
+        Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
+    }
+
+    [Fact]
     public void Model_ShouldApplySoftDeleteFilterToAllBaseEntities()
     {
         using var context = CreateContext();

@@ -17,6 +17,8 @@ public class AppDbContext : DbContext
     }
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+    public DbSet<Habit> Habits => Set<Habit>();
+    public DbSet<HabitLog> HabitLogs => Set<HabitLog>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
