@@ -1,0 +1,184 @@
+<section class="habit-section">
+    <h2 class="habit-section__header">
+        @if (Collapsible)
+        {
+            <button type="button"
+                    class="habit-section__header-button"
+                    @onclick="ToggleExpanded"
+                    aria-expanded="@IsExpanded">
+                <span>@Title</span>
+                <span class="habit-section__count">@Habits.Count</span>
+                <span class="habit-section__toggle">
+                    @(IsExpanded ? "?" : "+")
+                </span>
+            </button>
+        }
+        else
+        {
+            <span>@Title</span>
+            <span class="habit-section__count">@Habits.Count</span>
+        }
+    </h2>
+
+    @if (IsExpanded)
+    {
+        @if (Habits.Count == 0)
+        {
+            <p class="habit-section__empty">@EmptyMessage</p>
+        }
+        else
+        {
+            <div class="habit-list">
+                @foreach (var habit in Habits)
+                {
+                    <article class="habit-card">
+                        <div class="habit-card__content">
+                            <div class="habit-card__title-row">
+                                <h3>@habit.Name</h3>
+
+                                @if (habit.IsCompletedToday)
+                                {
+                                    <span class="habit-card__completed">
+                                        Completed today
+                                    </span>
+                                }
+                            </div>
+
+                            <div class="habit-card__metadata">
+                                <span>@FormatTarget(habit)</span>
+                                <span>@GetEstimatedTimeLabel(habit.EstimatedTime)</span>
+                                <span>Friction: @habit.FrictionLevel</span>
+                                <span>@FormatStreak(habit.CurrentStreak)</span>
+                            </div>
+                        </div>
+
+                        <div class="habit-card__actions">
+                            @if (habit.IsActive)
+                            {
+                                @if (!habit.IsCompletedToday)
+                                {
+                                    <button type="button"
+                                            disabled="@IsBusy"
+                                            @onclick="() => OnComplete.InvokeAsync(habit)">
+                                        Complete
+                                    </button>
+                                }
+
+                                <a class="secondary-button"
+                                   href="@($"/habits/{habit.Id}/edit")">
+                                    Edit
+                                </a>
+
+                                <button type="button"
+                                        class="danger-button"
+                                        disabled="@IsBusy"
+                                        @onclick="() => OnArchive.InvokeAsync(habit)">
+                                    Archive
+                                </button>
+                            }
+
+                            <a class="secondary-button"
+                               href="@($"/habits/{habit.Id}/history")">
+                                View history
+                            </a>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<HabitSummaryDto> Habits { get; set; } =
+        Array.Empty<HabitSummaryDto>();
+
+    [Parameter]
+    public string EmptyMessage { get; set; } =
+        "No habits here.";
+
+    [Parameter]
+    public bool Collapsible { get; set; }
+
+    [Parameter]
+    public bool InitiallyExpanded { get; set; } = true;
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<HabitSummaryDto> OnComplete { get; set; }
+
+    [Parameter]
+    public EventCallback<HabitSummaryDto> OnArchive { get; set; }
+
+    private bool _isExpanded;
+    private bool _initialized;
+
+    private bool IsExpanded =>
+        !Collapsible || _isExpanded;
+
+    protected override void OnParametersSet()
+    {
+        if (_initialized)
+        {
+            return;
+        }
+
+        _isExpanded = InitiallyExpanded;
+        _initialized = true;
+    }
+
+    private void ToggleExpanded()
+    {
+        if (Collapsible)
+        {
+            _isExpanded = !_isExpanded;
+        }
+    }
+
+    private static string FormatTarget(HabitSummaryDto habit)
+    {
+        if (habit.TargetType == HabitTargetType.Quantity &&
+            habit.TargetQuantity.HasValue &&
+            !string.IsNullOrWhiteSpace(habit.TargetUnit))
+        {
+            return $"{habit.TargetQuantity.Value:0.##} " +
+                habit.TargetUnit;
+        }
+
+        return "Binary target";
+    }
+
+    private static string FormatStreak(int currentStreak)
+    {
+        return currentStreak == 1
+            ? "1 day streak"
+            : $"{currentStreak} day streak";
+    }
+
+    private static string GetEstimatedTimeLabel(
+        EstimatedTime estimatedTime)
+    {
+        return estimatedTime switch
+        {
+            EstimatedTime.Under15Minutes =>
+                "Under 15 minutes",
+
+            EstimatedTime.Between15And30Minutes =>
+                "15–30 minutes",
+
+            EstimatedTime.Between30And60Minutes =>
+                "30–60 minutes",
+
+            EstimatedTime.Over60Minutes =>
+                "Over 60 minutes",
+
+            _ => estimatedTime.ToString()
+        };
+    }
+}

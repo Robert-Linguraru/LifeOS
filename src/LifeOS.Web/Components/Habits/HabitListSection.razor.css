@@ -1,0 +1,147 @@
+.habit-section {
+    margin-bottom: 1.5rem;
+}
+
+.habit-section__header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.75rem 0;
+    font: inherit;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-align: left;
+}
+
+.habit-section__header-button {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.habit-section__header-button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 0.25rem;
+}
+
+.habit-section__count {
+    display: inline-flex;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #b8b8b8;
+    border-radius: 999px;
+    font-size: 0.8rem;
+}
+
+.habit-section__toggle {
+    margin-left: auto;
+}
+
+.habit-section__empty {
+    margin: 0;
+    padding: 1rem;
+    border: 1px dashed #b8b8b8;
+    border-radius: 0.5rem;
+}
+
+.habit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.habit-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 0.5rem;
+}
+
+.habit-card__content {
+    min-width: 0;
+    flex: 1;
+}
+
+.habit-card__title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.habit-card__title-row h3 {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.habit-card__completed {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.habit-card__metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.habit-card__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.habit-card__actions button,
+.habit-card__actions a {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid #b8b8b8;
+    border-radius: 0.35rem;
+    font: inherit;
+    text-decoration: none;
+}
+
+.habit-card__actions button {
+    cursor: pointer;
+}
+
+.habit-card__actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.danger-button {
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .habit-card {
+        flex-direction: column;
+    }
+
+    .habit-card__actions {
+        align-items: stretch;
+    }
+
+    .habit-card__actions button,
+    .habit-card__actions a {
+        flex: 1;
+        text-align: center;
+    }
+}

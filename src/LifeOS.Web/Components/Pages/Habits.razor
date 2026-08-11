@@ -1,7 +1,210 @@
 ﻿@page "/habits"
 
+@inject IHabitService HabitService
+
 <PageTitle>Habits</PageTitle>
 
-<h1>Habits</h1>
+<div class="habits-page">
+    <div class="habits-page__header">
+        <div>
+            <h1>Habits</h1>
+            <p>Build consistency with small actions that matter.</p>
+        </div>
 
-<p>Coming soon...</p>
+        <a class="primary-button" href="/habits/new">
+            Add habit
+        </a>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p>Loading habits...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">
+            <p>@_loadError</p>
+
+            <button type="button"
+                    disabled="@_isBusy"
+                    @onclick="LoadHabitsAsync">
+                Try again
+            </button>
+        </div>
+    }
+    else if (_habitList is not null)
+    {
+        @if (_actionError is not null)
+        {
+            <div class="error-message" role="alert">
+                @_actionError
+            </div>
+        }
+
+        @if (_habitList.Active.Count == 0 &&
+             _habitList.Archived.Count == 0)
+        {
+            <div class="habits-page__empty">
+                <h2>Start with one habit</h2>
+                <p>
+                    Add a habit you can realistically complete today.
+                </p>
+                <a class="primary-button" href="/habits/new">
+                    Add your first habit
+                </a>
+            </div>
+        }
+
+        <HabitListSection Title="Active"
+                          Habits="@_habitList.Active"
+                          EmptyMessage="No active habits. Add one to get started."
+                          IsBusy="@_isBusy"
+                          OnComplete="CompleteHabitAsync"
+                          OnArchive="ArchiveHabitAsync" />
+
+        <HabitListSection Title="Archived"
+                          Habits="@_habitList.Archived"
+                          EmptyMessage="No archived habits."
+                          Collapsible="true"
+                          InitiallyExpanded="false"
+                          IsBusy="@_isBusy" />
+    }
+</div>
+
+@code {
+    private HabitListDto? _habitList;
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private string? _actionError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHabitsAsync();
+    }
+
+    private async Task LoadHabitsAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _habitList = await HabitService.GetHabitListAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError =
+                "Something went wrong while loading habits.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CompleteHabitAsync(HabitSummaryDto habit)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            try
+            {
+                await HabitService.CompleteHabitAsync(habit.Id);
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+                return;
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError = "The habit could not be found.";
+                await TryRefreshHabitsAsync(
+                    "The habit could not be found, and the latest habit data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while completing the habit.";
+                return;
+            }
+
+            await TryRefreshHabitsAsync(
+                "The habit was completed, but the latest habit data could not be reloaded. Please refresh the page.");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task ArchiveHabitAsync(HabitSummaryDto habit)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            try
+            {
+                await HabitService.ArchiveHabitAsync(habit.Id);
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+                return;
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError = "The habit could not be found.";
+                await TryRefreshHabitsAsync(
+                    "The habit could not be found, and the latest habit data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while archiving the habit.";
+                return;
+            }
+
+            await TryRefreshHabitsAsync(
+                "The habit was archived, but the latest habit data could not be reloaded. Please refresh the page.");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task TryRefreshHabitsAsync(
+        string refreshFailureMessage)
+    {
+        try
+        {
+            _habitList = await HabitService.GetHabitListAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = refreshFailureMessage;
+        }
+    }
+}

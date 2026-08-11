@@ -1,0 +1,51 @@
+.habit-history-page {
+    max-width: 800px;
+}
+
+.habit-history-page__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.habit-history-page__header h1 {
+    margin-bottom: 0.25rem;
+}
+
+.habit-history-page__header p {
+    margin: 0;
+}
+
+.habit-history-page__empty {
+    padding: 1rem;
+    border: 1px dashed #b8b8b8;
+    border-radius: 0.5rem;
+}
+
+.habit-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.habit-history-entry {
+    padding: 1rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 0.5rem;
+}
+
+@media (max-width: 700px) {
+    .habit-history-page__header {
+        flex-direction: column;
+    }
+
+    .habit-history-page__header .secondary-button {
+        width: 100%;
+        text-align: center;
+    }
+}

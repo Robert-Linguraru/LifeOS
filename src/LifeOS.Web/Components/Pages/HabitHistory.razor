@@ -1,0 +1,103 @@
+@page "/habits/{HabitId:guid}/history"
+
+@inject IHabitService HabitService
+
+<PageTitle>Habit History</PageTitle>
+
+<div class="habit-history-page">
+    <div class="habit-history-page__header">
+        <div>
+            <h1>Habit history</h1>
+            @if (_history is not null)
+            {
+                <p>@_history.Name</p>
+            }
+        </div>
+
+        <a class="secondary-button" href="/habits">
+            Back to habits
+        </a>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p>Loading history...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">
+            <p>@_loadError</p>
+
+            <button type="button"
+                    @onclick="LoadHistoryAsync">
+                Try again
+            </button>
+        </div>
+
+        <a class="secondary-button" href="/habits">
+            Back to habits
+        </a>
+    }
+    else if (_history is not null)
+    {
+        @if (_history.Entries.Count == 0)
+        {
+            <div class="habit-history-page__empty">
+                <p>No completions recorded yet.</p>
+            </div>
+        }
+        else
+        {
+            <ol class="habit-history-list">
+                @foreach (var entry in _history.Entries)
+                {
+                    <li class="habit-history-entry">
+                        <span>@entry.CompletionDate.ToString("dd MMM yyyy")</span>
+                    </li>
+                }
+            </ol>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid HabitId { get; set; }
+
+    private HabitHistoryDto? _history;
+    private bool _isLoading = true;
+    private string? _loadError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadHistoryAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _history = await HabitService.GetHabitHistoryAsync(HabitId);
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (ResourceNotFoundException)
+        {
+            _loadError = "The habit could not be found.";
+        }
+        catch (Exception)
+        {
+            _loadError =
+                "Something went wrong while loading habit history.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

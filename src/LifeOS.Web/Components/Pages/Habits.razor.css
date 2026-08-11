@@ -1,0 +1,74 @@
+.habits-page {
+    max-width: 1100px;
+}
+
+.habits-page__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.habits-page__header h1 {
+    margin-bottom: 0.25rem;
+}
+
+.habits-page__header p {
+    margin: 0;
+}
+
+.habits-page__empty {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    border: 1px dashed #b8b8b8;
+    border-radius: 0.5rem;
+}
+
+.habits-page__empty h2 {
+    margin-top: 0;
+}
+
+.habits-page__empty p {
+    margin-bottom: 1rem;
+}
+
+.primary-button,
+.secondary-button {
+    display: inline-block;
+    padding: 0.65rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 0.4rem;
+    font: inherit;
+    text-decoration: none;
+}
+
+.primary-button {
+    cursor: pointer;
+}
+
+.error-message {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid currentColor;
+    border-radius: 0.4rem;
+}
+
+.error-message button {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid #b8b8b8;
+    border-radius: 0.35rem;
+    font: inherit;
+    cursor: pointer;
+}
+
+@media (max-width: 700px) {
+    .habits-page__header {
+        flex-direction: column;
+    }
+
+    .habits-page__header .primary-button {
+        width: 100%;
+        text-align: center;
+    }
+}
