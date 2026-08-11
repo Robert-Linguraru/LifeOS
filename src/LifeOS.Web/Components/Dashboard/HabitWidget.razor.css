@@ -1,0 +1,77 @@
+.habit-widget {
+    padding: 1.25rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 0.6rem;
+}
+
+.habit-widget__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.habit-widget__header h2 {
+    margin: 0;
+}
+
+.habit-widget__header p {
+    margin: 0.25rem 0 0;
+}
+
+.habit-widget__header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.habit-widget__header-actions a,
+.habit-widget__empty a,
+.habit-widget__error button {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid #b8b8b8;
+    border-radius: 0.35rem;
+    font: inherit;
+    text-decoration: none;
+}
+
+.habit-widget__error button {
+    cursor: pointer;
+}
+
+.habit-widget__progress {
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+}
+
+.habit-widget__items {
+    display: flex;
+    flex-direction: column;
+}
+
+.habit-widget__empty,
+.habit-widget__error {
+    padding: 0.75rem;
+    border: 1px dashed #b8b8b8;
+    border-radius: 0.4rem;
+}
+
+.habit-widget__empty p {
+    margin-top: 0;
+}
+
+@media (max-width: 700px) {
+    .habit-widget__header {
+        flex-direction: column;
+    }
+
+    .habit-widget__header-actions {
+        width: 100%;
+    }
+
+    .habit-widget__header-actions a {
+        flex: 1;
+        text-align: center;
+    }
+}

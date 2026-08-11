@@ -1,0 +1,48 @@
+.habit-widget-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid #e0e0e0;
+}
+
+.habit-widget-item__content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.habit-widget-item__title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.habit-widget-item__completed {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.habit-widget-item button {
+    flex-shrink: 0;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid #b8b8b8;
+    border-radius: 0.35rem;
+    cursor: pointer;
+    font: inherit;
+}
+
+.habit-widget-item button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+@media (max-width: 700px) {
+    .habit-widget-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

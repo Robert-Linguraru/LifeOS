@@ -1,0 +1,57 @@
+<div class="habit-widget-item">
+    <div class="habit-widget-item__content">
+        <div class="habit-widget-item__title-row">
+            <strong>@Habit.Name</strong>
+
+            @if (Habit.IsCompletedToday)
+            {
+                <span class="habit-widget-item__completed">
+                    Completed
+                </span>
+            }
+        </div>
+
+        <span>@FormatTarget(Habit)</span>
+        <span>@FormatStreak(Habit.CurrentStreak)</span>
+    </div>
+
+    @if (!Habit.IsCompletedToday)
+    {
+        <button type="button"
+                disabled="@IsBusy"
+                @onclick="() => OnComplete.InvokeAsync(Habit)">
+            Complete
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public HabitSummaryDto Habit { get; set; } = default!;
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<HabitSummaryDto> OnComplete { get; set; }
+
+    private static string FormatTarget(HabitSummaryDto habit)
+    {
+        if (habit.TargetType == HabitTargetType.Quantity &&
+            habit.TargetQuantity.HasValue &&
+            !string.IsNullOrWhiteSpace(habit.TargetUnit))
+        {
+            return $"{habit.TargetQuantity.Value:0.##} " +
+                habit.TargetUnit;
+        }
+
+        return "Binary target";
+    }
+
+    private static string FormatStreak(int currentStreak)
+    {
+        return currentStreak == 1
+            ? "1 day streak"
+            : $"{currentStreak} day streak";
+    }
+}

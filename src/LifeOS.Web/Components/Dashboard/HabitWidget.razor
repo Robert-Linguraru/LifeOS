@@ -1,0 +1,172 @@
+@inject IDashboardService DashboardService
+@inject IHabitService HabitService
+
+<section class="habit-widget">
+    <div class="habit-widget__header">
+        <div>
+            <h2>Habits</h2>
+
+            @if (_widget is not null)
+            {
+                <p>@_widget.CurrentDate.ToString("dd MMM yyyy")</p>
+            }
+        </div>
+
+        <div class="habit-widget__header-actions">
+            <a class="secondary-button" href="/habits">
+                View all
+            </a>
+
+            <a class="primary-button" href="/habits/new">
+                Add habit
+            </a>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p>Loading habits...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="habit-widget__error" role="alert">
+            <p>@_loadError</p>
+
+            <button type="button"
+                    disabled="@_isBusy"
+                    @onclick="LoadWidgetAsync">
+                Try again
+            </button>
+        </div>
+    }
+    else if (_widget is not null)
+    {
+        @if (_actionError is not null)
+        {
+            <div class="habit-widget__error" role="alert">
+                @_actionError
+            </div>
+        }
+
+        <p class="habit-widget__progress">
+            @_widget.CompletedCount of @_widget.TotalActiveCount completed
+        </p>
+
+        @if (_widget.ActiveHabits.Count == 0)
+        {
+            <div class="habit-widget__empty">
+                <p>No active habits yet.</p>
+
+                <a class="primary-button" href="/habits/new">
+                    Add a habit
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="habit-widget__items">
+                @foreach (var habit in _widget.ActiveHabits)
+                {
+                    <HabitWidgetItem
+                        Habit="@habit"
+                        IsBusy="@_isBusy"
+                        OnComplete="CompleteHabitAsync" />
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private DashboardHabitWidgetDto? _widget;
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private string? _actionError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWidgetAsync();
+    }
+
+    private async Task LoadWidgetAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _widget = await DashboardService.GetHabitWidgetAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError =
+                "Something went wrong while loading habits.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CompleteHabitAsync(HabitSummaryDto habit)
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _actionError = null;
+
+        try
+        {
+            try
+            {
+                await HabitService.CompleteHabitAsync(habit.Id);
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+                return;
+            }
+            catch (ResourceNotFoundException)
+            {
+                _actionError = "The habit could not be found.";
+                await TryRefreshWidgetAsync(
+                    "The habit could not be found, and the latest habit data could not be reloaded. Please refresh the page.");
+                return;
+            }
+            catch (Exception)
+            {
+                _actionError =
+                    "Something went wrong while completing the habit.";
+                return;
+            }
+
+            await TryRefreshWidgetAsync(
+                "The habit was completed, but the latest habit data could not be reloaded. Please refresh the page.");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task TryRefreshWidgetAsync(
+        string refreshFailureMessage)
+    {
+        try
+        {
+            _widget = await DashboardService.GetHabitWidgetAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = refreshFailureMessage;
+        }
+    }
+}

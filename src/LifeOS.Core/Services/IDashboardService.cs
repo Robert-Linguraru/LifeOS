@@ -6,4 +6,7 @@ public interface IDashboardService
 {
     Task<DashboardTaskWidgetDto> GetTaskWidgetAsync(
         CancellationToken cancellationToken = default);
+
+    Task<DashboardHabitWidgetDto> GetHabitWidgetAsync(
+        CancellationToken cancellationToken = default);
 }
