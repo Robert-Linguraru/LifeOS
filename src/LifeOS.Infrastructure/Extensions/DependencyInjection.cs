@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskService, TaskService>();
 
         services.AddScoped<IHabitRepository, HabitRepository>();
+        services.AddScoped<IHabitService, HabitService>();
 
 
         services.AddSingleton(TimeProvider.System);

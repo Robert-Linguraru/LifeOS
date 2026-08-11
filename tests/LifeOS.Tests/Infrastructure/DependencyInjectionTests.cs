@@ -112,6 +112,38 @@ public sealed class DependencyInjectionTests
     }
 
     [Fact]
+    public void AddInfrastructure_ShouldRegisterHabitService()
+    {
+        var configurationValues =
+            new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] =
+                    "Host=localhost;Port=5433;Database=lifeos;" +
+                    "Username=lifeos;Password=test"
+            };
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationValues)
+            .Build();
+
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+
+        var descriptor = services.SingleOrDefault(
+            service =>
+                service.ServiceType == typeof(IHabitService));
+
+        Assert.NotNull(descriptor);
+        Assert.Equal(
+            typeof(HabitService),
+            descriptor.ImplementationType);
+        Assert.Equal(
+            ServiceLifetime.Scoped,
+            descriptor.Lifetime);
+    }
+
+    [Fact]
     public void AddInfrastructure_ShouldRegisterTaskService()
     {
         // Arrange
