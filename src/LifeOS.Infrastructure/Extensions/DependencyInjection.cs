@@ -1,4 +1,5 @@
 ﻿using LifeOS.Core.Abstractions;
+using LifeOS.Core.Abstractions.Habits;
 using LifeOS.Core.Abstractions.Tasks;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Persistence;
@@ -34,6 +35,8 @@ public static class DependencyInjection
         
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<ITaskService, TaskService>();
+
+        services.AddScoped<IHabitRepository, HabitRepository>();
 
 
         services.AddSingleton(TimeProvider.System);
