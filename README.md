@@ -48,6 +48,6 @@ Before beginning work, read the documentation in the following order:
 
 **Phase:** V1 Development
 
-Documentation has completed architecture review and is considered:
+Milestone 5
 
 **✅ READY TO BUILD**
