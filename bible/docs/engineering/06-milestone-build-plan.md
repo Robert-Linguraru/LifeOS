@@ -129,6 +129,8 @@ Done when:
 
 ## Milestone 4 - Habits vertical slice
 
+Status: Complete — Ticket 16 verification passed
+
 Goal: habits and completion logs work reliably.
 
 Scope:

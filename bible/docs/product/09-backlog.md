@@ -50,14 +50,14 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 
 ### Habits
 
-- `Milestone 4` Habit create, read, update, and archive workflows.
-- `Milestone 4` Active/archive lifecycle using `IsActive`; no restore/reactivate or user-facing delete.
-- `Milestone 4` Daily habits only.
-- `Milestone 4` Binary completion with optional quantity-target metadata and no achieved-quantity entry.
-- `Milestone 4` Immutable HabitLog.
-- `Milestone 4` Unique `(UserId, HabitId, CompletionDate)` constraint with idempotent duplicate completion.
-- `Milestone 4` Basic current daily streak and newest-first completion history.
-- `Milestone 4` Dashboard Habit widget with completion progress.
+- `Completed — Milestone 4` Habit create, read, update, and archive workflows.
+- `Completed — Milestone 4` Active/archive lifecycle using `IsActive`; no restore/reactivate or user-facing delete.
+- `Completed — Milestone 4` Daily habits only.
+- `Completed — Milestone 4` Binary completion with optional quantity-target metadata and no achieved-quantity entry.
+- `Completed — Milestone 4` Immutable HabitLog.
+- `Completed — Milestone 4` Unique `(UserId, HabitId, CompletionDate)` constraint with idempotent duplicate completion.
+- `Completed — Milestone 4` Basic current daily streak and newest-first completion history.
+- `Completed — Milestone 4` Dashboard Habit widget with completion progress.
 - `Milestone 5` Habit completion XP integration.
 - `Milestone 6` Habit reminder integration.
 

@@ -154,7 +154,7 @@ Technical debt should only be addressed when there is a measurable improvement i
 
 Avoid introducing abstractions before they are justified by the application.
 
-## TD-005 — Task list queries load all user tasks into memory
+## TD-005 — Task and Habit list projections load user data into memory
 
 Status: Open
 Priority: Low for V1; revisit as task volume grows
@@ -162,19 +162,24 @@ Introduced: Milestone 3
 
 TaskService.GetTaskListAsync currently loads all non-deleted tasks for the
 current user and performs status classification, date grouping, and sorting
-in memory.
+in memory. HabitService.GetHabitListAsync also loads the current user's
+completion-date projection and calculates active Habit completion state and
+current streaks in memory.
 
-This is intentional for the initial Tasks vertical slice because it keeps
-the repository contract and query behavior simple.
+This is intentional for the initial Tasks and Habits vertical slices because
+it keeps the repository contracts and query behavior simple. Habit list state
+uses one bounded current-user completion-date projection rather than one
+query per Habit.
 
-As task history grows, replace this with targeted database queries,
-projections, and/or pagination so completed and archived task history does
-not need to be loaded for every task-list request.
+As task history or Habit completion history grows, replace this with targeted
+database queries, projections, and/or pagination so task history and Habit
+completion dates do not need to be loaded or aggregated in memory for every
+list request.
 
 Revisit when:
-- task volume begins affecting task-list latency or memory usage;
+- task or Habit volume begins affecting list latency or memory usage;
 - pagination is introduced;
-- completed/archived history becomes large;
+- completed/archived task history or Habit completion history becomes large;
 - database-side filtering is otherwise required.
 
 
