@@ -51,10 +51,15 @@
 }
 
 .habit-widget__empty,
-.habit-widget__error {
+.habit-widget__error,
+.habit-widget__status {
     padding: 0.75rem;
     border: 1px dashed #b8b8b8;
     border-radius: 0.4rem;
+}
+
+.habit-widget__status {
+    margin-bottom: 0.75rem;
 }
 
 .habit-widget__empty p {

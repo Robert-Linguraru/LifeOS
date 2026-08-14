@@ -41,6 +41,13 @@
             </div>
         }
 
+        @if (_actionStatus is not null)
+        {
+            <div class="status-message" role="status">
+                @_actionStatus
+            </div>
+        }
+
         @if (_habitList.Active.Count == 0 &&
              _habitList.Archived.Count == 0)
         {
@@ -77,6 +84,7 @@
     private bool _isBusy;
     private string? _loadError;
     private string? _actionError;
+    private string? _actionStatus;
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,12 +124,15 @@
 
         _isBusy = true;
         _actionError = null;
+        _actionStatus = null;
 
         try
         {
+            HabitCompletionResultDto completion;
+
             try
             {
-                await HabitService.CompleteHabitAsync(habit.Id);
+                completion = await HabitService.CompleteHabitAsync(habit.Id);
             }
             catch (ValidationException exception)
             {
@@ -142,6 +153,8 @@
                 return;
             }
 
+            _actionStatus = GetCompletionStatus(completion);
+
             await TryRefreshHabitsAsync(
                 "The habit was completed, but the latest habit data could not be reloaded. Please refresh the page.");
         }
@@ -149,6 +162,34 @@
         {
             _isBusy = false;
         }
+    }
+
+    private static string GetCompletionStatus(
+        HabitCompletionResultDto result)
+    {
+        if (!result.WasNewlyCompleted)
+        {
+            return "Habit is already completed today.";
+        }
+
+        if (result.XpAwardFailed)
+        {
+            return "Habit completed, but XP could not be recorded.";
+        }
+
+        if (result.XpAward is null || result.XpAward.IsDuplicate)
+        {
+            return "Habit completed.";
+        }
+
+        if (result.XpAward.AwardedXp == 0)
+        {
+            return "Habit completed. Daily Quest XP cap already reached.";
+        }
+
+        return result.XpAward.IsCapConstrained
+            ? $"Habit completed. +{result.XpAward.AwardedXp:N0} XP — daily Quest XP cap reached."
+            : $"Habit completed. +{result.XpAward.AwardedXp:N0} XP.";
     }
 
     private async Task ArchiveHabitAsync(HabitSummaryDto habit)

@@ -67,6 +67,13 @@
             </div>
         }
 
+        @if (_actionStatus is not null)
+        {
+            <div class="status-message" role="status">
+                @_actionStatus
+            </div>
+        }
+
         <TaskListSection Title="Overdue"
                          Tasks="@FilterTasks(_taskList.Overdue)"
                          EmptyMessage="No overdue tasks."
@@ -130,6 +137,7 @@
 
     private string? _loadError;
     private string? _actionError;
+    private string? _actionStatus;
 
     protected override async Task OnInitializedAsync()
     {
@@ -223,12 +231,15 @@
 
         _isBusy = true;
         _actionError = null;
+        _actionStatus = null;
 
         try
         {
+            TaskCompletionResultDto completion;
+
             try
             {
-                await TaskService.CompleteTaskAsync(
+                completion = await TaskService.CompleteTaskAsync(
                     task.Id);
             }
             catch (ValidationException exception)
@@ -252,6 +263,8 @@
                 return;
             }
 
+            _actionStatus = GetCompletionStatus(completion);
+
             await TryRefreshTasksAsync(
                 "The task was completed, but the latest task data could not be reloaded. Please refresh the page.");
         }
@@ -259,6 +272,34 @@
         {
             _isBusy = false;
         }
+    }
+
+    private static string GetCompletionStatus(
+        TaskCompletionResultDto result)
+    {
+        if (!result.WasNewlyCompleted)
+        {
+            return "Task is already completed.";
+        }
+
+        if (result.XpAwardFailed)
+        {
+            return "Task completed, but XP could not be recorded.";
+        }
+
+        if (result.XpAward is null || result.XpAward.IsDuplicate)
+        {
+            return "Task completed.";
+        }
+
+        if (result.XpAward.AwardedXp == 0)
+        {
+            return "Task completed. Daily Quest XP cap already reached.";
+        }
+
+        return result.XpAward.IsCapConstrained
+            ? $"Task completed. +{result.XpAward.AwardedXp:N0} XP — daily Quest XP cap reached."
+            : $"Task completed. +{result.XpAward.AwardedXp:N0} XP.";
     }
 
     private async Task ArchiveTaskAsync(

@@ -9,8 +9,20 @@
     </div>
 
     <div class="dashboard-grid">
-        <TaskWidget />
-        <HabitWidget />
-        <XpWidget />
+        <TaskWidget OnXpChanged="RefreshXpWidgetAsync" />
+        <HabitWidget OnXpChanged="RefreshXpWidgetAsync" />
+        <XpWidget @ref="_xpWidget" />
     </div>
 </div>
+
+@code {
+    private XpWidget? _xpWidget;
+
+    private async Task RefreshXpWidgetAsync()
+    {
+        if (_xpWidget is not null)
+        {
+            await _xpWidget.RefreshAsync();
+        }
+    }
+}

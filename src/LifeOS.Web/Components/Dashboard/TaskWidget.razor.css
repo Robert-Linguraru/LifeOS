@@ -46,10 +46,15 @@
 }
 
 .task-widget__empty,
-.task-widget__error {
+.task-widget__error,
+.task-widget__status {
     padding: 0.75rem;
     border: 1px dashed #b8b8b8;
     border-radius: 0.4rem;
+}
+
+.task-widget__status {
+    margin-bottom: 0.75rem;
 }
 
 @media (max-width: 700px) {

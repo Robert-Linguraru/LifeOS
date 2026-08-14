@@ -49,6 +49,13 @@
     }
     else if (_widget is not null)
     {
+        @if (_actionStatus is not null)
+        {
+            <div class="task-widget__status" role="status">
+                @_actionStatus
+            </div>
+        }
+
         @if (_actionError is not null)
         {
             <div class="task-widget__error"
@@ -116,6 +123,9 @@
 </section>
 
 @code {
+    [Parameter]
+    public EventCallback OnXpChanged { get; set; }
+
     private DashboardTaskWidgetDto? _widget;
 
     private bool _isLoading = true;
@@ -123,6 +133,7 @@
 
     private string? _loadError;
     private string? _actionError;
+    private string? _actionStatus;
 
     protected override async Task OnInitializedAsync()
     {
@@ -165,12 +176,15 @@
 
         _isBusy = true;
         _actionError = null;
+        _actionStatus = null;
 
         try
         {
+            TaskCompletionResultDto completion;
+
             try
             {
-                await TaskService.CompleteTaskAsync(
+                completion = await TaskService.CompleteTaskAsync(
                     task.Id);
             }
             catch (ValidationException exception)
@@ -194,13 +208,53 @@
                 return;
             }
 
+            _actionStatus = GetCompletionStatus(completion);
+
             await TryRefreshWidgetAsync(
                 "The task was completed, but the latest task data could not be reloaded. Please refresh the page.");
+
+            if (completion.XpAward?.AwardedXp > 0)
+            {
+                try
+                {
+                    await OnXpChanged.InvokeAsync();
+                }
+                catch (Exception)
+                {
+                }
+            }
         }
         finally
         {
             _isBusy = false;
         }
+    }
+
+    private static string GetCompletionStatus(TaskCompletionResultDto result)
+    {
+        if (!result.WasNewlyCompleted)
+        {
+            return "Task is already completed.";
+        }
+
+        if (result.XpAwardFailed)
+        {
+            return "Task completed, but XP could not be recorded.";
+        }
+
+        if (result.XpAward is null || result.XpAward.IsDuplicate)
+        {
+            return "Task completed.";
+        }
+
+        if (result.XpAward.AwardedXp == 0)
+        {
+            return "Task completed. Daily Quest XP cap already reached.";
+        }
+
+        return result.XpAward.IsCapConstrained
+            ? $"Task completed. +{result.XpAward.AwardedXp:N0} XP — daily Quest XP cap reached."
+            : $"Task completed. +{result.XpAward.AwardedXp:N0} XP.";
     }
 
     private async Task RefreshWidgetAsync()

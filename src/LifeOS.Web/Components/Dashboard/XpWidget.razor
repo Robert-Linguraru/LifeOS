@@ -48,6 +48,12 @@
 </section>
 
 @code {
+    public async Task RefreshAsync()
+    {
+        await LoadWidgetAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private DashboardXpWidgetDto? _widget;
     private bool _isLoading = true;
     private string? _loadError;
