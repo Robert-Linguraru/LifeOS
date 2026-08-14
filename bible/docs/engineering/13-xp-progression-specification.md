@@ -35,7 +35,7 @@ Use the existing Core enums `EstimatedTime` and `FrictionLevel`. Do not create X
 | `Medium` | 1.5 |
 | `High` | 2.0 |
 
-Raw Quest XP is `Base XP × Friction multiplier`, rounded to the nearest whole XP where required. Use exact integer/decimal arithmetic, not binary floating point. The canonical matrix is:
+Raw Quest XP is `Base XP × Friction multiplier`. Quest XP calculations use decimal arithmetic. When a calculated XP value is not a whole number, round to the nearest whole XP using `MidpointRounding.AwayFromZero`. Do not use binary floating point. The canonical matrix is:
 
 | EstimatedTime | Low | Medium | High |
 |---|---:|---:|---:|

@@ -179,6 +179,7 @@ Future AI features need qualitative review plus structured checks for:
 - Between30And60Minutes high friction gives 300 XP.
 - Over60Minutes high friction gives 400 XP.
 - all 12 Quest XP combinations, invalid enums, exact level thresholds, echelon boundaries, and very large non-negative `long` values are covered;
+- Quest XP uses decimal arithmetic and `MidpointRounding.AwayFromZero` for non-whole calculated values;
 - daily cap underflow, crossing, exhaustion, time-zone changes, and ledger-sum authority are covered;
 - crossing awards only the remaining capacity; cap exhaustion succeeds with actual XP zero and no zero-XP transaction;
 - deterministic Task and Habit idempotency keys are covered.

@@ -172,7 +172,7 @@ Requirement labels:
 - `V1` The system shall calculate quest XP from estimated time and friction level.
 - `V1` Time base values shall be: `Under15Minutes = 50 XP`, `Between15And30Minutes = 100 XP`, `Between30And60Minutes = 150 XP`, `Over60Minutes = 200 XP`.
 - `V1` Friction multipliers shall be: `Low = 1.0`, `Medium = 1.5`, `High = 2.0`.
-- `V1` Quest XP shall be rounded to the nearest whole XP value after multiplication.
+- `V1` Quest XP shall use decimal arithmetic and, when multiplication produces a non-whole value, round to the nearest whole XP using `MidpointRounding.AwayFromZero`.
 - `V1` The daily quest XP cap shall be 500 XP per user per user-local date.
 - `Milestone 5` The system shall award quest XP when eligible tasks or habits are completed.
 - `Milestone 5` The system shall not award duplicate quest XP for the same completion event.
