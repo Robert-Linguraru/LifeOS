@@ -57,12 +57,12 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 
 - XP is never user-editable.
 - XP is only written by `IXpService`.
-- Every XP award creates an XP transaction.
+- Every positive actual XP award creates one XP transaction; a zero actual award creates none.
 - User progression updates must be atomic with XP transaction creation.
 - Completing a task/habit twice must not award XP twice.
 - Daily quest XP cap must be enforced server-side.
 - Level/echelon calculations must be deterministic and tested.
-- Level-up/echelon notifications should be emitted through notification service, not UI shortcuts.
+- Milestone 5 returns level/echelon transition metadata and does not create persisted notifications; notification persistence belongs to Milestone 6.
 
 ## 7. Habit guardrails
 

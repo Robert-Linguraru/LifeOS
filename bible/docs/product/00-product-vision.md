@@ -203,11 +203,11 @@ Long-term system elements include:
 - daily, weekly, and momentum streaks;
 - levels;
 - echelons with cosmetic profile borders;
-- level-up notifications;
+- level/echelon transition feedback;
 - weekly XP summaries;
 - AI explanations of XP sources.
 
-Milestone 5 includes XP transactions, user progression, task/habit quest XP, a daily quest XP cap, levels, echelons, and basic level-up notification. The full DailyScore engine should wait until more life-domain modules exist; V1 should not create misleading zero-based daily scores for modules that are not implemented.
+Milestone 5 includes the append-only XP ledger, user progression, task/habit Quest XP, a shared 500-XP daily cap, exact levels and echelons, and transition metadata. It does not create persisted notifications or add a global/header XP chip. Notification persistence belongs to Milestone 6. The full DailyScore engine should wait until more life-domain modules exist; V1 should not create misleading zero-based daily scores for modules that are not implemented.
 
 ### 6.7 Sleep and health
 

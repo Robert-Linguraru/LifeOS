@@ -1304,11 +1304,11 @@ Future versions may add:
 
 ---
 
-# 14. XPService
+# 14. XpService
 
 ## Purpose
 
-XPService owns the complete progression system of LifeOS.
+`XpService` owns the Milestone 5 XP/progression core vertical slice.
 
 Every XP change in the application must pass through XPService.
 
@@ -1318,7 +1318,7 @@ No other service may directly modify UserProgression or XPTransaction.
 
 # Responsibilities
 
-XPService is responsible for
+`XpService` is responsible for
 
 - Awarding XP
 - Enforcing Daily XP Cap
@@ -1327,7 +1327,7 @@ XPService is responsible for
 - Calculating Levels
 - Calculating Echelons
 - Returning Progression information
-- Emitting progression notifications
+- Returning level/echelon transition metadata and logging significant transitions where appropriate
 
 ---
 
@@ -1336,17 +1336,13 @@ XPService is responsible for
 XPService depends on
 
 ```text
-IXPRepository
-
-IUserProgressionRepository
-
-INotificationService
+IXpRepository
 
 IDateTimeProvider
 
 ICurrentUserService
 
-ILogger<XPService>
+ILogger<XpService>
 ```
 
 XPService must NOT depend on
@@ -1372,23 +1368,7 @@ It never retrieves Task or Habit data itself.
 ## Award Quest XP
 
 ```csharp
-Task AwardQuestXPAsync(AwardQuestXpDto dto);
-```
-
----
-
-## Award Daily Score XP (Future)
-
-```csharp
-Task AwardDailyScoreXPAsync(AwardDailyScoreDto dto);
-```
-
----
-
-## Award Streak Bonus (Future)
-
-```csharp
-Task AwardStreakBonusAsync(AwardStreakBonusDto dto);
+Task<XpAwardResultDto> AwardQuestXpAsync(...);
 ```
 
 ---
@@ -1404,7 +1384,7 @@ Task<UserProgressionDto> GetProgressionAsync();
 ## Get XP History
 
 ```csharp
-Task<IEnumerable<XPTransactionDto>> GetHistoryAsync();
+Task<IEnumerable<XpTransactionDto>> GetXpHistoryAsync();
 ```
 
 ---
@@ -1412,7 +1392,7 @@ Task<IEnumerable<XPTransactionDto>> GetHistoryAsync();
 ## Calculate Quest XP
 
 ```csharp
-Task<int> CalculateQuestXPAsync(
+Task<int> CalculateQuestXpAsync(
     EstimatedTime estimatedTime,
     FrictionLevel friction);
 ```
@@ -1438,7 +1418,7 @@ Task<Echelon> CalculateEchelonAsync(int level);
 ## Check Daily Cap
 
 ```csharp
-Task<bool> CanAwardQuestXPAsync();
+Task<bool> CanAwardQuestXpAsync();
 ```
 
 ---
@@ -1495,11 +1475,7 @@ Cap enforcement occurs before creating XPTransaction.
 
 ## Transactions
 
-Every XP award creates
-
-```
-XPTransaction
-```
+Every positive actual award creates one `XpTransaction`; a zero actual award creates none. `XpAmount` is the capped awarded amount, not raw XP.
 
 Every XPTransaction has
 
@@ -1541,7 +1517,7 @@ XPService validates
 - Duplicate Idempotency Key
 - Positive XP
 - Valid Source
-- Existing User Progression
+- Current-user validation and lazy, race-safe progression initialization
 
 ---
 
@@ -1735,7 +1711,7 @@ HabitRepository
 
 FinanceService
 
-XPService
+XpService
 ```
 
 ---

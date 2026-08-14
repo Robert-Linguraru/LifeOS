@@ -67,7 +67,7 @@ Contains
 - Application logo
 - Current page title
 - Search (future)
-- XP display (Milestone 5)
+- XP Progress widget (Milestone 5; not a global/header display)
 - Notification bell (Milestone 6)
 - User profile
 - Settings shortcut
@@ -152,13 +152,15 @@ Displays
 
 - Current Level
 - Current Echelon
-- Total XP
-- Today's Quest XP
-- Daily XP Cap Progress
+- Total lifetime XP
+- Today's actual Quest XP
+- `x of 500` daily cap progress
+- Remaining Quest XP
+- Accessible progress semantics
 
 Actions
 
-- View Progress (future)
+- No XP history page is required in Milestone 5.
 
 ---
 
@@ -293,6 +295,8 @@ DashboardService exposes widget-specific DTOs and capabilities. The existing Tas
 - target metadata.
 
 Future module slices may add their own widget-specific capabilities when their owning services exist. They must not require a composite dashboard call or direct repository access from Web.
+
+Milestone 5 adds `GetXpWidgetAsync(...)`, which delegates progression state to `IXpService`. `DashboardService` does not query `IXpRepository`, calculate XP, level, or echelon, or independently determine the authoritative local business date. Milestone 5 does not add an XP chip to `MainLayout` or the global header.
 
 ---
 

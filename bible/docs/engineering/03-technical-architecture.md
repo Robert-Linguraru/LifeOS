@@ -172,14 +172,16 @@ The following services belong to later milestones and must not be introduced as 
 
 ### 6.5 XP service
 
-Provide an `IXPService` for:
+Provide an `IXpService` for:
 
 - calculating quest XP;
 - enforcing daily caps;
 - creating XP transactions;
 - updating user progression;
-- detecting level/echelon changes;
-- creating notifications for progression events.
+- detecting level/echelon changes and returning transition metadata;
+- current progression and newest-first XP history queries.
+
+Milestone 5 uses one `IXpRepository` aggregate persistence boundary for `XpTransaction` and `UserProgression`. It does not require `INotificationService`; persisted progression notifications belong to Milestone 6.
 
 No other service or UI component should mutate XP directly.
 
@@ -499,8 +501,9 @@ Required capabilities:
 - apply daily quest XP cap using user-local business date;
 - create XP transaction with idempotency key;
 - update UserProgression in the same transaction;
-- detect level/echelon changes;
-- create progression notification through notification service.
+- detect level/echelon changes and return transition metadata;
+- initialize progression lazily and race-safely;
+- return an idempotent partial-success result when source completion succeeds but XP cannot be persisted after three attempts.
 
 ### 15.4 Reminder service
 

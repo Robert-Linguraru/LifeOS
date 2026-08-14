@@ -129,7 +129,7 @@ Milestone 5 includes:
 - level calculation;
 - echelon calculation;
 - basic level/echelon display;
-- level-up notification.
+- level/echelon transition feedback (persisted notifications are Milestone 6).
 
 V1 does not include the full DailyScore engine. DailyScore is a future feature because it needs more than tasks and habits to avoid misleading scoring.
 

@@ -35,7 +35,7 @@ Primary navigation:
 
 Secondary navigation or header elements:
 
-- XP/Level chip
+- XP Progress widget (Dashboard only; no global/header XP chip in Milestone 5)
 - Notification bell
 - Quick add button
 - Profile/settings menu
@@ -79,7 +79,7 @@ Desktop layout:
 
 ```text
 +--------------------------------------------------------------+
-| Header: LifeOS | Level/Echelon | Quick Add | Notifications   |
+| Header: LifeOS | Quick Add | Notifications                    |
 +----------------------+----------------------+----------------+
 | Today's Tasks        | Today's Habits       | XP Progress    |
 | - due task           | - habit checkboxes   | level bar      |
@@ -93,8 +93,8 @@ Desktop layout:
 Mobile layout:
 
 ```text
-Header
-XP chip
+Dashboard
+XP Progress widget
 Today tasks card
 Today habits card
 Quick add buttons
@@ -164,7 +164,7 @@ Flow:
 3. Task service marks task complete.
 4. UI updates the task list.
 
-Milestone 3 has no XP or reminder integration. Those interactions are introduced only with their Milestone 5 and 6 slices.
+Milestone 3 has no XP or reminder integration. XP is introduced in Milestone 5 through the Dashboard XP Progress widget and completion feedback; persisted notifications and the notification UI belong to Milestone 6.
 
 Failure behavior:
 

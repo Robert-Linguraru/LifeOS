@@ -173,10 +173,10 @@ public enum NotificationType
 
 # XP Enums
 
-## XPSource
+## XpSource
 
 ```csharp
-public enum XPSource
+public enum XpSource
 {
     QuestCompletion = 0,
     DailyScore = 1,
@@ -188,10 +188,10 @@ public enum XPSource
 
 ---
 
-## XPSourceType
+## XpSourceType
 
 ```csharp
-public enum XPSourceType
+public enum XpSourceType
 {
     Task = 0,
     Habit = 1,
@@ -199,6 +199,8 @@ public enum XPSourceType
     Streak = 3
 }
 ```
+
+The numeric values are stable and must not be renumbered because they are persisted by EF Core. Milestone 5 uses `QuestCompletion` with `Task` or `Habit` source types. `DailyScore`, `StreakBonus`, `ManualAdjustment`, `System`, and future source types remain reserved; their behavior is not implemented in Milestone 5. The planned .NET symbols use `XpSource`, `XpSourceType`, and `XpTransaction`, not `XPSource` or `XPSourceType`.
 
 ---
 

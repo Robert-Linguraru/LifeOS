@@ -407,3 +407,29 @@ Priority: Fix when convenient. Doesn't block anything.
 Originally, soft-delete filtering was configured specifically for UserSettings.
 As part of the Tasks vertical slice, AppDbContext was updated to apply the
 IsDeleted == false query filter automatically to all mapped BaseEntity types.
+
+## TD-006 — Durable completion-to-XP reconciliation
+
+### Current limitation
+
+Milestone 5 performs synchronous XP awarding after authoritative Task or Habit completion, but there is no durable outbox, event, or reconciliation record guaranteeing eventual XP repair after a total XP subsystem failure.
+
+### Current mitigation
+
+- deterministic XP idempotency keys;
+- bounded synchronous XP retries;
+- explicit XP-specific partial-success results;
+- structured logging;
+- atomic XP transaction and progression persistence.
+
+### Revisit triggers
+
+Revisit if real XP-loss incidents occur, transient database failures become material, more event-driven reward sources are added, asynchronous processing is introduced, or reliability requirements demand guaranteed eventual award.
+
+### Potential future approaches
+
+Examples include a transactional outbox, durable completion-event ledger, or reconciliation command/job. These mechanisms are not implemented in Milestone 5.
+
+### Status
+
+Open — accepted Milestone 5 limitation.

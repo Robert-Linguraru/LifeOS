@@ -169,25 +169,33 @@ Done when:
 
 Goal: make gamification trustworthy.
 
-Scope:
+Implementation order:
 
-- XPTransaction entity;
-- UserProgression entity;
-- XP service;
-- exact quest XP formula;
-- daily quest XP cap;
-- level calculation;
-- echelon calculation;
-- idempotency key strategy;
-- task completion XP;
-- habit completion XP;
-- XP dashboard display;
-- level-up notification through notification service.
+1. documentation alignment and executable baseline;
+2. deterministic XP/progression rules;
+3. XP domain and contracts;
+4. EF model;
+5. migration and PostgreSQL schema;
+6. atomic XP repository;
+7. XP service;
+8. Task completion hardening and XP integration;
+9. Habit XP integration;
+10. Dashboard XP projection;
+11. XP widget;
+12. completion feedback and Dashboard coordination;
+13. final PostgreSQL, concurrency, regression, and manual closure.
+
+Scope includes the append-only `XpTransaction` ledger, lazy one-per-user `UserProgression`, exact Quest XP and level/echelon rules, shared 500-XP cap, deterministic idempotency, duplicate protection, progression concurrency, atomic XP/progression persistence, current progression/history service queries, Task/Habit integration, transition metadata, and the XP Progress Dashboard widget.
+
+Milestone 5 detects level/echelon changes but does not create persisted notifications. Notification persistence and user-facing level/echelon notification creation belong to Milestone 6.
 
 Out of scope:
 
-- DailyScore engine;
-- streak bonus XP job.
+- DailyScore calculation or scheduled processing;
+- streak bonus XP;
+- Notification entity, persistence, service, or UI;
+- global/header XP display, XP history UI, analytics, charts, achievements, badges, unlocks, or privileges;
+- backfill, reversal, compensation, outbox, reconciliation jobs, background jobs, or generic repository/Unit of Work architecture.
 
 Done when:
 
@@ -196,6 +204,7 @@ Done when:
 - daily cap works;
 - user progression updates atomically;
 - level/echelon calculations are tested;
+- the frozen contracts in this plan cannot be silently changed by later implementation tickets;
 - build/tests pass.
 
 ## Milestone 6 - Notifications and one-time reminders

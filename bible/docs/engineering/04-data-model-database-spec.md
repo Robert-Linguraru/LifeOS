@@ -234,7 +234,7 @@ Constraints:
 
 - unique `(UserId, IdempotencyKey)` where `IdempotencyKey` is not null.
 
-### 4.6 XPTransaction
+### 4.6 XpTransaction
 
 Purpose: append-only XP audit log.
 
@@ -242,14 +242,15 @@ Fields:
 
 - `Id`;
 - `UserId`;
-- `Source` enum: QuestCompletion, DailyScoreFuture, StreakBonusFuture, ManualAdjustmentFuture, System;
+- `Source` enum: `QuestCompletion`, `DailyScore`, `StreakBonus`, `ManualAdjustment`, `System`;
 - `SourceType` nullable enum: Task, Habit, DailyScore, Streak;
 - `SourceEntityId` nullable;
-- `XPAmount` int;
+- `XpAmount` int;
 - `OccurredAtUtc` UTC instant;
 - `BusinessDate` date-only in the user's local time zone;
 - `Notes` nullable;
-- `IdempotencyKey` nullable string;
+- `IdempotencyKey` nullable string, max 200 characters;
+- `Notes` nullable string, max 500 characters;
 - audit fields.
 
 Constraints:
@@ -264,8 +265,10 @@ Indexes:
 
 Idempotency key examples:
 
-- `TaskComplete:{TaskId}`;
-- `HabitComplete:{HabitId}:{CompletionDate}`.
+- `TaskComplete:{TaskId:D}`;
+- `HabitComplete:{HabitId:D}:{CompletionDate:yyyy-MM-dd}`.
+
+Milestone 5 Quest-completion awards require a non-null idempotency key. The unique index is `(UserId, IdempotencyKey)` for non-null keys. `XpAmount` is the actual positive capped award, not raw XP. Existing rows are append-only; persistence rejects modification or deletion before generic soft-delete conversion. No Task/Habit polymorphic foreign key is created, and source archive or soft deletion never removes or reverses XP. Future compensating transactions remain schema-compatible.
 
 ### 4.7 UserProgression
 
@@ -273,12 +276,13 @@ Purpose: denormalized current progression state.
 
 Fields:
 
-- `UserId` primary key or unique key;
+- inherited `Id` primary key and required unique `UserId`;
 - `TotalLifetimeXP` long;
 - `CurrentLevel` int;
 - `CurrentEchelon` enum: Iron, Bronze, Silver, Gold, Platinum, Onyx, Radiant, Apex, Celestial, Immortal, Abyssal, Ascendant;
 - `DailyQuestXPToday` int;
-- `DailyQuestXPDate` date-only;
+- `DailyQuestXPDate` nullable `DateOnly?`, mapped to PostgreSQL `date`;
+- `Version` long, default 0, non-negative, and an EF concurrency token;
 - `UpdatedAtUtc`.
 
 Constraints:
@@ -291,6 +295,8 @@ Notes:
 - Level is derived from the documented level formula.
 - Echelon is derived from documented level thresholds.
 - The progression update and XP transaction creation must happen atomically.
+
+Progression defaults are lifetime XP 0, level 1, echelon Iron, daily Quest XP 0, daily date null, and version 0. It is initialized lazily and race-safely on first access or award; no startup or user-seeding pipeline is added. The ledger sum for the target user-local `BusinessDate` is authoritative for the 500-XP cap, not the cache fields. `IXpRepository` is the single persistence boundary for XP transactions and progression; no separate progression repository or Unit of Work is required.
 
 ### 4.8 FinanceCategory
 

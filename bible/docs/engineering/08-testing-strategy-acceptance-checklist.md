@@ -178,16 +178,20 @@ Future AI features need qualitative review plus structured checks for:
 - Between15And30Minutes medium friction gives 150 XP.
 - Between30And60Minutes high friction gives 300 XP.
 - Over60Minutes high friction gives 400 XP.
-- Daily quest XP cap prevents excess XP.
-- Completing after cap still completes the task/habit but awards no extra quest XP.
+- all 12 Quest XP combinations, invalid enums, exact level thresholds, echelon boundaries, and very large non-negative `long` values are covered;
+- daily cap underflow, crossing, exhaustion, time-zone changes, and ledger-sum authority are covered;
+- crossing awards only the remaining capacity; cap exhaustion succeeds with actual XP zero and no zero-XP transaction;
+- deterministic Task and Habit idempotency keys are covered.
 
 ### 7.2 XP transaction integrity
 
-- Every XP award creates an XP transaction.
+- Every positive actual award creates one append-only XP transaction; zero awards create none.
 - XP transaction has correct user.
 - XP transaction has correct source.
 - XP transaction has correct business date.
-- Duplicate idempotency key is rejected.
+- Duplicate/replayed idempotency is a safe outcome and never increments progression twice.
+- Filtered `(UserId, IdempotencyKey)` uniqueness, required lengths, PostgreSQL `date`, `bigint`, no polymorphic Task/Habit FK, and the `Version` concurrency token are covered.
+- Existing XP transaction modification/deletion is rejected before soft-delete conversion.
 
 ### 7.3 User progression
 
@@ -195,7 +199,9 @@ Future AI features need qualitative review plus structured checks for:
 - Level recalculates correctly from the documented level formula.
 - Echelon recalculates correctly from documented thresholds.
 - Progression update and XP transaction are atomic.
-- User progression exists after seeding.
+- User progression is lazily initialized and race-safe; no seeding is required.
+- Concurrency conflicts retry the complete award at most 3 times; unrelated database errors propagate.
+- History is current-user scoped, immutable, and newest-first.
 
 ## 8. Reminder and notification acceptance checklist
 
@@ -258,8 +264,9 @@ Future AI features need qualitative review plus structured checks for:
 - Dashboard shows overdue tasks.
 - Dashboard shows today's habits.
 - Dashboard shows habit completion progress.
-- Dashboard shows XP level/echelon.
-- Dashboard shows unread notifications.
+- Dashboard shows the XP Progress widget: level, echelon, lifetime XP, today's Quest XP, `x of 500`, remaining XP, and accessible progress semantics.
+- Dashboard refreshes after Task/Habit completion and distinguishes persisted failure, XP partial success, and refresh failure.
+- Milestone 5 does not require a global/header XP chip, XP history UI, or notification UI.
 - Dashboard shows simple finance summary.
 - Quick-add actions open correct forms.
 - Empty states are useful.

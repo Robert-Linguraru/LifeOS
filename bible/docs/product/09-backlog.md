@@ -63,14 +63,11 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 
 ### XP and gamification
 
-- `V1` XPTransaction.
-- `V1` UserProgression.
-- `Milestone 5` Quest XP.
-- `Milestone 5` Daily quest XP cap.
-- `Milestone 5` Level calculation.
-- `Milestone 5` Echelon calculation.
-- `Milestone 5` XP dashboard display.
-- `Milestone 5` Basic level-up notification.
+- `Milestone 5` append-only `XpTransaction` ledger and lazy `UserProgression` projection.
+- `Milestone 5` Quest XP from Task and Habit completion, including the shared 500-XP daily cap.
+- `Milestone 5` exact level and echelon calculation, idempotency, concurrency, and atomic persistence.
+- `Milestone 5` XP progression service/history contract and XP Progress Dashboard widget.
+- `Milestone 5` level/echelon transition metadata (persisted user notifications are Milestone 6).
 - `Future` DailyScore engine.
 - `Future` Streak bonus XP job.
 

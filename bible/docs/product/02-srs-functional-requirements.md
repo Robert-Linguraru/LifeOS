@@ -405,3 +405,7 @@ Default income categories:
 - `V1` The solution shall separate UI, domain, infrastructure, and job concerns.
 - `V1` Feature logic shall live in services, not Razor pages.
 - `V1` The system shall be modular enough to add future domains.
+
+### 18.1 Milestone 5 XP contract
+
+Milestone 5 uses `IXpService`/`XpService` and `IXpRepository`. It awards positive `QuestCompletion` XP for new Task and Habit completion events only, uses the shared 500-XP per-user-local-business-date cap, and treats cap crossing, cap exhaustion, duplicate replay, and lazy progression initialization as successful handled outcomes. Positive actual awards are recorded in an append-only ledger and committed atomically with the materialized progression projection. Level/echelon transitions are returned as metadata; persisted notifications and notification UI are Milestone 6. The XP Progress Dashboard widget is in scope, while a global/header XP chip and XP history UI are not.

@@ -151,14 +151,14 @@ Persisted
 
 - XP Transactions are append-only.
 - XP Transactions are never modified.
-- Corrections create compensating transactions rather than editing history.
+- Existing rows cannot be modified or deleted. Future corrections may use compensating transactions; no correction workflow is in Milestone 5.
 
 ---
 
 # User Progression Lifecycle
 
 ```
-Seeded
+Lazily initialized
     │
     ▼
 Active
@@ -170,8 +170,9 @@ Updated
 ### Rules
 
 - Every user owns exactly one UserProgression record.
-- Progression is updated only through XPService.
+- Progression is updated only through `XpService`.
 - Progression is never edited manually.
+- First access or first award creates the row race-safely; no startup or account seeding is required.
 
 ---
 
