@@ -2,9 +2,11 @@
 using LifeOS.Core.Abstractions.Tasks;
 using LifeOS.Core.Constants;
 using LifeOS.Core.DTOs.Tasks;
+using LifeOS.Core.DTOs.Xp;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums.Tasks;
 using LifeOS.Core.Enums;
+using LifeOS.Core.Enums.Xp;
 using LifeOS.Core.Exceptions;
 using LifeOS.Core.Mappings;
 using LifeOS.Core.Services;
@@ -18,6 +20,7 @@ public sealed class TaskService : ITaskService
     private readonly ICurrentUserService _currentUser;
     private readonly IUserSettingsService _userSettingsService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IXpService _xpService;
     private readonly ILogger<TaskService> _logger;
 
     public TaskService(
@@ -25,12 +28,14 @@ public sealed class TaskService : ITaskService
         ICurrentUserService currentUser,
         IUserSettingsService userSettingsService,
         IDateTimeProvider dateTimeProvider,
+        IXpService xpService,
         ILogger<TaskService> logger)
     {
         _repository = repository;
         _currentUser = currentUser;
         _userSettingsService = userSettingsService;
         _dateTimeProvider = dateTimeProvider;
+        _xpService = xpService;
         _logger = logger;
     }
 
@@ -329,9 +334,9 @@ public sealed class TaskService : ITaskService
             .ThenBy(task => task.Title);
     }
 
-    public async Task<TaskDetailsDto> CompleteTaskAsync(
-    Guid taskId,
-    CancellationToken cancellationToken = default)
+    public async Task<TaskCompletionResultDto> CompleteTaskAsync(
+        Guid taskId,
+        CancellationToken cancellationToken = default)
     {
         var userId = GetCurrentUserId();
 
@@ -348,7 +353,7 @@ public sealed class TaskService : ITaskService
 
         if (task.Status == TaskItemStatus.Completed)
         {
-            return task.ToDetailsDto();
+            return CreateCompletionResult(task, false);
         }
 
         if (task.Status != TaskItemStatus.Active)
@@ -361,22 +366,85 @@ public sealed class TaskService : ITaskService
             await _userSettingsService.GetCurrentUserSettingsAsync(
                 cancellationToken);
 
-        task.Status = TaskItemStatus.Completed;
-        task.CompletedAtUtc = _dateTimeProvider.UtcNow;
-        task.CompletedDate =
-            _dateTimeProvider.GetCurrentDate(
-                settings.TimeZoneId);
-
-        await _repository.UpdateAsync(
-            task,
+        var completion = await _repository.CompleteAsync(
+            userId,
+            taskId,
+            _dateTimeProvider.UtcNow,
+            _dateTimeProvider.GetCurrentDate(settings.TimeZoneId),
             cancellationToken);
+
+        if (completion.Status == TaskCompletionWriteStatus.NotFound)
+        {
+            throw new ResourceNotFoundException("Task was not found.");
+        }
+
+        if (completion.Status == TaskCompletionWriteStatus.Archived)
+        {
+            throw new ValidationException("Only active tasks can be completed.");
+        }
+
+        var authoritativeTask = completion.Task ??
+            throw new InvalidOperationException("Task completion did not return the authoritative task.");
+
+        if (completion.Status == TaskCompletionWriteStatus.AlreadyCompleted)
+        {
+            return CreateCompletionResult(authoritativeTask, false);
+        }
+
+        XpAwardResultDto? xpAward = null;
+        var xpAwardFailed = false;
+
+        try
+        {
+            xpAward = await _xpService.AwardQuestXpAsync(
+                new AwardQuestXpDto
+                {
+                    SourceType = XpSourceType.Task,
+                    SourceEntityId = authoritativeTask.Id,
+                    OccurredAtUtc = authoritativeTask.CompletedAtUtc ??
+                        throw new InvalidOperationException("Completed task timestamp is missing."),
+                    BusinessDate = authoritativeTask.CompletedDate ??
+                        throw new InvalidOperationException("Completed task date is missing."),
+                    EstimatedTime = authoritativeTask.EstimatedTime,
+                    FrictionLevel = authoritativeTask.FrictionLevel
+                },
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            xpAwardFailed = true;
+            _logger.LogError(
+                exception,
+                "XP award failed after completing task {TaskId} for user {UserId}",
+                authoritativeTask.Id,
+                userId);
+        }
 
         _logger.LogInformation(
             "Completed task {TaskId} for user {UserId}",
             task.Id,
             userId);
 
-        return task.ToDetailsDto();
+        return CreateCompletionResult(
+            authoritativeTask,
+            true,
+            xpAward,
+            xpAwardFailed);
+    }
+
+    private static TaskCompletionResultDto CreateCompletionResult(
+        TaskItem task,
+        bool wasNewlyCompleted,
+        XpAwardResultDto? xpAward = null,
+        bool xpAwardFailed = false)
+    {
+        return new TaskCompletionResultDto
+        {
+            Task = task.ToDetailsDto(),
+            WasNewlyCompleted = wasNewlyCompleted,
+            XpAward = xpAward,
+            XpAwardFailed = xpAwardFailed
+        };
     }
 
     public async Task<TaskDetailsDto> ArchiveTaskAsync(

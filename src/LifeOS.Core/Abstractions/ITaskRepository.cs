@@ -21,6 +21,13 @@ public interface ITaskRepository
         TaskItem task,
         CancellationToken cancellationToken = default);
 
+    Task<TaskCompletionWriteResult> CompleteAsync(
+        Guid userId,
+        Guid taskId,
+        DateTimeOffset completedAtUtc,
+        DateOnly completedDate,
+        CancellationToken cancellationToken = default);
+
     Task DeleteAsync(
         TaskItem task,
         CancellationToken cancellationToken = default);

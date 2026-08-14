@@ -2,9 +2,11 @@
 using LifeOS.Core.Abstractions.Tasks;
 using LifeOS.Core.DTOs;
 using LifeOS.Core.DTOs.Tasks;
+using LifeOS.Core.DTOs.Xp;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums.Tasks;
 using LifeOS.Core.Enums;
+using LifeOS.Core.Enums.Xp;
 using LifeOS.Core.Exceptions;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Services;
@@ -21,6 +23,7 @@ public sealed class TaskServiceTests
     private readonly Mock<ICurrentUserService> _currentUser = new();
     private readonly Mock<IUserSettingsService> _userSettingsService = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IXpService> _xpService = new();
     private readonly Mock<ILogger<TaskService>> _logger = new();
 
     private TaskService CreateService()
@@ -38,6 +41,7 @@ public sealed class TaskServiceTests
             _currentUser.Object,
             _userSettingsService.Object,
             _dateTimeProvider.Object,
+            _xpService.Object,
             _logger.Object);
     }
 
@@ -73,6 +77,98 @@ public sealed class TaskServiceTests
                     task.Status == TaskItemStatus.Active),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_NewCompletion_SendsAuthoritativeTaskDataToXp()
+    {
+        var taskId = Guid.NewGuid();
+        var completedAt = new DateTimeOffset(2026, 8, 8, 22, 30, 0, TimeSpan.Zero);
+        var completedDate = new DateOnly(2026, 8, 9);
+        var task = new TaskItem
+        {
+            Id = taskId,
+            UserId = UserId,
+            Title = "XP task",
+            Status = TaskItemStatus.Active,
+            EstimatedTime = EstimatedTime.Over60Minutes,
+            FrictionLevel = FrictionLevel.High
+        };
+        ConfigureCompletion(task, completedAt, completedDate);
+        _xpService.Setup(item => item.AwardQuestXpAsync(
+                It.IsAny<AwardQuestXpDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new XpAwardResultDto { AwardedXp = 200 });
+
+        var result = await CreateService().CompleteTaskAsync(taskId);
+
+        Assert.True(result.WasNewlyCompleted);
+        Assert.False(result.XpAwardFailed);
+        _xpService.Verify(item => item.AwardQuestXpAsync(
+            It.Is<AwardQuestXpDto>(dto =>
+                dto.SourceType == XpSourceType.Task &&
+                dto.SourceEntityId == taskId &&
+                dto.OccurredAtUtc == completedAt &&
+                dto.BusinessDate == completedDate &&
+                dto.EstimatedTime == EstimatedTime.Over60Minutes &&
+                dto.FrictionLevel == FrictionLevel.High),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_XpFailure_ReturnsPartialSuccessWithoutReopeningTask()
+    {
+        var taskId = Guid.NewGuid();
+        var task = new TaskItem
+        {
+            Id = taskId,
+            UserId = UserId,
+            Title = "XP failure task",
+            Status = TaskItemStatus.Active,
+            EstimatedTime = EstimatedTime.Between15And30Minutes,
+            FrictionLevel = FrictionLevel.Low
+        };
+        var completedAt = new DateTimeOffset(2026, 8, 8, 22, 30, 0, TimeSpan.Zero);
+        var completedDate = new DateOnly(2026, 8, 9);
+        ConfigureCompletion(task, completedAt, completedDate);
+        var exception = new XpConcurrencyException();
+        _xpService.Setup(item => item.AwardQuestXpAsync(
+                It.IsAny<AwardQuestXpDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(exception);
+
+        var result = await CreateService().CompleteTaskAsync(taskId);
+
+        Assert.True(result.WasNewlyCompleted);
+        Assert.True(result.XpAwardFailed);
+        Assert.Null(result.XpAward);
+        Assert.Equal(TaskItemStatus.Completed, result.Task.Status);
+        _repository.Verify(item => item.UpdateAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private void ConfigureCompletion(TaskItem task, DateTimeOffset completedAt, DateOnly completedDate)
+    {
+        _repository.Setup(item => item.GetByIdAsync(UserId, task.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(task);
+        _userSettingsService.Setup(item => item.GetCurrentUserSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserSettingsDto { UserId = UserId, TimeZoneId = "Europe/Bucharest" });
+        _dateTimeProvider.SetupGet(item => item.UtcNow).Returns(completedAt);
+        _dateTimeProvider.Setup(item => item.GetCurrentDate("Europe/Bucharest")).Returns(completedDate);
+        _repository.Setup(item => item.CompleteAsync(UserId, task.Id, completedAt, completedDate,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TaskCompletionWriteResult
+            {
+                Status = TaskCompletionWriteStatus.NewlyCompleted,
+                Task = new TaskItem
+                {
+                    Id = task.Id,
+                    UserId = UserId,
+                    Title = task.Title,
+                    Status = TaskItemStatus.Completed,
+                    EstimatedTime = task.EstimatedTime,
+                    FrictionLevel = task.FrictionLevel,
+                    CompletedAtUtc = completedAt,
+                    CompletedDate = completedDate
+                }
+            });
     }
 
     [Fact]
@@ -512,6 +608,27 @@ public sealed class TaskServiceTests
                 "Europe/Bucharest"))
             .Returns(localDate);
 
+        _repository
+            .Setup(x => x.CompleteAsync(
+                UserId,
+                taskId,
+                utcNow,
+                localDate,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TaskCompletionWriteResult
+            {
+                Status = TaskCompletionWriteStatus.NewlyCompleted,
+                Task = new TaskItem
+                {
+                    Id = task.Id,
+                    UserId = UserId,
+                    Title = task.Title,
+                    Status = TaskItemStatus.Completed,
+                    CompletedAtUtc = utcNow,
+                    CompletedDate = localDate
+                }
+            });
+
         var service = CreateService();
 
         var result =
@@ -519,19 +636,22 @@ public sealed class TaskServiceTests
 
         Assert.Equal(
             TaskItemStatus.Completed,
-            result.Status);
+            result.Task.Status);
 
         Assert.Equal(
             utcNow,
-            result.CompletedAtUtc);
+            result.Task.CompletedAtUtc);
 
         Assert.Equal(
             localDate,
-            result.CompletedDate);
+            result.Task.CompletedDate);
 
         _repository.Verify(
-            x => x.UpdateAsync(
-                task,
+            x => x.CompleteAsync(
+                UserId,
+                taskId,
+                utcNow,
+                localDate,
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -577,11 +697,11 @@ public sealed class TaskServiceTests
 
         Assert.Equal(
             originalCompletedAtUtc,
-            result.CompletedAtUtc);
+            result.Task.CompletedAtUtc);
 
         Assert.Equal(
             originalCompletedDate,
-            result.CompletedDate);
+            result.Task.CompletedDate);
 
         _repository.Verify(
             x => x.UpdateAsync(
