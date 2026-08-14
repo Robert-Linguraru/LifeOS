@@ -1,0 +1,90 @@
+.xp-widget {
+    padding: 1.25rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 0.6rem;
+}
+
+.xp-widget__header {
+    margin-bottom: 1rem;
+}
+
+.xp-widget__header h2 {
+    margin: 0;
+}
+
+.xp-widget__identity {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.xp-widget__level,
+.xp-widget__echelon,
+.xp-widget__lifetime,
+.xp-widget__remaining {
+    margin: 0;
+}
+
+.xp-widget__level {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.xp-widget__echelon {
+    font-weight: 600;
+}
+
+.xp-widget__lifetime {
+    margin-top: 0.75rem;
+}
+
+.xp-widget__daily {
+    margin-top: 1.25rem;
+}
+
+.xp-widget__daily-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+}
+
+.xp-widget__daily progress {
+    display: block;
+    width: 100%;
+    height: 1rem;
+}
+
+.xp-widget__remaining {
+    margin-top: 0.4rem;
+    font-size: 0.95rem;
+}
+
+.xp-widget__error {
+    padding: 0.75rem;
+    border: 1px dashed #b8b8b8;
+    border-radius: 0.4rem;
+}
+
+.xp-widget__error p {
+    margin-top: 0;
+}
+
+.xp-widget__error button {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid #b8b8b8;
+    border-radius: 0.35rem;
+    cursor: pointer;
+    font: inherit;
+}
+
+@media (max-width: 700px) {
+    .xp-widget__identity,
+    .xp-widget__daily-label {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+}

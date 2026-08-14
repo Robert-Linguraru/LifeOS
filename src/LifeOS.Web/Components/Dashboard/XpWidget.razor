@@ -1,0 +1,82 @@
+@inject IDashboardService DashboardService
+
+<section class="xp-widget" aria-labelledby="xp-widget-title">
+    <div class="xp-widget__header">
+        <h2 id="xp-widget-title">XP Progress</h2>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading XP progress...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="xp-widget__error" role="alert">
+            <p>@_loadError</p>
+            <button type="button" @onclick="LoadWidgetAsync">
+                Try again
+            </button>
+        </div>
+    }
+    else if (_widget is not null)
+    {
+        <div class="xp-widget__identity">
+            <p class="xp-widget__level">Level @_widget.CurrentLevel</p>
+            <p class="xp-widget__echelon">@_widget.CurrentEchelon</p>
+        </div>
+
+        <p class="xp-widget__lifetime">
+            @_widget.TotalLifetimeXp.ToString("N0") lifetime XP
+        </p>
+
+        <div class="xp-widget__daily">
+            <div class="xp-widget__daily-label">
+                <span>Daily Quest XP</span>
+                <span>@_widget.DailyQuestXpToday / @_widget.DailyQuestXpCap</span>
+            </div>
+            <progress
+                value="@_widget.DailyQuestXpToday"
+                max="@_widget.DailyQuestXpCap"
+                aria-label="Daily Quest XP progress: @_widget.DailyQuestXpToday of @_widget.DailyQuestXpCap XP">
+                @_widget.ProgressPercent%
+            </progress>
+            <p class="xp-widget__remaining">
+                @_widget.RemainingQuestXp XP remaining
+            </p>
+        </div>
+    }
+</section>
+
+@code {
+    private DashboardXpWidgetDto? _widget;
+    private bool _isLoading = true;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWidgetAsync();
+    }
+
+    private async Task LoadWidgetAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _widget = await DashboardService.GetXpWidgetAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError = "Something went wrong while loading XP progress.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
