@@ -119,12 +119,14 @@ public sealed class XpRepositoryIntegrationTests
             50,
             new DateOnly(2026, 8, 12),
             occurredAtUtc: timestamp);
+        sameTimeFirst.Id = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var sameTimeSecond = CreateTransaction(
             userId,
             "same-second",
             75,
             new DateOnly(2026, 8, 12),
             occurredAtUtc: timestamp);
+        sameTimeSecond.Id = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
         await using (var context = _fixture.CreateDbContext())
         {

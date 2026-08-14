@@ -112,6 +112,29 @@ public sealed class DependencyInjectionTests
     }
 
     [Fact]
+    public void AddInfrastructure_ShouldRegisterXpRepositoryAndService()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] =
+                    "Host=localhost;Port=5433;Database=lifeos;Username=lifeos;Password=test"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(configuration);
+
+        var repository = services.Single(service => service.ServiceType == typeof(IXpRepository));
+        var service = services.Single(item => item.ServiceType == typeof(IXpService));
+
+        Assert.Equal(typeof(XpRepository), repository.ImplementationType);
+        Assert.Equal(ServiceLifetime.Scoped, repository.Lifetime);
+        Assert.Equal(typeof(XpService), service.ImplementationType);
+        Assert.Equal(ServiceLifetime.Scoped, service.Lifetime);
+    }
+
+    [Fact]
     public void AddInfrastructure_ShouldRegisterHabitService()
     {
         var configurationValues =
