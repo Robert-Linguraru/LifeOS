@@ -19,6 +19,8 @@ public class AppDbContext : DbContext
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<Habit> Habits => Set<Habit>();
     public DbSet<HabitLog> HabitLogs => Set<HabitLog>();
+    public DbSet<XpTransaction> XpTransactions => Set<XpTransaction>();
+    public DbSet<UserProgression> UserProgressions => Set<UserProgression>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -68,11 +70,27 @@ public class AppDbContext : DbContext
     {
         ChangeTracker.DetectChanges();
 
+        RejectXpTransactionMutations();
+
         var utcNow = _dateTimeProvider.UtcNow;
 
         foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
             ApplyEntityLifecycleRule(entry, utcNow);
+        }
+    }
+
+    private void RejectXpTransactionMutations()
+    {
+        var mutatedTransaction = ChangeTracker
+            .Entries<XpTransaction>()
+            .FirstOrDefault(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted);
+
+        if (mutatedTransaction is not null)
+        {
+            throw new InvalidOperationException(
+                "Existing XP transactions are append-only and cannot be modified or deleted.");
         }
     }
     private static void ApplyEntityLifecycleRule(

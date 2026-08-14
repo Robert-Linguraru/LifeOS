@@ -3,6 +3,8 @@ using LifeOS.Core.Constants;
 using LifeOS.Core.Entities;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace LifeOS.Tests.Infrastructure.Persistence;
 
@@ -222,6 +224,145 @@ public sealed class AppDbContextModelTests
         {
             Assert.NotNull(entityType.GetQueryFilter());
         }
+    }
+
+    [Fact]
+    public void Model_ShouldMapXpTransactionWithAppendOnlyLedgerContract()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(XpTransaction));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("XpTransactions", entityType.GetTableName());
+        Assert.Equal(
+            nameof(XpTransaction.Id),
+            entityType.FindPrimaryKey()!.Properties.Single().Name);
+
+        Assert.False(entityType.FindProperty(nameof(XpTransaction.UserId))!.IsNullable);
+        Assert.False(entityType.FindProperty(nameof(XpTransaction.Source))!.IsNullable);
+        Assert.True(entityType.FindProperty(nameof(XpTransaction.SourceType))!.IsNullable);
+        Assert.True(entityType.FindProperty(nameof(XpTransaction.SourceEntityId))!.IsNullable);
+        Assert.False(entityType.FindProperty(nameof(XpTransaction.XpAmount))!.IsNullable);
+        Assert.False(entityType.FindProperty(nameof(XpTransaction.OccurredAtUtc))!.IsNullable);
+        Assert.False(entityType.FindProperty(nameof(XpTransaction.BusinessDate))!.IsNullable);
+        Assert.True(entityType.FindProperty(nameof(XpTransaction.IdempotencyKey))!.IsNullable);
+        Assert.True(entityType.FindProperty(nameof(XpTransaction.Notes))!.IsNullable);
+        Assert.Equal(
+            200,
+            entityType.FindProperty(nameof(XpTransaction.IdempotencyKey))!.GetMaxLength());
+        Assert.Equal(
+            500,
+            entityType.FindProperty(nameof(XpTransaction.Notes))!.GetMaxLength());
+        Assert.Equal(
+            "date",
+            entityType.FindProperty(nameof(XpTransaction.BusinessDate))!.GetColumnType());
+        Assert.Equal(
+            "timestamp with time zone",
+            entityType.FindProperty(nameof(XpTransaction.OccurredAtUtc))!.GetColumnType());
+
+        var indexes = entityType.GetIndexes().ToList();
+        var idempotencyIndex = indexes.Single(index => index.Properties
+            .Select(property => property.Name)
+            .SequenceEqual([
+                nameof(XpTransaction.UserId),
+                nameof(XpTransaction.IdempotencyKey)]));
+
+        Assert.True(idempotencyIndex.IsUnique);
+        Assert.Equal(
+            "\"IdempotencyKey\" IS NOT NULL",
+            idempotencyIndex.GetFilter());
+        Assert.Contains(indexes, index => index.Properties.Select(property => property.Name)
+            .SequenceEqual([nameof(XpTransaction.UserId), nameof(XpTransaction.OccurredAtUtc)]));
+        Assert.Contains(indexes, index => index.Properties.Select(property => property.Name)
+            .SequenceEqual([nameof(XpTransaction.UserId), nameof(XpTransaction.BusinessDate)]));
+        Assert.Contains(indexes, index => index.Properties.Select(property => property.Name)
+            .SequenceEqual([nameof(XpTransaction.UserId), nameof(XpTransaction.Source)]));
+
+        Assert.Empty(entityType.GetForeignKeys());
+    }
+
+    [Fact]
+    public void Model_ShouldMapUserProgressionWithConcurrencyAndConstraints()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserProgression));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("UserProgressions", entityType.GetTableName());
+        Assert.Equal(
+            nameof(UserProgression.Id),
+            entityType.FindPrimaryKey()!.Properties.Single().Name);
+
+        var userIdIndex = entityType.GetIndexes().Single(index => index.Properties
+            .Select(property => property.Name)
+            .SequenceEqual([nameof(UserProgression.UserId)]));
+        Assert.True(userIdIndex.IsUnique);
+
+        Assert.Equal(
+            typeof(long),
+            entityType.FindProperty(nameof(UserProgression.TotalLifetimeXp))!.ClrType);
+        Assert.Equal(
+            "bigint",
+            entityType.FindProperty(nameof(UserProgression.TotalLifetimeXp))!.GetColumnType());
+        Assert.Equal(
+            "bigint",
+            entityType.FindProperty(nameof(UserProgression.Version))!.GetColumnType());
+        Assert.False(entityType.FindProperty(nameof(UserProgression.Version))!.IsNullable);
+        Assert.True(entityType.FindProperty(nameof(UserProgression.Version))!.IsConcurrencyToken);
+        Assert.True(entityType.FindProperty(nameof(UserProgression.DailyQuestXpDate))!.IsNullable);
+        Assert.Equal(
+            "date",
+            entityType.FindProperty(nameof(UserProgression.DailyQuestXpDate))!.GetColumnType());
+
+        var designEntityType = context.GetService<IDesignTimeModel>()
+            .Model
+            .FindEntityType(typeof(UserProgression));
+
+        Assert.NotNull(designEntityType);
+
+        var constraints = designEntityType.GetCheckConstraints()
+            .Select(constraint => constraint.Name)
+            .ToList();
+
+        Assert.Contains("CK_UserProgressions_TotalLifetimeXp_NonNegative", constraints);
+        Assert.Contains("CK_UserProgressions_CurrentLevel_AtLeastOne", constraints);
+        Assert.Contains("CK_UserProgressions_DailyQuestXpToday_InRange", constraints);
+        Assert.Contains("CK_UserProgressions_Version_NonNegative", constraints);
+    }
+
+    [Fact]
+    public void SaveChanges_ShouldRejectModifiedXpTransactionBeforePersistence()
+    {
+        using var context = CreateContext();
+        var transaction = new XpTransaction { UserId = Guid.NewGuid() };
+
+        context.Attach(transaction);
+        context.Entry(transaction).State = EntityState.Modified;
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => context.SaveChanges());
+
+        Assert.Contains("append-only", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(EntityState.Modified, context.Entry(transaction).State);
+    }
+
+    [Fact]
+    public void SaveChanges_ShouldRejectDeletedXpTransactionBeforeSoftDeleteConversion()
+    {
+        using var context = CreateContext();
+        var transaction = new XpTransaction { UserId = Guid.NewGuid() };
+
+        context.Attach(transaction);
+        context.Entry(transaction).State = EntityState.Deleted;
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => context.SaveChanges());
+
+        Assert.Contains("append-only", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(EntityState.Deleted, context.Entry(transaction).State);
+        Assert.False(transaction.IsDeleted);
     }
 
     private static AppDbContext CreateContext()
