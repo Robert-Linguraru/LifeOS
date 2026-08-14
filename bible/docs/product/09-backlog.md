@@ -68,6 +68,7 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 - `Milestone 5` exact level and echelon calculation, idempotency, concurrency, and atomic persistence.
 - `Milestone 5` XP progression service/history contract and XP Progress Dashboard widget.
 - `Milestone 5` level/echelon transition metadata (persisted user notifications are Milestone 6).
+- `Milestone 5` completed: PostgreSQL persistence, Task/Habit integration, Dashboard feedback, and sibling XP refresh coordination verified in Ticket 13 closure.
 - `Future` DailyScore engine.
 - `Future` Streak bonus XP job.
 

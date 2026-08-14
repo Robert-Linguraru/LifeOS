@@ -433,3 +433,22 @@ Examples include a transactional outbox, durable completion-event ledger, or rec
 ### Status
 
 Open — accepted Milestone 5 limitation.
+
+
+## TD-007 - Component/browser automation for interactive Dashboard regressions
+
+### Current limitation
+
+The Razor component namespace regression in Milestone 4 and the sibling Dashboard XP refresh regression in Milestone 5 were found by manual browser verification rather than the automated suite.
+
+### Revisit trigger
+
+Before adding further interactive Dashboard coordination or more cross-widget behavior, evaluate component/browser automation that can verify rendered component resolution, completion feedback, and sibling refresh behavior.
+
+### Scope decision
+
+No UI automation framework is introduced during Milestone 5 closure. Manual verification remains the current acceptance mechanism for the existing UI scope.
+
+### Status
+
+Open - targeted future testing revisit.

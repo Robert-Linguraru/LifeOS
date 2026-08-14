@@ -205,6 +205,7 @@ Done when:
 - user progression updates atomically;
 - level/echelon calculations are tested;
 - the frozen contracts in this plan cannot be silently changed by later implementation tickets;
+- the complete migration chain, cross-source cap behavior, Task/Habit regressions, Dashboard XP projection, and manual UI refresh behavior are verified;
 - build/tests pass.
 
 ## Milestone 6 - Notifications and one-time reminders

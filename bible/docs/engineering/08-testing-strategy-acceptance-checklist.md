@@ -204,6 +204,14 @@ Future AI features need qualitative review plus structured checks for:
 - Concurrency conflicts retry the complete award at most 3 times; unrelated database errors propagate.
 - History is current-user scoped, immutable, and newest-first.
 
+### 7.4 Milestone 5 closure
+
+- The complete PostgreSQL migration chain applies from an empty database through `AddXpProgression` with no pending model changes.
+- Task and Habit Quest awards share one 500-XP daily cap, including cross-source partial-cap composition.
+- Task/Habit completion, XP persistence, progression consistency, source history, timezone behavior, and Dashboard projections pass regression verification.
+- Dashboard Task/Habit completion refreshes the XP Progress widget without navigation or a page reload.
+- Ticket 13 closure verification uses real PostgreSQL/Testcontainers and records the actual full-suite result.
+
 ## 8. Reminder and notification acceptance checklist
 
 ### 8.1 Reminder creation
