@@ -42,7 +42,7 @@ public interface IHabitRepository
             Guid userId,
             CancellationToken cancellationToken = default);
 
-    Task<bool> TryAddLogAsync(
+    Task<HabitLogWriteResult> TryAddLogAsync(
         HabitLog habitLog,
         CancellationToken cancellationToken = default);
 }

@@ -2,9 +2,11 @@ using LifeOS.Core.Abstractions;
 using LifeOS.Core.Abstractions.Habits;
 using LifeOS.Core.Constants;
 using LifeOS.Core.DTOs.Habits;
+using LifeOS.Core.DTOs.Xp;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums;
 using LifeOS.Core.Enums.Habits;
+using LifeOS.Core.Enums.Xp;
 using LifeOS.Core.Exceptions;
 using LifeOS.Core.Mappings;
 using LifeOS.Core.Services;
@@ -21,6 +23,7 @@ public sealed class HabitService : IHabitService
     private readonly ICurrentUserService _currentUser;
     private readonly IUserSettingsService _userSettingsService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IXpService _xpService;
     private readonly ILogger<HabitService> _logger;
 
     public HabitService(
@@ -28,12 +31,14 @@ public sealed class HabitService : IHabitService
         ICurrentUserService currentUser,
         IUserSettingsService userSettingsService,
         IDateTimeProvider dateTimeProvider,
+        IXpService xpService,
         ILogger<HabitService> logger)
     {
         _repository = repository;
         _currentUser = currentUser;
         _userSettingsService = userSettingsService;
         _dateTimeProvider = dateTimeProvider;
+        _xpService = xpService;
         _logger = logger;
     }
 
@@ -242,7 +247,7 @@ public sealed class HabitService : IHabitService
         };
     }
 
-    public async Task<HabitSummaryDto> CompleteHabitAsync(
+    public async Task<HabitCompletionResultDto> CompleteHabitAsync(
         Guid habitId,
         CancellationToken cancellationToken = default)
     {
@@ -281,9 +286,12 @@ public sealed class HabitService : IHabitService
                 habitId,
                 cancellationToken);
 
-            return habit.ToSummaryDto(
-                true,
-                CalculateCurrentStreak(existingDates, currentDate));
+            return CreateCompletionResult(
+                habit.ToSummaryDto(
+                    true,
+                    CalculateCurrentStreak(existingDates, currentDate)),
+                false,
+                completionLog: existingLog);
         }
 
         var habitLog = new HabitLog
@@ -294,23 +302,15 @@ public sealed class HabitService : IHabitService
             CompletedAtUtc = utcNow
         };
 
-        var inserted = await _repository.TryAddLogAsync(
+        var writeResult = await _repository.TryAddLogAsync(
             habitLog,
             cancellationToken);
 
-        if (!inserted)
+        var authoritativeLog = writeResult.Log;
+        if (authoritativeLog is null)
         {
-            var authoritativeLog = await _repository.GetLogByDateAsync(
-                userId,
-                habitId,
-                currentDate,
-                cancellationToken);
-
-            if (authoritativeLog is null)
-            {
-                throw new ResourceNotFoundException(
-                    "The completed Habit state could not be retrieved.");
-            }
+            throw new ResourceNotFoundException(
+                "The completed Habit state could not be retrieved.");
         }
 
         var completionDates = await _repository.GetCompletionDatesAsync(
@@ -323,9 +323,65 @@ public sealed class HabitService : IHabitService
             habitId,
             userId);
 
-        return habit.ToSummaryDto(
+        var summary = habit.ToSummaryDto(
             true,
-            CalculateCurrentStreak(completionDates, currentDate));
+            CalculateCurrentStreak(completionDates, authoritativeLog.CompletionDate));
+
+        if (!writeResult.WasInserted)
+        {
+            return CreateCompletionResult(
+                summary,
+                false,
+                completionLog: authoritativeLog);
+        }
+
+        XpAwardResultDto? xpAward = null;
+        var xpAwardFailed = false;
+
+        try
+        {
+            xpAward = await _xpService.AwardQuestXpAsync(
+                new AwardQuestXpDto
+                {
+                    SourceType = XpSourceType.Habit,
+                    SourceEntityId = habit.Id,
+                    OccurredAtUtc = authoritativeLog.CompletedAtUtc,
+                    BusinessDate = authoritativeLog.CompletionDate,
+                    EstimatedTime = habit.EstimatedTime,
+                    FrictionLevel = habit.FrictionLevel
+                },
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            xpAwardFailed = true;
+            _logger.LogError(
+                exception,
+                "XP award failed after completing habit {HabitId} with log {HabitLogId} for user {UserId}",
+                habit.Id,
+                authoritativeLog.Id,
+                userId);
+        }
+
+        return CreateCompletionResult(summary, true, xpAward, xpAwardFailed, authoritativeLog);
+    }
+
+    private static HabitCompletionResultDto CreateCompletionResult(
+        HabitSummaryDto habit,
+        bool wasNewlyCompleted,
+        XpAwardResultDto? xpAward = null,
+        bool xpAwardFailed = false,
+        HabitLog? completionLog = null)
+    {
+        return new HabitCompletionResultDto
+        {
+            Habit = habit,
+            CompletedAtUtc = completionLog?.CompletedAtUtc,
+            CompletionDate = completionLog?.CompletionDate,
+            WasNewlyCompleted = wasNewlyCompleted,
+            XpAward = xpAward,
+            XpAwardFailed = xpAwardFailed
+        };
     }
 
     public async Task<HabitHistoryDto> GetHabitHistoryAsync(

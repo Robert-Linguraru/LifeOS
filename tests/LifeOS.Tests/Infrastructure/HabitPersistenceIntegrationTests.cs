@@ -173,6 +173,7 @@ public sealed class HabitPersistenceIntegrationTests
         var currentUser = new Mock<ICurrentUserService>();
         var userSettings = new Mock<IUserSettingsService>();
         var dateTimeProvider = new Mock<IDateTimeProvider>();
+        var xpService = new Mock<IXpService>();
         var logger = new Mock<ILogger<HabitService>>();
 
         currentUser.Setup(service => service.UserId).Returns(userId);
@@ -195,6 +196,7 @@ public sealed class HabitPersistenceIntegrationTests
             currentUser.Object,
             userSettings.Object,
             dateTimeProvider.Object,
+            xpService.Object,
             logger.Object);
 
         var created = await service.CreateHabitAsync(
@@ -208,8 +210,8 @@ public sealed class HabitPersistenceIntegrationTests
         var archived = await service.ArchiveHabitAsync(created.Id);
         var history = await service.GetHabitHistoryAsync(created.Id);
 
-        Assert.True(firstCompletion.IsCompletedToday);
-        Assert.True(secondCompletion.IsCompletedToday);
+        Assert.True(firstCompletion.Habit.IsCompletedToday);
+        Assert.True(secondCompletion.Habit.IsCompletedToday);
         Assert.False(archived.IsActive);
         Assert.Single(history.Entries);
         Assert.Equal(currentDate, history.Entries[0].CompletionDate);

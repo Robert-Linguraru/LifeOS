@@ -2,9 +2,11 @@ using LifeOS.Core.Abstractions;
 using LifeOS.Core.Abstractions.Habits;
 using LifeOS.Core.DTOs;
 using LifeOS.Core.DTOs.Habits;
+using LifeOS.Core.DTOs.Xp;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums;
 using LifeOS.Core.Enums.Habits;
+using LifeOS.Core.Enums.Xp;
 using LifeOS.Core.Exceptions;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Services;
@@ -21,6 +23,7 @@ public sealed class HabitServiceTests
     private readonly Mock<ICurrentUserService> _currentUser = new();
     private readonly Mock<IUserSettingsService> _userSettingsService = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IXpService> _xpService = new();
     private readonly Mock<ILogger<HabitService>> _logger = new();
 
     private HabitService CreateService()
@@ -62,6 +65,7 @@ public sealed class HabitServiceTests
             _currentUser.Object,
             _userSettingsService.Object,
             _dateTimeProvider.Object,
+            _xpService.Object,
             _logger.Object);
     }
 
@@ -98,6 +102,75 @@ public sealed class HabitServiceTests
                     habit.TargetUnit == null),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteHabitAsync_NewLog_SendsAuthoritativeLogDataToXp()
+    {
+        var currentDate = new DateOnly(2026, 8, 10);
+        var utcNow = new DateTimeOffset(2026, 8, 10, 23, 30, 0, TimeSpan.Zero);
+        var habit = CreateHabit("Read", true);
+        habit.EstimatedTime = EstimatedTime.Over60Minutes;
+        habit.FrictionLevel = FrictionLevel.High;
+        var authoritativeLog = new HabitLog
+        {
+            Id = Guid.NewGuid(), UserId = UserId, HabitId = habit.Id,
+            CompletionDate = currentDate, CompletedAtUtc = utcNow
+        };
+        SetupHabitLookup(habit);
+        _repository.Setup(item => item.GetLogByDateAsync(UserId, habit.Id, currentDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((HabitLog?)null);
+        _repository.Setup(item => item.TryAddLogAsync(It.IsAny<HabitLog>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HabitLogWriteResult { WasInserted = true, Log = authoritativeLog });
+        _repository.Setup(item => item.GetCompletionDatesAsync(UserId, habit.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([currentDate]);
+        _xpService.Setup(item => item.AwardQuestXpAsync(It.IsAny<AwardQuestXpDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new XpAwardResultDto { AwardedXp = 200 });
+        SetupDate(currentDate, utcNow);
+
+        var result = await CreateService().CompleteHabitAsync(habit.Id);
+
+        Assert.True(result.WasNewlyCompleted);
+        Assert.Equal(authoritativeLog.CompletedAtUtc, result.CompletedAtUtc);
+        _xpService.Verify(item => item.AwardQuestXpAsync(
+            It.Is<AwardQuestXpDto>(dto =>
+                dto.SourceType == XpSourceType.Habit &&
+                dto.SourceEntityId == habit.Id &&
+                dto.OccurredAtUtc == authoritativeLog.CompletedAtUtc &&
+                dto.BusinessDate == authoritativeLog.CompletionDate &&
+                dto.EstimatedTime == EstimatedTime.Over60Minutes &&
+                dto.FrictionLevel == FrictionLevel.High),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteHabitAsync_XpFailure_ReturnsPartialSuccessWithoutDeletingLog()
+    {
+        var currentDate = new DateOnly(2026, 8, 10);
+        var utcNow = new DateTimeOffset(2026, 8, 10, 23, 30, 0, TimeSpan.Zero);
+        var habit = CreateHabit("Read", true);
+        var authoritativeLog = new HabitLog
+        {
+            Id = Guid.NewGuid(), UserId = UserId, HabitId = habit.Id,
+            CompletionDate = currentDate, CompletedAtUtc = utcNow
+        };
+        SetupHabitLookup(habit);
+        _repository.Setup(item => item.GetLogByDateAsync(UserId, habit.Id, currentDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((HabitLog?)null);
+        _repository.Setup(item => item.TryAddLogAsync(It.IsAny<HabitLog>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HabitLogWriteResult { WasInserted = true, Log = authoritativeLog });
+        _repository.Setup(item => item.GetCompletionDatesAsync(UserId, habit.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([currentDate]);
+        _xpService.Setup(item => item.AwardQuestXpAsync(It.IsAny<AwardQuestXpDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new XpConcurrencyException());
+        SetupDate(currentDate, utcNow);
+
+        var result = await CreateService().CompleteHabitAsync(habit.Id);
+
+        Assert.True(result.WasNewlyCompleted);
+        Assert.True(result.XpAwardFailed);
+        Assert.Equal(authoritativeLog.CompletionDate, result.CompletionDate);
+        _repository.Verify(item => item.TryAddLogAsync(It.IsAny<HabitLog>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -734,7 +807,17 @@ public sealed class HabitServiceTests
             .Setup(repository => repository.TryAddLogAsync(
                 It.IsAny<HabitLog>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .ReturnsAsync(new HabitLogWriteResult
+            {
+                WasInserted = true,
+                Log = new HabitLog
+                {
+                    UserId = UserId,
+                    HabitId = habit.Id,
+                    CompletionDate = currentDate,
+                    CompletedAtUtc = utcNow
+                }
+            });
         _repository
             .Setup(repository => repository.GetCompletionDatesAsync(
                 UserId,
@@ -747,8 +830,8 @@ public sealed class HabitServiceTests
 
         var result = await service.CompleteHabitAsync(habit.Id);
 
-        Assert.True(result.IsCompletedToday);
-        Assert.Equal(2, result.CurrentStreak);
+        Assert.True(result.Habit.IsCompletedToday);
+        Assert.Equal(2, result.Habit.CurrentStreak);
         _repository.Verify(
             repository => repository.TryAddLogAsync(
                 It.Is<HabitLog>(log =>
@@ -800,7 +883,8 @@ public sealed class HabitServiceTests
 
         var result = await service.CompleteHabitAsync(habit.Id);
 
-        Assert.True(result.IsCompletedToday);
+        Assert.True(result.Habit.IsCompletedToday);
+        Assert.False(result.WasNewlyCompleted);
         _repository.Verify(
             repository => repository.TryAddLogAsync(
                 It.IsAny<HabitLog>(),
@@ -841,7 +925,11 @@ public sealed class HabitServiceTests
             .Setup(repository => repository.TryAddLogAsync(
                 It.IsAny<HabitLog>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .ReturnsAsync(new HabitLogWriteResult
+            {
+                WasInserted = false,
+                Log = authoritativeLog
+            });
         _repository
             .Setup(repository => repository.GetCompletionDatesAsync(
                 UserId,
@@ -854,14 +942,15 @@ public sealed class HabitServiceTests
 
         var result = await service.CompleteHabitAsync(habit.Id);
 
-        Assert.True(result.IsCompletedToday);
+        Assert.True(result.Habit.IsCompletedToday);
+        Assert.False(result.WasNewlyCompleted);
         _repository.Verify(
             repository => repository.GetLogByDateAsync(
                 UserId,
                 habit.Id,
                 currentDate,
                 It.IsAny<CancellationToken>()),
-            Times.Exactly(2));
+            Times.Once);
     }
 
     [Fact]

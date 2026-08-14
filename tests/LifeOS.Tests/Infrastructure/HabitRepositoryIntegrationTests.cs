@@ -156,8 +156,11 @@ public sealed class HabitRepositoryIntegrationTests
         var inserted = await repository.TryAddLogAsync(firstLog);
         var duplicate = await repository.TryAddLogAsync(duplicateLog);
 
-        Assert.True(inserted);
-        Assert.False(duplicate);
+        Assert.True(inserted.WasInserted);
+        Assert.NotNull(inserted.Log);
+        Assert.False(duplicate.WasInserted);
+        Assert.NotNull(duplicate.Log);
+        Assert.Equal(firstLog.CompletionDate, duplicate.Log!.CompletionDate);
     }
 
     [Fact]

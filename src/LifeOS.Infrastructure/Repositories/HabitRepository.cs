@@ -1,3 +1,4 @@
+using LifeOS.Core.Abstractions;
 using LifeOS.Core.Abstractions.Habits;
 using LifeOS.Core.Entities;
 using LifeOS.Infrastructure.Persistence;
@@ -144,7 +145,7 @@ public sealed class HabitRepository : IHabitRepository
             .ToList();
     }
 
-    public async Task<bool> TryAddLogAsync(
+    public async Task<HabitLogWriteResult> TryAddLogAsync(
         HabitLog habitLog,
         CancellationToken cancellationToken = default)
     {
@@ -156,12 +157,28 @@ public sealed class HabitRepository : IHabitRepository
         try
         {
             await context.SaveChangesAsync(cancellationToken);
-            return true;
+            return new HabitLogWriteResult
+            {
+                WasInserted = true,
+                Log = habitLog
+            };
         }
         catch (DbUpdateException exception)
             when (IsExpectedDuplicateCompletion(exception))
         {
-            return false;
+            var existing = await context.HabitLogs
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    log => log.UserId == habitLog.UserId &&
+                        log.HabitId == habitLog.HabitId &&
+                        log.CompletionDate == habitLog.CompletionDate,
+                    cancellationToken);
+
+            return new HabitLogWriteResult
+            {
+                WasInserted = false,
+                Log = existing
+            };
         }
     }
 

@@ -24,7 +24,7 @@ public interface IHabitService
     Task<HabitListDto> GetHabitListAsync(
         CancellationToken cancellationToken = default);
 
-    Task<HabitSummaryDto> CompleteHabitAsync(
+    Task<HabitCompletionResultDto> CompleteHabitAsync(
         Guid habitId,
         CancellationToken cancellationToken = default);
 
