@@ -1,6 +1,8 @@
 ﻿using LifeOS.Core.DTOs.Habits;
 using LifeOS.Core.DTOs.Tasks;
+using LifeOS.Core.DTOs.Xp;
 using LifeOS.Core.Enums.Habits;
+using LifeOS.Core.Enums.Xp;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Services;
 using Moq;
@@ -11,6 +13,7 @@ public sealed class DashboardServiceTests
 {
     private readonly Mock<ITaskService> _taskService = new();
     private readonly Mock<IHabitService> _habitService = new();
+    private readonly Mock<IXpService> _xpService = new();
 
     [Fact]
     public async Task GetTaskWidgetAsync_ReturnsOnlyOverdueAndTodayTasks()
@@ -59,7 +62,8 @@ public sealed class DashboardServiceTests
         var service =
             new DashboardService(
                 _taskService.Object,
-                _habitService.Object);
+                _habitService.Object,
+                _xpService.Object);
 
         // Act
         var result =
@@ -99,7 +103,8 @@ public sealed class DashboardServiceTests
         var service =
             new DashboardService(
                 _taskService.Object,
-                _habitService.Object);
+                _habitService.Object,
+                _xpService.Object);
 
         // Act
         await service.GetTaskWidgetAsync();
@@ -152,7 +157,8 @@ public sealed class DashboardServiceTests
 
         var service = new DashboardService(
             _taskService.Object,
-            _habitService.Object);
+            _habitService.Object,
+            _xpService.Object);
 
         var result = await service.GetHabitWidgetAsync();
 
@@ -196,12 +202,83 @@ public sealed class DashboardServiceTests
 
         var service = new DashboardService(
             _taskService.Object,
-            _habitService.Object);
+            _habitService.Object,
+            _xpService.Object);
 
         var result = await service.GetHabitWidgetAsync();
 
         Assert.Equal(0, result.TotalActiveCount);
         Assert.Equal(0, result.CompletedCount);
         Assert.Empty(result.ActiveHabits);
+    }
+
+    [Fact]
+    public async Task GetXpWidgetAsync_NewUser_ProjectsDefaultState()
+    {
+        _xpService.Setup(service => service.GetProgressionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserProgressionDto
+            {
+                TotalLifetimeXp = 0,
+                CurrentLevel = 1,
+                CurrentEchelon = Echelon.Iron,
+                DailyQuestXpToday = 0
+            });
+
+        var service = new DashboardService(_taskService.Object, _habitService.Object, _xpService.Object);
+
+        var result = await service.GetXpWidgetAsync();
+
+        Assert.Equal(0L, result.TotalLifetimeXp);
+        Assert.Equal(1, result.CurrentLevel);
+        Assert.Equal(Echelon.Iron, result.CurrentEchelon);
+        Assert.Equal(0, result.DailyQuestXpToday);
+        Assert.Equal(500, result.DailyQuestXpCap);
+        Assert.Equal(500, result.RemainingQuestXp);
+        Assert.Equal(0, result.ProgressPercent);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 500)]
+    [InlineData(1, 0, 499)]
+    [InlineData(250, 50, 250)]
+    [InlineData(499, 99, 1)]
+    [InlineData(500, 100, 0)]
+    public async Task GetXpWidgetAsync_ProjectsCapAndPercentage(
+        int dailyXp, int expectedPercent, int expectedRemaining)
+    {
+        _xpService.Setup(service => service.GetProgressionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserProgressionDto
+            {
+                TotalLifetimeXp = 2700,
+                CurrentLevel = 10,
+                CurrentEchelon = Echelon.Bronze,
+                DailyQuestXpToday = dailyXp
+            });
+
+        var service = new DashboardService(_taskService.Object, _habitService.Object, _xpService.Object);
+
+        var result = await service.GetXpWidgetAsync();
+
+        Assert.Equal(2700, result.TotalLifetimeXp);
+        Assert.Equal(10, result.CurrentLevel);
+        Assert.Equal(Echelon.Bronze, result.CurrentEchelon);
+        Assert.Equal(500, result.DailyQuestXpCap);
+        Assert.Equal(expectedRemaining, result.RemainingQuestXp);
+        Assert.Equal(expectedPercent, result.ProgressPercent);
+        _xpService.Verify(service => service.GetProgressionAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetXpWidgetAsync_ProgressionError_Propagates()
+    {
+        var exception = new InvalidOperationException("progression failed");
+        _xpService.Setup(service => service.GetProgressionAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(exception);
+
+        var service = new DashboardService(_taskService.Object, _habitService.Object, _xpService.Object);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetXpWidgetAsync());
+
+        Assert.Same(exception, actual);
     }
 }

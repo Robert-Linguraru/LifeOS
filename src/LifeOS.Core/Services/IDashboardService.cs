@@ -9,4 +9,7 @@ public interface IDashboardService
 
     Task<DashboardHabitWidgetDto> GetHabitWidgetAsync(
         CancellationToken cancellationToken = default);
+
+    Task<DashboardXpWidgetDto> GetXpWidgetAsync(
+        CancellationToken cancellationToken = default);
 }
