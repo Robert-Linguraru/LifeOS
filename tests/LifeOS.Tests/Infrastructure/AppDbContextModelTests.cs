@@ -92,6 +92,27 @@ public sealed class AppDbContextModelTests
     }
 
     [Fact]
+    public void Model_ShouldMapOptionalTimeZoneConfirmationWithoutAnIndex()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserSettings));
+
+        Assert.NotNull(entityType);
+
+        var property = entityType.FindProperty(
+            nameof(UserSettings.TimeZoneConfiguredAtUtc));
+
+        Assert.NotNull(property);
+        Assert.True(property.IsNullable);
+        Assert.Equal("timestamp with time zone", property.GetColumnType());
+        Assert.DoesNotContain(
+            entityType.GetIndexes(),
+            index => index.Properties.Any(item =>
+                item.Name == nameof(UserSettings.TimeZoneConfiguredAtUtc)));
+    }
+
+    [Fact]
     public void Model_ShouldMapHabitWithDocumentedProperties()
     {
         using var context = CreateContext();
@@ -409,6 +430,11 @@ public sealed class AppDbContextModelTests
             string timeZoneId)
         {
             return utcInstant;
+        }
+
+        public IReadOnlyList<string> GetTimeZoneIds()
+        {
+            return ["UTC"];
         }
     }
 }

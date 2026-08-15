@@ -160,4 +160,12 @@ public sealed class SystemDateTimeProvider : IDateTimeProvider
             utcInstant.ToUniversalTime(),
             timeZone);
     }
+
+    public IReadOnlyList<string> GetTimeZoneIds()
+    {
+        return TimeZoneInfo.GetSystemTimeZones()
+            .Select(timeZone => timeZone.Id)
+            .OrderBy(timeZoneId => timeZoneId, StringComparer.Ordinal)
+            .ToArray();
+    }
 }

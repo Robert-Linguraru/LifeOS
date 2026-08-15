@@ -55,7 +55,8 @@ public sealed class UserSettingsService : IUserSettingsService
         return new UserSettingsDto
         {
             UserId = settings.UserId,
-            TimeZoneId = settings.TimeZoneId
+            TimeZoneId = settings.TimeZoneId,
+            TimeZoneConfiguredAtUtc = settings.TimeZoneConfiguredAtUtc
         };
     }
 
@@ -65,7 +66,11 @@ public sealed class UserSettingsService : IUserSettingsService
     {
         var userId = GetCurrentUserId();
 
-        if (!_dateTimeProvider.IsValidTimeZone(timeZoneId))
+        var normalizedTimeZoneId = timeZoneId?.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedTimeZoneId) ||
+            normalizedTimeZoneId.Length > 100 ||
+            !_dateTimeProvider.IsValidTimeZone(normalizedTimeZoneId))
         {
             throw new ValidationException(
                "The supplied time zone is invalid.");
@@ -81,7 +86,8 @@ public sealed class UserSettingsService : IUserSettingsService
                 "User settings were not found.");
         }
 
-        settings.TimeZoneId = timeZoneId;
+        settings.TimeZoneId = normalizedTimeZoneId;
+        settings.TimeZoneConfiguredAtUtc = _dateTimeProvider.UtcNow;
 
         await _repository.UpdateAsync(
             settings,

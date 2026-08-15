@@ -119,5 +119,10 @@ public sealed class PostgreSqlContainerFixture : IAsyncLifetime
         {
             return utcInstant;
         }
+
+        public IReadOnlyList<string> GetTimeZoneIds()
+        {
+            return ["UTC"];
+        }
     }
 }

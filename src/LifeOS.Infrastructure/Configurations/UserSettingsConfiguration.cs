@@ -24,6 +24,10 @@ public sealed class UserSettingsConfiguration
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(settings => settings.TimeZoneConfiguredAtUtc)
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
         builder.Property(settings => settings.CreatedAtUtc)
             .IsRequired();
 

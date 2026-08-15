@@ -18,4 +18,6 @@ public interface IDateTimeProvider
     DateTimeOffset ConvertUtcToLocal(
         DateTimeOffset utcInstant,
         string timeZoneId);
+
+    IReadOnlyList<string> GetTimeZoneIds();
 }

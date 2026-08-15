@@ -11,6 +11,8 @@ namespace LifeOS.Tests.Services;
 public sealed class UserSettingsServiceTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
+    private static readonly DateTimeOffset SavedAtUtc =
+        new(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
 
     private readonly Mock<IUserSettingsRepository> _repository = new();
     private readonly Mock<ICurrentUserService> _currentUser = new();
@@ -48,6 +50,7 @@ public sealed class UserSettingsServiceTests
 
         Assert.Equal(UserId, result.UserId);
         Assert.Equal("Europe/Bucharest", result.TimeZoneId);
+        Assert.Null(result.TimeZoneConfiguredAtUtc);
 
         _repository.Verify(
             x => x.AddAsync(It.IsAny<UserSettings>(), It.IsAny<CancellationToken>()),
@@ -72,7 +75,8 @@ public sealed class UserSettingsServiceTests
             x => x.AddAsync(
                 It.Is<UserSettings>(s =>
                     s.UserId == UserId &&
-                    s.TimeZoneId == "UTC"),
+                    s.TimeZoneId == "UTC" &&
+                    s.TimeZoneConfiguredAtUtc == null),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -119,6 +123,9 @@ public sealed class UserSettingsServiceTests
         _dateTimeProvider
             .Setup(x => x.IsValidTimeZone("Europe/Bucharest"))
             .Returns(true);
+        _dateTimeProvider
+            .Setup(x => x.UtcNow)
+            .Returns(SavedAtUtc);
 
         _repository
             .Setup(x => x.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
@@ -129,6 +136,7 @@ public sealed class UserSettingsServiceTests
         await service.UpdateTimeZoneAsync("Europe/Bucharest");
 
         Assert.Equal("Europe/Bucharest", settings.TimeZoneId);
+        Assert.Equal(SavedAtUtc, settings.TimeZoneConfiguredAtUtc);
 
         _repository.Verify(
             x => x.UpdateAsync(settings, It.IsAny<CancellationToken>()),
@@ -176,6 +184,77 @@ public sealed class UserSettingsServiceTests
 
         await Assert.ThrowsAsync<ValidationException>(
             () => service.UpdateTimeZoneAsync("Invalid"));
+
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<UserSettings>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTimeZoneAsync_ExplicitUtc_SetsConfirmationTimestamp()
+    {
+        var settings = new UserSettings
+        {
+            UserId = UserId,
+            TimeZoneId = "UTC"
+        };
+
+        _dateTimeProvider
+            .Setup(x => x.IsValidTimeZone("UTC"))
+            .Returns(true);
+        _dateTimeProvider
+            .Setup(x => x.UtcNow)
+            .Returns(SavedAtUtc);
+        _repository
+            .Setup(x => x.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        await CreateService().UpdateTimeZoneAsync(" UTC ");
+
+        Assert.Equal("UTC", settings.TimeZoneId);
+        Assert.Equal(SavedAtUtc, settings.TimeZoneConfiguredAtUtc);
+    }
+
+    [Fact]
+    public async Task UpdateTimeZoneAsync_RepeatedSave_UpdatesConfirmationTimestamp()
+    {
+        var settings = new UserSettings
+        {
+            UserId = UserId,
+            TimeZoneId = "UTC",
+            TimeZoneConfiguredAtUtc = SavedAtUtc.AddMinutes(-1)
+        };
+
+        _dateTimeProvider
+            .Setup(x => x.IsValidTimeZone("UTC"))
+            .Returns(true);
+        _dateTimeProvider
+            .Setup(x => x.UtcNow)
+            .Returns(SavedAtUtc);
+        _repository
+            .Setup(x => x.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        await CreateService().UpdateTimeZoneAsync("UTC");
+
+        Assert.Equal(SavedAtUtc, settings.TimeZoneConfiguredAtUtc);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("Invalid")]
+    public async Task UpdateTimeZoneAsync_InvalidValue_DoesNotPersist(
+        string timeZoneId)
+    {
+        _dateTimeProvider
+            .Setup(x => x.IsValidTimeZone(It.IsAny<string>()))
+            .Returns(false);
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => CreateService().UpdateTimeZoneAsync(timeZoneId));
 
         _repository.Verify(
             x => x.UpdateAsync(

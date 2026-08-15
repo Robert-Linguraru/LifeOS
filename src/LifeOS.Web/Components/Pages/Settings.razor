@@ -1,7 +1,149 @@
 ﻿@page "/settings"
 
+@using LifeOS.Core.Abstractions
+@using LifeOS.Core.DTOs
+@using LifeOS.Core.Exceptions
+@using LifeOS.Core.Services
+@using LifeOS.Web.Models.Settings
+@inject IUserSettingsService UserSettingsService
+@inject IDateTimeProvider DateTimeProvider
+
 <PageTitle>Settings</PageTitle>
 
-<h1>Settings</h1>
+<div class="settings-page">
+    <h1>Settings</h1>
+    <p>Confirm your time zone to prepare LifeOS for future reminder scheduling.</p>
 
-<p>Coming soon...</p>
+    @if (_isLoading)
+    {
+        <p role="status">Loading settings...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button"
+                class="secondary-button"
+                @onclick="LoadAsync">
+            Retry
+        </button>
+    }
+    else
+    {
+        <section aria-labelledby="time-zone-heading">
+            <h2 id="time-zone-heading">Time zone</h2>
+
+            <p>
+                Current timezone: <strong>@_settings!.TimeZoneId</strong>
+            </p>
+
+            @if (_settings.TimeZoneConfiguredAtUtc is null)
+            {
+                <p role="status">Not yet confirmed.</p>
+            }
+            else
+            {
+                <p role="status">Confirmed.</p>
+            }
+
+            <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+
+                @if (_saveError is not null)
+                {
+                    <div class="error-message" role="alert">@_saveError</div>
+                }
+
+                @if (_saveMessage is not null)
+                {
+                    <div class="success-message" role="status">@_saveMessage</div>
+                }
+
+                <div class="form-field">
+                    <label for="time-zone">Time zone</label>
+                    <InputSelect id="time-zone"
+                                 class="form-control"
+                                 @bind-Value="_model.TimeZoneId"
+                                 disabled="@_isSaving">
+                        @foreach (var timeZoneId in _timeZoneIds)
+                        {
+                            <option value="@timeZoneId">@timeZoneId</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => _model.TimeZoneId" />
+                </div>
+
+                <button type="submit"
+                        class="primary-button"
+                        disabled="@_isSaving">
+                    @(_isSaving ? "Saving..." : "Save time zone")
+                </button>
+            </EditForm>
+        </section>
+    }
+</div>
+
+@code {
+    private readonly TimeZoneSettingsModel _model = new();
+    private IReadOnlyList<string> _timeZoneIds = [];
+    private UserSettingsDto? _settings;
+    private string? _loadError;
+    private string? _saveError;
+    private string? _saveMessage;
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        _saveError = null;
+        _saveMessage = null;
+
+        try
+        {
+            _timeZoneIds = DateTimeProvider.GetTimeZoneIds();
+            _settings = await UserSettingsService.GetCurrentUserSettingsAsync();
+            _model.TimeZoneId = _settings.TimeZoneId;
+        }
+        catch (Exception)
+        {
+            _loadError = "Settings could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        _saveError = null;
+        _saveMessage = null;
+
+        try
+        {
+            await UserSettingsService.UpdateTimeZoneAsync(_model.TimeZoneId);
+            _settings = await UserSettingsService.GetCurrentUserSettingsAsync();
+            _model.TimeZoneId = _settings.TimeZoneId;
+            _saveMessage = "Time zone saved and confirmed.";
+        }
+        catch (ValidationException exception)
+        {
+            _saveError = exception.Message;
+        }
+        catch (Exception)
+        {
+            _saveError = "Time zone could not be saved. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}
