@@ -80,7 +80,11 @@
     {
         if (!_disposed)
         {
-            _ = InvokeAsync(LoadWidgetAsync);
+            _ = InvokeAsync(async () =>
+            {
+                await LoadWidgetAsync();
+                StateHasChanged();
+            });
         }
     }
 

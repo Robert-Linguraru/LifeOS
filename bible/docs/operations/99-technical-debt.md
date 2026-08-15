@@ -471,8 +471,17 @@ No UI automation framework is introduced during Milestone 5 closure. Manual veri
 
 ## M6 scope decision
 
-Targeted bUnit coverage is required for the highest-risk M6 components and
-partially mitigates this debt. Manual browser verification remains mandatory.
+Targeted bUnit component coverage was introduced in Milestone 6 for the highest-risk
+Notification, Reminder, and Dashboard behaviors. It partially mitigates this debt
+by protecting the class of UI integration defects that escaped service and
+integration tests, including:
+
+- literal Razor expression rendering;
+- unsupported icon glyphs;
+- component refresh/invalidation wiring;
+- source-prefill and form behavior.
+
+Manual browser verification remains mandatory.
 No complete Playwright/Selenium platform is introduced in M6.
 
 ## Status

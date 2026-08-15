@@ -24,7 +24,10 @@
 .reminder-editor__source {
     padding: 0.75rem;
     border-radius: 0.5rem;
-    background: var(--surface-muted-color, #f2f4f7);
+    color: var(--color-text, #ffffff);
+    background: var(--color-surface, #252525);
+    border: 1px solid var(--color-border, #444444);
+    min-width: 0;
     overflow-wrap: anywhere;
 }
 

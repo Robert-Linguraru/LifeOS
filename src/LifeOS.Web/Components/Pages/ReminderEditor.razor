@@ -71,23 +71,16 @@
 
             @if (!string.IsNullOrWhiteSpace(_sourceDescription))
             {
-                <p class="reminder-editor__source" role="status">@_sourceDescription</p>
+                <p class="reminder-editor__source" role="status">
+                    @_sourceDescription
+                </p>
             }
-
-            <div class="form-field">
-                <label for="reminder-source-type">Source</label>
-                <InputSelect id="reminder-source-type"
-                             class="form-control"
-                             TValue="ReminderSourceType"
-                             Value="_model.SourceType"
-                             ValueChanged="HandleSourceTypeChanged"
-                             ValueExpression="() => _model.SourceType"
-                             disabled="@(_isSaving || _sourceIsPrefilled || IsEditMode)">
-                    <option value="@ReminderSourceType.Custom">Custom reminder</option>
-                    <option value="@ReminderSourceType.Task">Task</option>
-                    <option value="@ReminderSourceType.Habit">Habit</option>
-                </InputSelect>
-            </div>
+            else if (!IsEditMode)
+            {
+                <p class="reminder-editor__source" role="status">
+                    Custom reminder
+                </p>
+            }
 
             <div class="form-field">
                 <label for="reminder-title">Title</label>
@@ -195,7 +188,6 @@
     private bool _confirmCancel;
     private bool _timeZoneConfirmed;
     private bool _isTerminal;
-    private bool _sourceIsPrefilled;
     private string? _loadError;
     private string? _saveError;
 
@@ -293,8 +285,7 @@
                 _model.SourceType = sourceType;
                 _model.SourceId = task.Id;
                 _model.Title = task.Title;
-                _sourceIsPrefilled = true;
-                _sourceDescription = $"Task - {task.Title}";
+                _sourceDescription = FormatSource(sourceType, task.Title);
 
                 if (task.DueDate.HasValue && task.DueTime.HasValue)
                 {
@@ -324,8 +315,7 @@
             _model.SourceType = sourceType;
             _model.SourceId = habit.Id;
             _model.Title = habit.Name;
-            _sourceIsPrefilled = true;
-            _sourceDescription = $"Habit - {habit.Name}";
+            _sourceDescription = FormatSource(sourceType, habit.Name);
         }
         catch (ResourceNotFoundException)
         {
@@ -337,7 +327,6 @@
     {
         _model.SourceType = ReminderSourceType.Custom;
         _model.SourceId = null;
-        _sourceIsPrefilled = false;
         _sourceDescription = null;
     }
 
@@ -507,7 +496,7 @@
             ReminderSourceType.Habit => "Habit",
             _ => "Custom"
         };
-        return string.IsNullOrWhiteSpace(sourceTitle) ? $"Source: {label}" : $"Source: {label} — {sourceTitle}";
+        return string.IsNullOrWhiteSpace(sourceTitle) ? $"{label} reminder" : $"{label} — {sourceTitle}";
     }
 
     private static string ToUserValidationMessage(string message) => message switch
