@@ -1,0 +1,119 @@
+@implements IAsyncDisposable
+@inject INotificationService NotificationService
+@inject NotificationRefreshCoordinator RefreshCoordinator
+
+<a class="notification-bell"
+   href="/notifications"
+   aria-label="@AccessibleLabel"
+   title="Notifications">
+    <span class="notification-bell__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+        </svg>
+    </span>
+    <span class="notification-bell__text">Notifications</span>
+    @if (_hasLoaded && _unreadCount > 0)
+    {
+        <span class="notification-bell__badge" aria-hidden="true">
+            @BadgeText
+        </span>
+    }
+</a>
+
+@if (_hasLoadError)
+{
+    <span class="notification-bell__status" role="status">
+        Notification count unavailable
+    </span>
+}
+
+@code {
+    private readonly CancellationTokenSource _disposeCancellation = new();
+    private IDisposable? _subscription;
+    private PeriodicTimer? _timer;
+    private Task? _pollingTask;
+    private int _unreadCount;
+    private bool _hasLoaded;
+    private bool _hasLoadError;
+
+    private string BadgeText => _unreadCount >= 100 ? "99+" : _unreadCount.ToString();
+
+    private string AccessibleLabel => !_hasLoaded
+        ? "Notifications"
+        : _unreadCount == 0
+            ? "Notifications, no unread notifications"
+            : $"Notifications, {_unreadCount} unread";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _subscription = RefreshCoordinator.Subscribe(OnRefreshRequested);
+        await RefreshCountAsync();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        _pollingTask = PollAsync();
+    }
+
+    private void OnRefreshRequested(object? sender, EventArgs args)
+    {
+        _ = InvokeAsync(RefreshCountAsync);
+    }
+
+    private async Task PollAsync()
+    {
+        try
+        {
+            while (_timer is not null &&
+                   await _timer.WaitForNextTickAsync(_disposeCancellation.Token))
+            {
+                await RefreshCountAsync();
+            }
+        }
+        catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RefreshCountAsync()
+    {
+        if (_disposeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            _unreadCount = await NotificationService.GetUnreadCountAsync(
+                _disposeCancellation.Token);
+            _hasLoaded = true;
+            _hasLoadError = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            _hasLoadError = true;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposeCancellation.Cancel();
+        _subscription?.Dispose();
+        _timer?.Dispose();
+
+        if (_pollingTask is not null)
+        {
+            try
+            {
+                await _pollingTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _disposeCancellation.Dispose();
+    }
+}

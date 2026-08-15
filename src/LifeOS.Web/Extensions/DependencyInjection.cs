@@ -18,6 +18,7 @@ public static class DependencyInjection
 
         services.AddScoped<ICurrentUserService,
             DevelopmentCurrentUserService>();
+        services.AddScoped<NotificationRefreshCoordinator>();
 
         return services;
     }

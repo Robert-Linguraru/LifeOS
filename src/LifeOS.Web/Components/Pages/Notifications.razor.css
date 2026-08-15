@@ -1,0 +1,38 @@
+.notifications-page {
+    max-width: 70rem;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.notifications-page__header {
+    margin-bottom: 1.5rem;
+}
+
+.notifications-page__header h1,
+.notifications-page__header p {
+    margin: 0;
+}
+
+.notifications-page__header p {
+    margin-top: 0.35rem;
+}
+
+.notifications-page__timezone {
+    color: var(--muted-text-color, #5f6672);
+}
+
+.notifications-page__list {
+    display: grid;
+    gap: 1rem;
+}
+
+.notifications-page__empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    border: 1px dashed var(--border-color, #d6d9df);
+    border-radius: 0.75rem;
+}
+
+.notifications-page__empty h2 {
+    margin-top: 0;
+}

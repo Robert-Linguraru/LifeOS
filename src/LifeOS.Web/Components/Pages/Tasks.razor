@@ -1,6 +1,7 @@
 ﻿@page "/tasks"
 
 @inject ITaskService TaskService
+@inject NotificationRefreshCoordinator NotificationRefresh
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
@@ -264,6 +265,13 @@
             }
 
             _actionStatus = GetCompletionStatus(completion);
+
+            if (completion.XpAward is not null &&
+                (completion.XpAward.LevelChanged ||
+                 completion.XpAward.EchelonChanged))
+            {
+                NotificationRefresh.RequestRefresh();
+            }
 
             await TryRefreshTasksAsync(
                 "The task was completed, but the latest task data could not be reloaded. Please refresh the page.");

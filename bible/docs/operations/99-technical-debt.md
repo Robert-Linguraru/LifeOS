@@ -478,3 +478,32 @@ No complete Playwright/Selenium platform is introduced in M6.
 ## Status
 
 Open - full browser automation remains future work.
+
+
+## TD-008 — Time-aware overdue Task classification
+
+Problem: Active Tasks due today remain grouped under Today after their DueTime has passed. Current grouping appears primarily date-based rather than considering the current user-local time.
+
+Desired future behavior:
+
+Due date before today → Overdue.
+Due today + no due time → Today.
+Due today + future due time → Today.
+Due today + due time at or before the authoritative current local time → Overdue.
+Completed Tasks never become Overdue.
+Classification must use the user's configured timezone and IDateTimeProvider, not browser/server-local time.
+
+Why deferred: Existing Task behavior predates M6 and does not affect Reminder correctness. Fix separately with focused Task grouping and timezone boundary tests.
+
+## TD-009 — Past Task due-time Reminder prefill
+
+Problem: Task → Add Reminder currently copies the Task's due date/time even when that due instant has already passed. The Reminder backend correctly rejects saving the past schedule, so there is no persistence/correctness issue, but the initial form state is inconvenient.
+
+Desired future behavior: When prefilling a Reminder from a Task:
+
+Future Task due date/time → copy exactly.
+Past Task due date/time → copy source/title but use the normal future Reminder scheduling default instead.
+Never silently move or modify the Task's own due time.
+User remains free to choose any valid future Reminder time.
+
+Why deferred: This is UX polish only. Existing Reminder validation safely prevents a past Reminder from being persisted.

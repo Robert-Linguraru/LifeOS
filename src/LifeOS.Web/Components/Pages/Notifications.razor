@@ -1,0 +1,190 @@
+@page "/notifications"
+
+@using LifeOS.Core.Abstractions
+@using LifeOS.Core.DTOs.Notifications
+@using LifeOS.Core.Exceptions
+@using LifeOS.Web.Components.Notifications
+@inject INotificationService NotificationService
+@inject IUserSettingsService UserSettingsService
+@inject IDateTimeProvider DateTimeProvider
+@inject NotificationRefreshCoordinator RefreshCoordinator
+
+<PageTitle>Notifications</PageTitle>
+
+<div class="notifications-page">
+    <div class="notifications-page__header">
+        <div>
+            <h1>Notifications</h1>
+            <p>Updates about reminders and your progress.</p>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading notifications...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">
+            Retry
+        </button>
+    }
+    else if (_notifications.Count == 0)
+    {
+        <section class="notifications-page__empty" aria-labelledby="empty-notifications-heading">
+            <h2 id="empty-notifications-heading">You're all caught up</h2>
+            <p>There are no current notifications.</p>
+        </section>
+    }
+    else
+    {
+        @if (_usingUtcFallback)
+        {
+            <p class="notifications-page__timezone" role="status">
+                Times are shown in UTC because your configured time zone could not be loaded.
+            </p>
+        }
+
+        <div class="notifications-page__list">
+            @foreach (var notification in _notifications)
+            {
+                <NotificationListItem Notification="notification"
+                                      CreatedText="@FormatCreatedAt(notification)"
+                                      IsBusy="_busyId == notification.Id"
+                                      MarkRequested="MarkAsReadAsync"
+                                      DismissRequested="DismissAsync" />
+            }
+        </div>
+    }
+
+    @if (_actionError is not null)
+    {
+        <div class="error-message" role="alert">@_actionError</div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<NotificationDto> _notifications = [];
+    private bool _isLoading = true;
+    private bool _usingUtcFallback;
+    private Guid? _busyId;
+    private string? _loadError;
+    private string? _actionError;
+    private string? _timeZoneId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        _actionError = null;
+
+        try
+        {
+            _notifications = await NotificationService.GetNotificationsAsync();
+            await LoadTimeZoneAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError = "Notifications could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadTimeZoneAsync()
+    {
+        try
+        {
+            var settings = await UserSettingsService.GetCurrentUserSettingsAsync();
+            if (!string.IsNullOrWhiteSpace(settings.TimeZoneId) &&
+                DateTimeProvider.IsValidTimeZone(settings.TimeZoneId))
+            {
+                _timeZoneId = settings.TimeZoneId;
+                _usingUtcFallback = false;
+                return;
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        _timeZoneId = null;
+        _usingUtcFallback = true;
+    }
+
+    private string FormatCreatedAt(NotificationDto notification)
+    {
+        if (_timeZoneId is null)
+        {
+            return $"{notification.CreatedAtUtc:dd MMM yyyy HH:mm} UTC";
+        }
+
+        try
+        {
+            var local = DateTimeProvider.ConvertUtcToLocal(
+                notification.CreatedAtUtc,
+                _timeZoneId);
+            return local.ToString("dd MMM yyyy HH:mm");
+        }
+        catch (Exception)
+        {
+            return $"{notification.CreatedAtUtc:dd MMM yyyy HH:mm} UTC";
+        }
+    }
+
+    private async Task MarkAsReadAsync(NotificationDto notification)
+    {
+        if (_busyId is not null || notification.IsRead)
+        {
+            return;
+        }
+
+        await MutateAsync(notification.Id, () => NotificationService.MarkAsReadAsync(notification.Id));
+    }
+
+    private async Task DismissAsync(NotificationDto notification)
+    {
+        if (_busyId is not null || notification.IsDismissed)
+        {
+            return;
+        }
+
+        await MutateAsync(notification.Id, () => NotificationService.DismissAsync(notification.Id));
+    }
+
+    private async Task MutateAsync(Guid notificationId, Func<Task> mutation)
+    {
+        _busyId = notificationId;
+        _actionError = null;
+        try
+        {
+            await mutation();
+            await LoadAsync();
+            RefreshCoordinator.RequestRefresh();
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError = "This notification is no longer available. Please reload the page.";
+        }
+        catch (Exception)
+        {
+            _actionError = "The notification could not be updated. Please try again.";
+        }
+        finally
+        {
+            _busyId = null;
+        }
+    }
+}

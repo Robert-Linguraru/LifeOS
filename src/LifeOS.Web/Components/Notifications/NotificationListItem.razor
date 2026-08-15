@@ -1,0 +1,83 @@
+@using LifeOS.Core.DTOs.Notifications
+@using LifeOS.Core.Enums.Notifications
+@inject NavigationManager Navigation
+
+<article class="notification-list-item @(Notification.IsRead ? "notification-list-item--read" : "notification-list-item--unread")">
+    <div class="notification-list-item__content">
+        <div class="notification-list-item__heading">
+            <h2>@Notification.Title</h2>
+            @if (!Notification.IsRead)
+            {
+                <span class="notification-list-item__state">Unread</span>
+            }
+            else
+            {
+                <span class="notification-list-item__state">Read</span>
+            }
+        </div>
+        <p>@Notification.Message</p>
+        <time datetime="@Notification.CreatedAtUtc.ToString("O")">
+            @CreatedText
+        </time>
+        @if (HasReminderSource)
+        {
+            <button type="button"
+                    class="notification-list-item__source"
+                    @onclick="OpenReminder">
+                Open reminder
+            </button>
+        }
+    </div>
+
+    <div class="notification-list-item__actions">
+        @if (!Notification.IsRead)
+        {
+            <button type="button"
+                    class="secondary-button"
+                    disabled="@IsBusy"
+                    @onclick="MarkAsReadAsync">
+                Mark as read
+            </button>
+        }
+        <button type="button"
+                class="danger-button"
+                disabled="@IsBusy"
+                @onclick="DismissAsync">
+            Dismiss
+        </button>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public NotificationDto Notification { get; set; } = null!;
+
+    [Parameter]
+    public string CreatedText { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<NotificationDto> MarkRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<NotificationDto> DismissRequested { get; set; }
+
+    private bool HasReminderSource =>
+        Notification.Type == NotificationType.ReminderDue &&
+        Notification.SourceType == NotificationSourceType.Reminder &&
+        Notification.SourceId.HasValue;
+
+    private Task MarkAsReadAsync() => MarkRequested.InvokeAsync(Notification);
+
+    private Task DismissAsync() => DismissRequested.InvokeAsync(Notification);
+
+    private void OpenReminder()
+    {
+        if (Notification.SourceId.HasValue)
+        {
+            Navigation.NavigateTo($"/reminders/{Notification.SourceId.Value:D}/edit");
+        }
+    }
+}
