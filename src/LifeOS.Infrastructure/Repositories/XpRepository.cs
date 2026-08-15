@@ -1,4 +1,5 @@
 using LifeOS.Core.Abstractions;
+using LifeOS.Core.Abstractions.Notifications;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums.Xp;
 using LifeOS.Infrastructure.Persistence;
@@ -144,6 +145,29 @@ public sealed class XpRepository : IXpRepository
 
         await using var context = await _contextFactory
             .CreateDbContextAsync(cancellationToken);
+        await using var aggregateTransaction = await context.Database
+            .BeginTransactionAsync(cancellationToken);
+
+        var existingTransaction = await context.XpTransactions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                item => item.UserId == request.UserId &&
+                    item.IdempotencyKey == request.IdempotencyKey,
+                cancellationToken);
+
+        if (existingTransaction is not null)
+        {
+            return new XpAwardCommitResult
+            {
+                Status = XpAwardCommitStatus.Duplicate,
+                Transaction = existingTransaction,
+                Progression = await context.UserProgressions
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        item => item.UserId == request.UserId,
+                        cancellationToken)
+            };
+        }
 
         var progression = await context.UserProgressions
             .SingleOrDefaultAsync(
@@ -176,6 +200,9 @@ public sealed class XpRepository : IXpRepository
 
         var transaction = new XpTransaction
         {
+            Id = request.XpTransactionId == Guid.Empty
+                ? Guid.NewGuid()
+                : request.XpTransactionId,
             UserId = request.UserId,
             Source = request.Source,
             SourceType = request.SourceType,
@@ -188,10 +215,25 @@ public sealed class XpRepository : IXpRepository
         };
 
         context.XpTransactions.Add(transaction);
+        foreach (var draft in request.Notifications)
+        {
+            context.Notifications.Add(new Notification
+            {
+                Id = draft.NotificationId,
+                UserId = request.UserId,
+                Type = draft.Type,
+                Title = draft.Title,
+                Message = draft.Message,
+                SourceType = draft.SourceType,
+                SourceId = draft.SourceId,
+                IdempotencyKey = draft.IdempotencyKey
+            });
+        }
 
         try
         {
             await context.SaveChangesAsync(cancellationToken);
+            await aggregateTransaction.CommitAsync(cancellationToken);
 
             return new XpAwardCommitResult
             {
@@ -202,6 +244,7 @@ public sealed class XpRepository : IXpRepository
         }
         catch (DbUpdateConcurrencyException)
         {
+            await aggregateTransaction.RollbackAsync(CancellationToken.None);
             return new XpAwardCommitResult
             {
                 Status = XpAwardCommitStatus.ConcurrencyConflict,
@@ -215,6 +258,7 @@ public sealed class XpRepository : IXpRepository
                 exception,
                 TransactionIdempotencyIndex))
         {
+            await aggregateTransaction.RollbackAsync(CancellationToken.None);
             var duplicate = await FindByIdempotencyKeyAsync(
                 request.UserId,
                 request.IdempotencyKey,
@@ -232,6 +276,11 @@ public sealed class XpRepository : IXpRepository
                 };
             }
 
+            throw;
+        }
+        catch
+        {
+            await aggregateTransaction.RollbackAsync(CancellationToken.None);
             throw;
         }
     }

@@ -1,8 +1,10 @@
 using LifeOS.Core.Abstractions;
+using LifeOS.Core.Abstractions.Notifications;
 using LifeOS.Core.Constants;
 using LifeOS.Core.DTOs.Xp;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums.Xp;
+using LifeOS.Core.Enums.Notifications;
 using LifeOS.Core.Exceptions;
 using LifeOS.Core.Mappings;
 using LifeOS.Core.Progression;
@@ -41,6 +43,9 @@ public sealed class XpService : IXpService
             ? XpIdempotencyKeyFactory.ForTask(dto.SourceEntityId)
             : XpIdempotencyKeyFactory.ForHabit(dto.SourceEntityId, dto.BusinessDate);
         var rawXp = XpRules.CalculateQuestXp(dto.EstimatedTime, dto.FrictionLevel);
+        var xpTransactionId = Guid.NewGuid();
+        var levelNotificationId = Guid.NewGuid();
+        var echelonNotificationId = Guid.NewGuid();
 
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
@@ -64,8 +69,18 @@ public sealed class XpService : IXpService
             var resultingLevel = XpRules.CalculateLevel(resultingLifetimeXp);
             var resultingEchelon = XpRules.CalculateEchelon(resultingLevel);
             var resultingVersion = checked(progression.Version + 1);
+            var notifications = CreateProgressionNotifications(
+                userId,
+                xpTransactionId,
+                levelNotificationId,
+                echelonNotificationId,
+                progression.CurrentLevel,
+                resultingLevel,
+                progression.CurrentEchelon,
+                resultingEchelon);
             var commit = await _repository.CommitAwardAsync(new XpAwardCommitRequest
             {
+                XpTransactionId = xpTransactionId,
                 UserId = userId,
                 Source = XpSource.QuestCompletion,
                 SourceType = dto.SourceType,
@@ -80,7 +95,8 @@ public sealed class XpService : IXpService
                 ResultingCurrentEchelon = resultingEchelon,
                 ResultingDailyQuestXpToday = Math.Min(currentDailyXp, XpConstants.DailyQuestXpCap),
                 ResultingDailyQuestXpDate = dto.BusinessDate,
-                ResultingVersion = resultingVersion
+                ResultingVersion = resultingVersion,
+                Notifications = notifications
             }, cancellationToken);
 
             if (commit.Status == XpAwardCommitStatus.Committed)
@@ -196,5 +212,50 @@ public sealed class XpService : IXpService
             PreviousEchelon = previousEchelon,
             CurrentEchelon = progression.CurrentEchelon
         };
+    }
+
+    private static IReadOnlyList<NotificationDraft> CreateProgressionNotifications(
+        Guid userId,
+        Guid xpTransactionId,
+        Guid levelNotificationId,
+        Guid echelonNotificationId,
+        int previousLevel,
+        int resultingLevel,
+        Echelon previousEchelon,
+        Echelon resultingEchelon)
+    {
+        var notifications = new List<NotificationDraft>(2);
+
+        if (resultingLevel > previousLevel)
+        {
+            notifications.Add(new NotificationDraft
+            {
+                NotificationId = levelNotificationId,
+                UserId = userId,
+                Type = NotificationType.LevelUp,
+                Title = "Level up!",
+                Message = $"You reached level {resultingLevel}.",
+                SourceType = NotificationSourceType.XpTransaction,
+                SourceId = xpTransactionId,
+                IdempotencyKey = $"XpLevelUp:{xpTransactionId:N}"
+            });
+        }
+
+        if (resultingEchelon != previousEchelon)
+        {
+            notifications.Add(new NotificationDraft
+            {
+                NotificationId = echelonNotificationId,
+                UserId = userId,
+                Type = NotificationType.EchelonChanged,
+                Title = "New echelon reached!",
+                Message = $"You reached the {resultingEchelon} echelon.",
+                SourceType = NotificationSourceType.XpTransaction,
+                SourceId = xpTransactionId,
+                IdempotencyKey = $"XpEchelonChanged:{xpTransactionId:N}"
+            });
+        }
+
+        return notifications;
     }
 }

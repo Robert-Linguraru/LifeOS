@@ -1,9 +1,13 @@
 using LifeOS.Core.Enums.Xp;
+using LifeOS.Core.Abstractions.Notifications;
+using LifeOS.Core.Enums.Xp;
 
 namespace LifeOS.Core.Abstractions;
 
 public sealed class XpAwardCommitRequest
 {
+    public Guid XpTransactionId { get; init; }
+
     public Guid UserId { get; init; }
 
     public XpSource Source { get; init; }
@@ -35,4 +39,6 @@ public sealed class XpAwardCommitRequest
     public DateOnly? ResultingDailyQuestXpDate { get; init; }
 
     public long ResultingVersion { get; init; }
+
+    public IReadOnlyList<NotificationDraft> Notifications { get; init; } = [];
 }
