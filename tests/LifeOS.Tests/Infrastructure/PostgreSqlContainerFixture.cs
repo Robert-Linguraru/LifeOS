@@ -55,6 +55,33 @@ public sealed class PostgreSqlContainerFixture : IAsyncLifetime
                     TimeSpan.Zero)));
     }
 
+    public IDbContextFactory<AppDbContext> CreateDbContextFactory()
+    {
+        return new TestDbContextFactory(this);
+    }
+
+    private sealed class TestDbContextFactory
+        : IDbContextFactory<AppDbContext>
+    {
+        private readonly PostgreSqlContainerFixture _fixture;
+
+        public TestDbContextFactory(PostgreSqlContainerFixture fixture)
+        {
+            _fixture = fixture;
+        }
+
+        public AppDbContext CreateDbContext()
+        {
+            return _fixture.CreateDbContext();
+        }
+
+        public Task<AppDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_fixture.CreateDbContext());
+        }
+    }
+
     private sealed class TestDateTimeProvider
         : IDateTimeProvider
     {

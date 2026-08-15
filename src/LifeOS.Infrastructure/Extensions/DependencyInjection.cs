@@ -1,5 +1,6 @@
 ﻿using LifeOS.Core.Abstractions;
 using LifeOS.Core.Abstractions.Habits;
+using LifeOS.Core.Abstractions.Notifications;
 using LifeOS.Core.Abstractions.Tasks;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Persistence;
@@ -38,6 +39,9 @@ public static class DependencyInjection
 
         services.AddScoped<IHabitRepository, HabitRepository>();
         services.AddScoped<IHabitService, HabitService>();
+
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         services.AddScoped<IXpRepository, XpRepository>();
         services.AddScoped<IXpService, XpService>();
