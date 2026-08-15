@@ -1,5 +1,6 @@
 using LifeOS.Core.Abstractions;
 using LifeOS.Infrastructure.Extensions;
+using Hangfire;
 using LifeOS.Web.Components;
 using LifeOS.Web.Options;
 using LifeOS.Web.Services;
@@ -35,5 +36,8 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+ReminderJobRegistration.RegisterDueReminderJob(
+    app.Services.GetRequiredService<IRecurringJobManager>());
 
 app.Run();

@@ -5,8 +5,12 @@ using LifeOS.Core.Abstractions.Reminders;
 using LifeOS.Core.Abstractions.Tasks;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Jobs;
+using LifeOS.Infrastructure.Options;
 using LifeOS.Infrastructure.Repositories;
 using LifeOS.Infrastructure.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +34,24 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString);
         });
 
+        services.AddOptions<ReminderProcessingOptions>()
+            .Bind(configuration.GetSection(ReminderProcessingOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHangfire(configuration =>
+        {
+            configuration.UsePostgreSqlStorage(
+                connectionString,
+                new PostgreSqlStorageOptions
+                {
+                    SchemaName = "hangfire",
+                    PrepareSchemaIfNecessary = true
+                });
+        });
+
+        services.AddHangfireServer();
+
         services.AddScoped<IDashboardService, DashboardService>();
 
         services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
@@ -47,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IReminderRepository, ReminderRepository>();
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IReminderProcessingService, ReminderProcessingService>();
+        services.AddScoped<DueReminderJob>();
 
         services.AddScoped<IXpRepository, XpRepository>();
         services.AddScoped<IXpService, XpService>();

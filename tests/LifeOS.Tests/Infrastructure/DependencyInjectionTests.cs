@@ -3,6 +3,8 @@ using LifeOS.Core.Abstractions.Habits;
 using LifeOS.Core.Abstractions.Tasks;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Extensions;
+using LifeOS.Infrastructure.Jobs;
+using LifeOS.Infrastructure.Options;
 using LifeOS.Infrastructure.Repositories;
 using LifeOS.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
@@ -234,6 +236,38 @@ public sealed class DependencyInjectionTests
         Assert.Equal(
             ServiceLifetime.Scoped,
             descriptor.Lifetime);
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldRegisterReminderJobComposition()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] =
+                    "Host=localhost;Port=5433;Database=lifeos;Username=lifeos;Password=test",
+                ["ReminderProcessing:BatchSize"] = "100",
+                ["ReminderProcessing:AutomaticRetryAttempts"] = "3"
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddLogging();
+        services.AddInfrastructure(configuration);
+
+        var processing = services.Single(service =>
+            service.ServiceType == typeof(IReminderProcessingService));
+        var job = services.Single(service =>
+            service.ServiceType == typeof(DueReminderJob));
+
+        Assert.Equal(typeof(ReminderProcessingService), processing.ImplementationType);
+        Assert.Equal(ServiceLifetime.Scoped, processing.Lifetime);
+        Assert.Equal(ServiceLifetime.Scoped, job.Lifetime);
+
+        using var provider = services.BuildServiceProvider();
+        Assert.NotNull(provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ReminderProcessingOptions>>());
+        using var scope = provider.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<DueReminderJob>());
     }
 
 
