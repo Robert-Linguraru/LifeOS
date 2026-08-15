@@ -46,6 +46,7 @@ public static class DependencyInjection
 
         services.AddScoped<IReminderRepository, ReminderRepository>();
         services.AddScoped<IReminderService, ReminderService>();
+        services.AddScoped<IReminderProcessingService, ReminderProcessingService>();
 
         services.AddScoped<IXpRepository, XpRepository>();
         services.AddScoped<IXpService, XpService>();

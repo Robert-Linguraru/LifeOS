@@ -1,9 +1,12 @@
 using LifeOS.Core.Abstractions.Reminders;
+using LifeOS.Core.Abstractions.Notifications;
 using LifeOS.Core.Constants;
 using LifeOS.Core.Entities;
+using LifeOS.Core.Enums.Notifications;
 using LifeOS.Core.Enums.Reminders;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace LifeOS.Infrastructure.Repositories;
 
@@ -156,11 +159,145 @@ public sealed class ReminderRepository : IReminderRepository
             .ToListAsync(cancellationToken);
     }
 
-    public Task<ReminderFireCommitResult> CommitFireAsync(
+    public async Task<ReminderFireCommitResult> CommitFireAsync(
         ReminderFireCommitRequest request,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException(
-            "Reminder firing is implemented in a later milestone ticket.");
+        await using var context =
+            await _contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction =
+            await context.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var reminder = await context.Reminders
+                .SingleOrDefaultAsync(
+                    candidate =>
+                        candidate.Id == request.ReminderId &&
+                        candidate.UserId == request.UserId,
+                    cancellationToken);
+
+            var initialOutcome = GetPreFireOutcome(reminder, request);
+            if (initialOutcome is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return initialOutcome;
+            }
+
+            var draft = request.Notification;
+            var notification = new Notification
+            {
+                Id = draft.NotificationId,
+                UserId = reminder!.UserId,
+                Type = NotificationType.ReminderDue,
+                Title = reminder.Title,
+                Message = reminder.Message ?? string.Empty,
+                SourceType = NotificationSourceType.Reminder,
+                SourceId = reminder.Id,
+                IdempotencyKey = draft.IdempotencyKey
+            };
+
+            context.Notifications.Add(notification);
+            reminder.Status = ReminderStatus.Fired;
+            reminder.FiredAtUtc = request.FiredAtUtc;
+            reminder.NotificationId = notification.Id;
+            reminder.Version++;
+            reminder.UpdatedAtUtc = request.FiredAtUtc;
+
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.Fired,
+                NotificationId = notification.Id
+            };
+        }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            return await ResolveDuplicateFireAsync(request, cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
+    private static ReminderFireCommitResult? GetPreFireOutcome(
+        Reminder? reminder,
+        ReminderFireCommitRequest request)
+    {
+        if (reminder is null)
+        {
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.Missing
+            };
+        }
+
+        if (reminder.Status == ReminderStatus.Fired)
+        {
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.AlreadyFired,
+                NotificationId = reminder.NotificationId
+            };
+        }
+
+        if (reminder.Status == ReminderStatus.Cancelled)
+        {
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.Cancelled
+            };
+        }
+
+        if (reminder.ScheduledForUtc > request.DueCutoffUtc)
+        {
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.NotDue
+            };
+        }
+
+        if (reminder.Version != request.ExpectedVersion)
+        {
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.ConcurrencyLost
+            };
+        }
+
+        return null;
+    }
+
+    private async Task<ReminderFireCommitResult> ResolveDuplicateFireAsync(
+        ReminderFireCommitRequest request,
+        CancellationToken cancellationToken)
+    {
+        var authoritative = await GetByIdAsync(
+            request.UserId,
+            request.ReminderId,
+            cancellationToken);
+
+        if (authoritative?.Status == ReminderStatus.Fired)
+        {
+            return new ReminderFireCommitResult
+            {
+                Status = ReminderFireCommitStatus.AlreadyFired,
+                NotificationId = authoritative.NotificationId
+            };
+        }
+
+        throw new DbUpdateException(
+            "A notification uniqueness conflict occurred before the reminder became fired.");
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException postgresException &&
+            postgresException.SqlState == PostgresErrorCodes.UniqueViolation;
     }
 }
