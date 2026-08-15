@@ -1,0 +1,134 @@
+@using LifeOS.Core.Abstractions
+@using LifeOS.Core.DTOs.Dashboard
+@using LifeOS.Core.DTOs.Reminders
+@implements IDisposable
+@inject IDashboardService DashboardService
+@inject IDateTimeProvider DateTimeProvider
+@inject NotificationRefreshCoordinator RefreshCoordinator
+@inject NavigationManager Navigation
+
+<section class="reminder-widget" aria-labelledby="reminder-widget-heading">
+    <div class="reminder-widget__header">
+        <h2 id="reminder-widget-heading">Reminders</h2>
+        <a class="reminder-widget__header-link" href="/reminders">Open reminders</a>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading reminders...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="reminder-widget__error" role="alert">
+            <p>@_loadError</p>
+            <button type="button" @onclick="LoadWidgetAsync">Retry</button>
+        </div>
+    }
+    else if (_widget is not null && _widget.Reminders.Count == 0)
+    {
+        <div class="reminder-widget__empty">
+            <p>No upcoming reminders.</p>
+            <a href="/reminders">Open reminders</a>
+        </div>
+    }
+    else if (_widget is not null)
+    {
+        <div class="reminder-widget__list">
+            @foreach (var reminder in _widget.Reminders)
+            {
+                <article class="reminder-widget__item">
+                    <div class="reminder-widget__item-content">
+                        <a class="reminder-widget__title"
+                           href="@($"/reminders/{reminder.Id:D}/edit")">
+                            @reminder.Title
+                        </a>
+                        <p class="reminder-widget__schedule">
+                            @reminder.ScheduledLocalDate.ToString("dd MMM yyyy") at
+                            @reminder.ScheduledLocalTime.ToString("HH:mm")
+                        </p>
+                        <p class="reminder-widget__timezone">
+                            @reminder.TimeZoneId
+                        </p>
+                        <p class="reminder-widget__source">
+                            Source: @GetSourceLabel(reminder)
+                        </p>
+                    </div>
+                    @if (IsDue(reminder))
+                    {
+                        <span class="reminder-widget__due">Due</span>
+                    }
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private DashboardReminderWidgetDto? _widget;
+    private IDisposable? _subscription;
+    private bool _isLoading = true;
+    private bool _disposed;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _subscription = RefreshCoordinator.Subscribe(OnRefreshRequested);
+        await LoadWidgetAsync();
+    }
+
+    private void OnRefreshRequested(object? sender, EventArgs args)
+    {
+        if (!_disposed)
+        {
+            _ = InvokeAsync(LoadWidgetAsync);
+        }
+    }
+
+    private async Task LoadWidgetAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            _widget = await DashboardService.GetReminderWidgetAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError = "Reminders could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool IsDue(ReminderSummaryDto reminder) =>
+        reminder.ScheduledForUtc <= DateTimeProvider.UtcNow;
+
+    private static string GetSourceLabel(ReminderSummaryDto reminder) =>
+        reminder.SourceType switch
+        {
+            ReminderSourceType.Task when !string.IsNullOrWhiteSpace(reminder.SourceTitle) =>
+                $"Task - {reminder.SourceTitle}",
+            ReminderSourceType.Habit when !string.IsNullOrWhiteSpace(reminder.SourceTitle) =>
+                $"Habit - {reminder.SourceTitle}",
+            ReminderSourceType.Task => "Task",
+            ReminderSourceType.Habit => "Habit",
+            _ => "Custom"
+        };
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _subscription?.Dispose();
+    }
+}

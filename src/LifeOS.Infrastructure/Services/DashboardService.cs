@@ -9,15 +9,18 @@ public sealed class DashboardService : IDashboardService
     private readonly ITaskService _taskService;
     private readonly IHabitService _habitService;
     private readonly IXpService _xpService;
+    private readonly IReminderService? _reminderService;
 
     public DashboardService(
         ITaskService taskService,
         IHabitService habitService,
-        IXpService xpService)
+        IXpService xpService,
+        IReminderService? reminderService = null)
     {
         _taskService = taskService;
         _habitService = habitService;
         _xpService = xpService;
+        _reminderService = reminderService;
     }
 
     public async Task<DashboardTaskWidgetDto> GetTaskWidgetAsync(
@@ -71,6 +74,23 @@ public sealed class DashboardService : IDashboardService
             DailyQuestXpCap = dailyCap,
             RemainingQuestXp = remainingXp,
             ProgressPercent = percentageXp * 100 / dailyCap
+        };
+    }
+
+    public async Task<DashboardReminderWidgetDto> GetReminderWidgetAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_reminderService is null)
+        {
+            throw new InvalidOperationException(
+                "The Reminder service is not configured.");
+        }
+
+        return new DashboardReminderWidgetDto
+        {
+            Reminders = await _reminderService.GetPendingAsync(
+                cancellationToken,
+                ReminderConstants.DashboardListLimit)
         };
     }
 }

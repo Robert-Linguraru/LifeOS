@@ -12,4 +12,7 @@ public interface IDashboardService
 
     Task<DashboardXpWidgetDto> GetXpWidgetAsync(
         CancellationToken cancellationToken = default);
+
+    Task<DashboardReminderWidgetDto> GetReminderWidgetAsync(
+        CancellationToken cancellationToken = default);
 }

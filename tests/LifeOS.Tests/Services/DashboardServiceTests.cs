@@ -1,6 +1,9 @@
 ﻿using LifeOS.Core.DTOs.Habits;
+using LifeOS.Core.DTOs.Reminders;
 using LifeOS.Core.DTOs.Tasks;
 using LifeOS.Core.DTOs.Xp;
+using LifeOS.Core.Constants;
+using LifeOS.Core.Enums.Reminders;
 using LifeOS.Core.Enums.Habits;
 using LifeOS.Core.Enums.Xp;
 using LifeOS.Core.Services;
@@ -14,6 +17,7 @@ public sealed class DashboardServiceTests
     private readonly Mock<ITaskService> _taskService = new();
     private readonly Mock<IHabitService> _habitService = new();
     private readonly Mock<IXpService> _xpService = new();
+    private readonly Mock<IReminderService> _reminderService = new();
 
     [Fact]
     public async Task GetTaskWidgetAsync_ReturnsOnlyOverdueAndTodayTasks()
@@ -278,6 +282,66 @@ public sealed class DashboardServiceTests
         var service = new DashboardService(_taskService.Object, _habitService.Object, _xpService.Object);
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetXpWidgetAsync());
+
+        Assert.Same(exception, actual);
+    }
+
+    [Fact]
+    public async Task GetReminderWidgetAsync_UsesBoundedPendingReminderQuery()
+    {
+        var reminders = new[]
+        {
+            new ReminderSummaryDto
+            {
+                Id = Guid.NewGuid(),
+                Title = "First",
+                SourceType = ReminderSourceType.Custom
+            },
+            new ReminderSummaryDto
+            {
+                Id = Guid.NewGuid(),
+                Title = "Second",
+                SourceType = ReminderSourceType.Task
+            }
+        };
+        _reminderService
+            .Setup(service => service.GetPendingAsync(
+                It.IsAny<CancellationToken>(),
+                ReminderConstants.DashboardListLimit))
+            .ReturnsAsync(reminders);
+
+        var service = new DashboardService(
+            _taskService.Object,
+            _habitService.Object,
+            _xpService.Object,
+            _reminderService.Object);
+
+        var result = await service.GetReminderWidgetAsync();
+
+        Assert.Equal(reminders, result.Reminders);
+        _reminderService.Verify(reminderService => reminderService.GetPendingAsync(
+            It.IsAny<CancellationToken>(),
+            ReminderConstants.DashboardListLimit), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetReminderWidgetAsync_PropagatesReminderQueryFailure()
+    {
+        var exception = new InvalidOperationException("reminders failed");
+        _reminderService
+            .Setup(service => service.GetPendingAsync(
+                It.IsAny<CancellationToken>(),
+                ReminderConstants.DashboardListLimit))
+            .ThrowsAsync(exception);
+
+        var service = new DashboardService(
+            _taskService.Object,
+            _habitService.Object,
+            _xpService.Object,
+            _reminderService.Object);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GetReminderWidgetAsync());
 
         Assert.Same(exception, actual);
     }

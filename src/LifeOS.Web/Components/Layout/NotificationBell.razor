@@ -54,7 +54,7 @@
 
     private void OnRefreshRequested(object? sender, EventArgs args)
     {
-        _ = InvokeAsync(RefreshCountAsync);
+        _ = InvokeAsync(() => RefreshCountAsync());
     }
 
     private async Task PollAsync()
@@ -64,7 +64,7 @@
             while (_timer is not null &&
                    await _timer.WaitForNextTickAsync(_disposeCancellation.Token))
             {
-                await RefreshCountAsync();
+                await RefreshCountAsync(publishRefresh: true);
             }
         }
         catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
@@ -72,7 +72,7 @@
         }
     }
 
-    private async Task RefreshCountAsync()
+    private async Task RefreshCountAsync(bool publishRefresh = false)
     {
         if (_disposeCancellation.IsCancellationRequested)
         {
@@ -86,6 +86,10 @@
             _hasLoaded = true;
             _hasLoadError = false;
             await InvokeAsync(StateHasChanged);
+            if (publishRefresh)
+            {
+                RefreshCoordinator.RequestRefresh();
+            }
         }
         catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
         {

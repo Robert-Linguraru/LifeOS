@@ -100,11 +100,12 @@ public sealed class ReminderService : IReminderService
     }
 
     public async Task<IReadOnlyList<ReminderSummaryDto>> GetPendingAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int limit = ReminderConstants.DefaultListLimit)
     {
         var reminders = await _repository.GetPendingAsync(
             GetCurrentUserId(),
-            ReminderConstants.DefaultListLimit,
+            limit,
             cancellationToken);
 
         return reminders

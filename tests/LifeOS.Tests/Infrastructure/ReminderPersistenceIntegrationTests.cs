@@ -1,6 +1,8 @@
 using LifeOS.Core.Entities;
+using LifeOS.Core.Constants;
 using LifeOS.Core.Enums.Notifications;
 using LifeOS.Core.Enums.Reminders;
+using LifeOS.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Tests.Infrastructure;
@@ -222,6 +224,61 @@ public sealed class ReminderPersistenceIntegrationTests
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
             () => secondContext.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task PendingQuery_ReturnsNextThreeForUserAndExcludesTerminalDeletedAndForeignRows()
+    {
+        var userId = Guid.NewGuid();
+        var first = CreateReminder(userId);
+        first.Title = "First";
+        first.ScheduledForUtc = first.ScheduledForUtc.AddHours(1);
+        var second = CreateReminder(userId);
+        second.Title = "Second";
+        second.ScheduledForUtc = second.ScheduledForUtc.AddHours(2);
+        var third = CreateReminder(userId);
+        third.Title = "Third";
+        third.ScheduledForUtc = third.ScheduledForUtc.AddHours(3);
+        var fourth = CreateReminder(userId);
+        fourth.Title = "Fourth";
+        fourth.ScheduledForUtc = fourth.ScheduledForUtc.AddHours(4);
+        var fifth = CreateReminder(userId);
+        fifth.Title = "Fifth";
+        fifth.ScheduledForUtc = fifth.ScheduledForUtc.AddHours(5);
+        var firedNotification = CreateNotification(userId);
+        var fired = CreateReminder(userId);
+        fired.Status = ReminderStatus.Fired;
+        fired.FiredAtUtc = fired.ScheduledForUtc;
+        fired.NotificationId = firedNotification.Id;
+        var cancelled = CreateReminder(userId);
+        cancelled.Status = ReminderStatus.Cancelled;
+        var deleted = CreateReminder(userId);
+        var foreign = CreateReminder(Guid.NewGuid());
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Reminders.AddRange(
+                first, second, third, fourth, fifth,
+                fired, cancelled, deleted, foreign);
+            context.Notifications.Add(firedNotification);
+            await context.SaveChangesAsync();
+            context.Remove(deleted);
+            await context.SaveChangesAsync();
+        }
+
+        var reminders = await new ReminderRepository(
+                _fixture.CreateDbContextFactory())
+            .GetPendingAsync(userId, ReminderConstants.DashboardListLimit);
+
+        Assert.Equal(
+            new[] { first.Id, second.Id, third.Id },
+            reminders.Select(reminder => reminder.Id));
+        Assert.DoesNotContain(reminders, reminder => reminder.Id == fourth.Id);
+        Assert.DoesNotContain(reminders, reminder => reminder.Id == fifth.Id);
+        Assert.DoesNotContain(reminders, reminder => reminder.Id == fired.Id);
+        Assert.DoesNotContain(reminders, reminder => reminder.Id == cancelled.Id);
+        Assert.DoesNotContain(reminders, reminder => reminder.Id == deleted.Id);
+        Assert.DoesNotContain(reminders, reminder => reminder.Id == foreign.Id);
     }
 
     private async Task AssertRejectsAsync(Reminder reminder)

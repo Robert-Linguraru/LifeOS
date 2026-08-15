@@ -1,4 +1,5 @@
 using LifeOS.Core.DTOs.Reminders;
+using LifeOS.Core.Constants;
 
 namespace LifeOS.Core.Services;
 
@@ -13,7 +14,8 @@ public interface IReminderService
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ReminderSummaryDto>> GetPendingAsync(
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int limit = ReminderConstants.DefaultListLimit);
 
     Task<ReminderMutationResultDto> UpdateAsync(
         Guid reminderId,
