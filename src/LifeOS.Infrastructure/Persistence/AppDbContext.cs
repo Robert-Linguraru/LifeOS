@@ -21,6 +21,8 @@ public class AppDbContext : DbContext
     public DbSet<HabitLog> HabitLogs => Set<HabitLog>();
     public DbSet<XpTransaction> XpTransactions => Set<XpTransaction>();
     public DbSet<UserProgression> UserProgressions => Set<UserProgression>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Reminder> Reminders => Set<Reminder>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

@@ -1,6 +1,7 @@
 ﻿using LifeOS.Core.Abstractions;
 using LifeOS.Core.Constants;
 using LifeOS.Core.Entities;
+using LifeOS.Core.Enums.Reminders;
 using LifeOS.Core.Time;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -110,6 +111,90 @@ public sealed class AppDbContextModelTests
             entityType.GetIndexes(),
             index => index.Properties.Any(item =>
                 item.Name == nameof(UserSettings.TimeZoneConfiguredAtUtc)));
+    }
+
+    [Fact]
+    public void Model_ShouldConfigureNotificationPersistenceContract()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.GetService<IDesignTimeModel>()
+            .Model.FindEntityType(typeof(Notification));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Notifications", entityType.GetTableName());
+        Assert.NotNull(entityType.FindProperty(nameof(Notification.UserId)));
+
+        var title = entityType.FindProperty(nameof(Notification.Title));
+        var message = entityType.FindProperty(nameof(Notification.Message));
+        var readAt = entityType.FindProperty(nameof(Notification.ReadAtUtc));
+        var dismissedAt = entityType.FindProperty(nameof(Notification.DismissedAtUtc));
+
+        Assert.Equal(200, title!.GetMaxLength());
+        Assert.Equal(2000, message!.GetMaxLength());
+        Assert.Equal("timestamp with time zone", readAt!.GetColumnType());
+        Assert.Equal("timestamp with time zone", dismissedAt!.GetColumnType());
+        Assert.Contains(
+            entityType.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_Notifications_SourcePair");
+        Assert.Contains(
+            entityType.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_Notifications_DismissedRequiresRead");
+        Assert.Contains(
+            entityType.GetIndexes(),
+            index => index.IsUnique && index.Properties.Select(item => item.Name)
+                .SequenceEqual([nameof(Notification.UserId), nameof(Notification.IdempotencyKey)]));
+    }
+
+    [Fact]
+    public void Model_ShouldConfigureReminderPersistenceContract()
+    {
+        using var context = CreateContext();
+
+        var entityType = context.GetService<IDesignTimeModel>()
+            .Model.FindEntityType(typeof(Reminder));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Reminders", entityType.GetTableName());
+        Assert.Equal(200, entityType.FindProperty(nameof(Reminder.Title))!.GetMaxLength());
+        Assert.Equal(2000, entityType.FindProperty(nameof(Reminder.Message))!.GetMaxLength());
+        Assert.Equal(200, entityType.FindProperty(nameof(Reminder.SourceTitle))!.GetMaxLength());
+        Assert.Equal(100, entityType.FindProperty(nameof(Reminder.TimeZoneId))!.GetMaxLength());
+        Assert.Equal("date", entityType.FindProperty(nameof(Reminder.ScheduledLocalDate))!.GetColumnType());
+        Assert.Equal("time without time zone", entityType.FindProperty(nameof(Reminder.ScheduledLocalTime))!.GetColumnType());
+        Assert.Equal("timestamp with time zone", entityType.FindProperty(nameof(Reminder.ScheduledForUtc))!.GetColumnType());
+        Assert.Equal("bigint", entityType.FindProperty(nameof(Reminder.Version))!.GetColumnType());
+        Assert.True(entityType.FindProperty(nameof(Reminder.Version))!.IsConcurrencyToken);
+        Assert.Equal(ReminderStatus.Pending, entityType.FindProperty(nameof(Reminder.Status))!.GetDefaultValue());
+        Assert.Equal(0L, entityType.FindProperty(nameof(Reminder.Version))!.GetDefaultValue());
+        Assert.Contains(
+            entityType.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_Reminders_SourceShape");
+        Assert.Contains(
+            entityType.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_Reminders_Lifecycle");
+        Assert.Contains(
+            entityType.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_Reminders_Version_NonNegative");
+        Assert.Contains(
+            entityType.GetIndexes(),
+            index => index.IsUnique && index.Properties.Select(item => item.Name)
+                .SequenceEqual([nameof(Reminder.UserId), nameof(Reminder.IdempotencyKey)]));
+        Assert.Contains(
+            entityType.GetIndexes(),
+            index => index.Properties.Select(item => item.Name)
+                .SequenceEqual([nameof(Reminder.UserId), nameof(Reminder.Status), nameof(Reminder.ScheduledForUtc)]));
+        Assert.Contains(
+            entityType.GetIndexes(),
+            index => index.Properties.Select(item => item.Name)
+                .SequenceEqual([nameof(Reminder.Status), nameof(Reminder.ScheduledForUtc)]));
+
+        var notificationForeignKey = entityType.GetForeignKeys()
+            .Single(foreignKey => foreignKey.Properties
+                .Select(property => property.Name)
+                .SequenceEqual([nameof(Reminder.NotificationId)]));
+
+        Assert.Equal(DeleteBehavior.Restrict, notificationForeignKey.DeleteBehavior);
     }
 
     [Fact]
