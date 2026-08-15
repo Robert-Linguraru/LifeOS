@@ -1,4 +1,6 @@
-﻿namespace LifeOS.Core.Abstractions;
+﻿using LifeOS.Core.Time;
+
+namespace LifeOS.Core.Abstractions;
 
 public interface IDateTimeProvider
 {
@@ -7,4 +9,13 @@ public interface IDateTimeProvider
     bool IsValidTimeZone(string timeZoneId);
 
     DateOnly GetCurrentDate(string timeZoneId);
+
+    LocalTimeConversionResult ConvertLocalToUtc(
+        DateOnly localDate,
+        TimeOnly localTime,
+        string timeZoneId);
+
+    DateTimeOffset ConvertUtcToLocal(
+        DateTimeOffset utcInstant,
+        string timeZoneId);
 }

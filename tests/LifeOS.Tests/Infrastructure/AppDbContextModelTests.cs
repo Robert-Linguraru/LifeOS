@@ -1,6 +1,7 @@
 ﻿using LifeOS.Core.Abstractions;
 using LifeOS.Core.Constants;
 using LifeOS.Core.Entities;
+using LifeOS.Core.Time;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -390,6 +391,24 @@ public sealed class AppDbContextModelTests
         public bool IsValidTimeZone(string timeZoneId)
         {
             return true;
+        }
+
+        public LocalTimeConversionResult ConvertLocalToUtc(
+            DateOnly localDate,
+            TimeOnly localTime,
+            string timeZoneId)
+        {
+            return LocalTimeConversionResult.Success(
+                new DateTimeOffset(
+                    localDate.ToDateTime(localTime),
+                    TimeSpan.Zero));
+        }
+
+        public DateTimeOffset ConvertUtcToLocal(
+            DateTimeOffset utcInstant,
+            string timeZoneId)
+        {
+            return utcInstant;
         }
     }
 }

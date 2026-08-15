@@ -1,4 +1,5 @@
 ﻿using LifeOS.Core.Abstractions;
+using LifeOS.Core.Time;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -99,6 +100,24 @@ public sealed class PostgreSqlContainerFixture : IAsyncLifetime
             {
                 return false;
             }
+        }
+
+        public LocalTimeConversionResult ConvertLocalToUtc(
+            DateOnly localDate,
+            TimeOnly localTime,
+            string timeZoneId)
+        {
+            return LocalTimeConversionResult.Success(
+                new DateTimeOffset(
+                    localDate.ToDateTime(localTime),
+                    TimeSpan.Zero));
+        }
+
+        public DateTimeOffset ConvertUtcToLocal(
+            DateTimeOffset utcInstant,
+            string timeZoneId)
+        {
+            return utcInstant;
         }
     }
 }
