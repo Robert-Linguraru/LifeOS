@@ -1,0 +1,47 @@
+.reminder-list-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color, #d6d9df);
+    border-radius: 0.75rem;
+    background: var(--surface-color, #fff);
+}
+
+.reminder-list-item h2 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 1.1rem;
+}
+
+.reminder-list-item p {
+    margin: 0.35rem 0 0;
+    overflow-wrap: anywhere;
+}
+
+.reminder-list-item__schedule {
+    font-weight: 600;
+}
+
+.reminder-list-item__source {
+    color: var(--muted-text-color, #5f6672);
+}
+
+.reminder-list-item__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .reminder-list-item {
+        flex-direction: column;
+    }
+
+    .reminder-list-item__actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}

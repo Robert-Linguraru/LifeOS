@@ -19,6 +19,15 @@
                 @onclick="NavigateToHabits">
             Cancel
         </button>
+        @if (IsEditMode && !_isArchived)
+        {
+            <button type="button"
+                    class="secondary-button"
+                    disabled="@_isSaving"
+                    @onclick="AddReminder">
+                Add reminder
+            </button>
+        }
     </div>
 
     @if (_isLoading)
@@ -383,6 +392,11 @@
     private void NavigateToHabits()
     {
         Navigation.NavigateTo("/habits");
+    }
+
+    private void AddReminder()
+    {
+        Navigation.NavigateTo($"/reminders/new?sourceType=Habit&sourceId={HabitId:D}");
     }
 
     private static string GetEstimatedTimeLabel(

@@ -1,0 +1,74 @@
+.reminder-editor {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.reminder-editor__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.reminder-editor__header h1,
+.reminder-editor__header p {
+    margin: 0;
+}
+
+.reminder-editor__header p {
+    margin-top: 0.35rem;
+}
+
+.reminder-editor__source {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--surface-muted-color, #f2f4f7);
+    overflow-wrap: anywhere;
+}
+
+.reminder-editor__gate,
+.reminder-editor__terminal,
+.reminder-editor__confirmation {
+    padding: 1rem;
+    border: 1px solid var(--border-color, #d6d9df);
+    border-radius: 0.75rem;
+}
+
+.reminder-editor__confirmation {
+    margin-top: 1rem;
+}
+
+.reminder-editor__gate h2,
+.reminder-editor__terminal h2,
+.reminder-editor__confirmation h2 {
+    margin-top: 0;
+}
+
+.reminder-editor .form-field {
+    margin-bottom: 1rem;
+}
+
+.reminder-editor .form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.reminder-editor .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+@media (max-width: 640px) {
+    .reminder-editor__header {
+        flex-direction: column;
+    }
+
+    .reminder-editor .form-row {
+        grid-template-columns: 1fr;
+    }
+}

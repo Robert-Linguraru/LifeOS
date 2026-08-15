@@ -1,0 +1,140 @@
+@page "/reminders"
+
+@using LifeOS.Core.DTOs.Reminders
+@using LifeOS.Core.Enums.Reminders
+@using LifeOS.Core.Exceptions
+@using LifeOS.Web.Components.Reminders
+@inject IReminderService ReminderService
+@inject NavigationManager Navigation
+
+<PageTitle>Reminders</PageTitle>
+
+<div class="reminders-page">
+    <div class="reminders-page__header">
+        <div>
+            <h1>Reminders</h1>
+            <p>Manage your upcoming reminders.</p>
+        </div>
+        <button type="button" class="primary-button" @onclick="CreateReminder">
+            New reminder
+        </button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading reminders...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">
+            Retry
+        </button>
+    }
+    else if (_reminders.Count == 0)
+    {
+        <section class="reminders-page__empty" aria-labelledby="empty-reminders-heading">
+            <h2 id="empty-reminders-heading">No upcoming reminders</h2>
+            <p>You do not have any pending reminders. Create one to be notified later.</p>
+            <button type="button" class="primary-button" @onclick="CreateReminder">
+                Create a reminder
+            </button>
+        </section>
+    }
+    else
+    {
+        <div class="reminders-page__list">
+            @foreach (var reminder in _reminders)
+            {
+                <ReminderListItem Reminder="reminder"
+                                  IsCancelling="_cancellingId == reminder.Id"
+                                  CancelRequested="() => CancelAsync(reminder)" />
+            }
+        </div>
+    }
+
+    @if (_cancelError is not null)
+    {
+        <div class="error-message" role="alert">@_cancelError</div>
+    }
+
+    </div>
+
+@code {
+        private IReadOnlyList<ReminderSummaryDto> _reminders = [];
+        private bool _isLoading = true;
+        private Guid? _cancellingId;
+        private string? _loadError;
+        private string? _cancelError;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadAsync();
+        }
+
+        private async Task LoadAsync()
+        {
+            _isLoading = true;
+            _loadError = null;
+            _cancelError = null;
+
+            try
+            {
+                _reminders = await ReminderService.GetPendingAsync();
+            }
+            catch (CurrentUserUnavailableException)
+            {
+                _loadError = "The current user is unavailable.";
+            }
+            catch (Exception)
+            {
+                _loadError = "Reminders could not be loaded. Please try again.";
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        private void CreateReminder()
+        {
+            Navigation.NavigateTo("/reminders/new");
+        }
+
+        private async Task CancelAsync(ReminderSummaryDto reminder)
+        {
+            if (_cancellingId is not null)
+            {
+                return;
+            }
+
+            _cancelError = null;
+            _cancellingId = reminder.Id;
+            try
+            {
+                var result = await ReminderService.CancelAsync(reminder.Id, reminder.Version);
+                if (result.Status is ReminderMutationStatus.Cancelled or
+                    ReminderMutationStatus.AlreadyCancelled or
+                    ReminderMutationStatus.Terminal)
+                {
+                    await LoadAsync();
+                }
+            }
+            catch (ReminderConcurrencyException)
+            {
+                _cancelError = "This reminder changed while it was being cancelled. Please reload and try again.";
+            }
+            catch (ResourceNotFoundException)
+            {
+                _cancelError = "This reminder could not be found. Please reload the page.";
+            }
+            catch (Exception)
+            {
+                _cancelError = "The reminder could not be cancelled. Please try again.";
+            }
+            finally
+            {
+                _cancellingId = null;
+            }
+        }
+    }

@@ -19,6 +19,15 @@
                 @onclick="NavigateToTasks">
             Cancel
         </button>
+        @if (IsEditMode)
+        {
+            <button type="button"
+                    class="secondary-button"
+                    disabled="@_isSaving"
+                    @onclick="AddReminder">
+                Add reminder
+            </button>
+        }
     </div>
 
     @if (_isLoading)
@@ -346,6 +355,11 @@
     private void NavigateToTasks()
     {
         Navigation.NavigateTo("/tasks");
+    }
+
+    private void AddReminder()
+    {
+        Navigation.NavigateTo($"/reminders/new?sourceType=Task&sourceId={TaskId:D}");
     }
 
     private static string GetEstimatedTimeLabel(

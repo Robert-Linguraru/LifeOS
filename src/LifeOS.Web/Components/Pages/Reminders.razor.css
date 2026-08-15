@@ -1,0 +1,46 @@
+.reminders-page {
+    max-width: 70rem;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.reminders-page__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.reminders-page__header h1,
+.reminders-page__header p {
+    margin: 0;
+}
+
+.reminders-page__header p {
+    margin-top: 0.35rem;
+}
+
+.reminders-page__list {
+    display: grid;
+    gap: 1rem;
+}
+
+.reminders-page__empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    border: 1px dashed var(--border-color, #d6d9df);
+    border-radius: 0.75rem;
+}
+
+.reminders-page__empty h2,
+.reminders-page__empty p {
+    margin-top: 0;
+}
+
+@media (max-width: 640px) {
+    .reminders-page__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

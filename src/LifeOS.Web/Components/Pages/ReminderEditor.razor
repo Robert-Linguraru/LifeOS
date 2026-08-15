@@ -1,0 +1,473 @@
+@page "/reminders/new"
+@page "/reminders/{ReminderId:guid}/edit"
+
+@using LifeOS.Core.DTOs
+@using LifeOS.Core.DTOs.Reminders
+@using LifeOS.Core.Abstractions
+@using LifeOS.Core.Enums.Reminders
+@using LifeOS.Core.Exceptions
+@using LifeOS.Web.Models.Reminders
+@inject IReminderService ReminderService
+@inject IUserSettingsService UserSettingsService
+@inject IDateTimeProvider DateTimeProvider
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="reminder-editor">
+    <div class="reminder-editor__header">
+        <div>
+            <h1>@HeadingText</h1>
+            <p>@DescriptionText</p>
+        </div>
+        <button type="button"
+                class="secondary-button"
+                disabled="@_isSaving"
+                @onclick="NavigateToReminders">
+            Back to reminders
+        </button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading reminder...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">
+            Retry
+        </button>
+    }
+    else if (!_timeZoneConfirmed)
+    {
+        <section class="reminder-editor__gate" aria-labelledby="time-zone-gate-heading">
+            <h2 id="time-zone-gate-heading">Confirm your time zone first</h2>
+            <p>Reminder scheduling requires a confirmed time zone so local times can be handled correctly.</p>
+            <a class="primary-button" href="/settings">Open settings</a>
+        </section>
+    }
+    else if (_isTerminal)
+    {
+        <section class="reminder-editor__terminal" aria-labelledby="terminal-heading">
+            <h2 id="terminal-heading">Reminder is @_reminderStatusText</h2>
+            <p>This reminder can no longer be edited or reopened.</p>
+            <button type="button" class="secondary-button" @onclick="NavigateToReminders">
+                Back to reminders
+            </button>
+        </section>
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="HandleValidSubmitAsync">
+            <DataAnnotationsValidator />
+
+            @if (_saveError is not null)
+            {
+                <div class="error-message" role="alert">@_saveError</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_sourceDescription))
+            {
+                <p class="reminder-editor__source" role="status">@_sourceDescription</p>
+            }
+
+            <div class="form-field">
+                <label for="reminder-source-type">Source</label>
+                <InputSelect id="reminder-source-type"
+                             class="form-control"
+                             TValue="ReminderSourceType"
+                             Value="_model.SourceType"
+                             ValueChanged="HandleSourceTypeChanged"
+                             ValueExpression="() => _model.SourceType"
+                             disabled="@(_isSaving || _sourceIsPrefilled || IsEditMode)">
+                    <option value="@ReminderSourceType.Custom">Custom reminder</option>
+                    <option value="@ReminderSourceType.Task">Task</option>
+                    <option value="@ReminderSourceType.Habit">Habit</option>
+                </InputSelect>
+            </div>
+
+            <div class="form-field">
+                <label for="reminder-title">Title</label>
+                <InputText id="reminder-title"
+                           class="form-control"
+                           @bind-Value="_model.Title"
+                           disabled="@_isSaving" />
+                <ValidationMessage For="() => _model.Title" />
+            </div>
+
+            <div class="form-field">
+                <label for="reminder-message">Message</label>
+                <InputTextArea id="reminder-message"
+                               class="form-control"
+                               @bind-Value="_model.Message"
+                               disabled="@_isSaving" />
+                <ValidationMessage For="() => _model.Message" />
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="reminder-date">Local date</label>
+                    <InputDate id="reminder-date"
+                               class="form-control"
+                               @bind-Value="_model.ScheduledLocalDate"
+                               disabled="@_isSaving" />
+                </div>
+                <div class="form-field">
+                    <label for="reminder-time">Local time</label>
+                    <InputDate id="reminder-time"
+                               class="form-control"
+                               Type="InputDateType.Time"
+                               @bind-Value="_model.ScheduledLocalTime"
+                               disabled="@_isSaving" />
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="reminder-time-zone">Time zone</label>
+                <InputSelect id="reminder-time-zone"
+                             class="form-control"
+                             @bind-Value="_model.TimeZoneId"
+                             disabled="@_isSaving">
+                    @foreach (var timeZoneId in _timeZoneIds)
+                    {
+                        <option value="@timeZoneId">@timeZoneId</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => _model.TimeZoneId" />
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="primary-button" disabled="@_isSaving">
+                    @(_isSaving ? "Saving..." : SaveButtonText)
+                </button>
+                @if (IsEditMode)
+                {
+                    <button type="button"
+                            class="danger-button"
+                            disabled="@_isSaving"
+                            @onclick="BeginCancel">
+                        Cancel reminder
+                    </button>
+                }
+                <button type="button" class="secondary-button" disabled="@_isSaving" @onclick="NavigateToReminders">
+                    Cancel
+                </button>
+            </div>
+        </EditForm>
+    }
+
+    @if (_confirmCancel)
+    {
+        <div class="reminder-editor__confirmation" role="alertdialog" aria-labelledby="cancel-heading">
+            <h2 id="cancel-heading">Cancel this reminder?</h2>
+            <p>Cancellation is permanent in this version of LifeOS.</p>
+            <button type="button" class="danger-button" disabled="@_isCancelling" @onclick="CancelAsync">
+                @(_isCancelling ? "Cancelling..." : "Confirm cancellation")
+            </button>
+            <button type="button" class="secondary-button" disabled="@_isCancelling" @onclick="() => _confirmCancel = false">
+                Keep reminder
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? ReminderId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "sourceType")]
+    public string? SourceTypeQuery { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "sourceId")]
+    public Guid? SourceIdQuery { get; set; }
+
+    private ReminderFormModel _model = new();
+    private IReadOnlyList<string> _timeZoneIds = [];
+    private ReminderDetailsDto? _reminder;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _isCancelling;
+    private bool _confirmCancel;
+    private bool _timeZoneConfirmed;
+    private bool _isTerminal;
+    private bool _sourceIsPrefilled;
+    private string? _loadError;
+    private string? _saveError;
+
+    private bool IsEditMode => ReminderId.HasValue;
+    private string PageTitleText => IsEditMode ? "Edit Reminder" : "New Reminder";
+    private string HeadingText => IsEditMode ? "Edit reminder" : "New reminder";
+    private string DescriptionText => IsEditMode
+        ? "Update this pending reminder."
+        : "Schedule a reminder using a local date and time.";
+    private string SaveButtonText => IsEditMode ? "Save changes" : "Create reminder";
+    private string? _sourceDescription;
+    private string _reminderStatusText => _reminder?.Status.ToString().ToLowerInvariant() ?? "terminal";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        _saveError = null;
+        _isTerminal = false;
+        _confirmCancel = false;
+
+        try
+        {
+            _timeZoneIds = DateTimeProvider.GetTimeZoneIds();
+            var settings = await UserSettingsService.GetCurrentUserSettingsAsync();
+            _timeZoneConfirmed = settings.TimeZoneConfiguredAtUtc is not null;
+
+            if (IsEditMode)
+            {
+                _reminder = await ReminderService.GetDetailsAsync(ReminderId!.Value);
+                _model = new ReminderFormModel
+                {
+                    SourceType = _reminder.SourceType,
+                    SourceId = _reminder.SourceId,
+                    Title = _reminder.Title,
+                    Message = _reminder.Message,
+                    ScheduledLocalDate = _reminder.ScheduledLocalDate,
+                    ScheduledLocalTime = _reminder.ScheduledLocalTime,
+                    TimeZoneId = _reminder.TimeZoneId,
+                    ExpectedVersion = _reminder.Version
+                };
+                _sourceDescription = FormatSource(_reminder.SourceType, _reminder.SourceTitle);
+                _isTerminal = _reminder.Status != ReminderStatus.Pending;
+            }
+            else
+            {
+                _model = new ReminderFormModel { TimeZoneId = settings.TimeZoneId };
+                ApplySourceQuery();
+            }
+        }
+        catch (ResourceNotFoundException)
+        {
+            _loadError = "The reminder could not be found.";
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError = "The reminder could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ApplySourceQuery()
+    {
+        if (!Enum.TryParse<ReminderSourceType>(SourceTypeQuery, true, out var sourceType) ||
+            sourceType == ReminderSourceType.Custom ||
+            SourceIdQuery is null || SourceIdQuery == Guid.Empty)
+        {
+            _model.SourceType = ReminderSourceType.Custom;
+            _model.SourceId = null;
+            _sourceIsPrefilled = false;
+            _sourceDescription = null;
+            return;
+        }
+
+        _model.SourceType = sourceType;
+        _model.SourceId = SourceIdQuery;
+        _sourceIsPrefilled = true;
+        _sourceDescription = $"{sourceType} source selected. It will be verified when you save.";
+    }
+
+    private void HandleSourceTypeChanged(ReminderSourceType sourceType)
+    {
+        _model.SourceType = sourceType;
+        if (sourceType == ReminderSourceType.Custom)
+        {
+            _model.SourceId = null;
+            _sourceIsPrefilled = false;
+            _sourceDescription = null;
+        }
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        if (_isSaving || _isTerminal)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _saveError = null;
+        try
+        {
+            if (!IsEditMode)
+            {
+                await ReminderService.CreateAsync(new CreateReminderDto
+                {
+                    SourceType = _model.SourceType,
+                    SourceId = _model.SourceId,
+                    Title = _model.Title,
+                    Message = _model.Message,
+                    ScheduledLocalDate = _model.ScheduledLocalDate,
+                    ScheduledLocalTime = _model.ScheduledLocalTime,
+                    TimeZoneId = _model.TimeZoneId
+                });
+            }
+            else
+            {
+                var result = await ReminderService.UpdateAsync(ReminderId!.Value, new UpdateReminderDto
+                {
+                    SourceType = _model.SourceType,
+                    SourceId = _model.SourceId,
+                    Title = _model.Title,
+                    Message = _model.Message,
+                    ScheduledLocalDate = _model.ScheduledLocalDate,
+                    ScheduledLocalTime = _model.ScheduledLocalTime,
+                    TimeZoneId = _model.TimeZoneId,
+                    ExpectedVersion = _model.ExpectedVersion
+                });
+                if (result.Status == ReminderMutationStatus.Terminal)
+                {
+                    ApplyReminder(result.Reminder);
+                    return;
+                }
+            }
+
+            Navigation.NavigateTo("/reminders");
+        }
+        catch (ReminderConcurrencyException)
+        {
+            await ReloadAfterConflictAsync("This reminder changed while you were editing it. Reload the latest version and try again.");
+        }
+        catch (ValidationException exception)
+        {
+            _saveError = ToUserValidationMessage(exception.Message);
+        }
+        catch (ResourceNotFoundException)
+        {
+            _saveError = "The reminder or its source could not be found.";
+        }
+        catch (Exception)
+        {
+            _saveError = "The reminder could not be saved. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void BeginCancel() => _confirmCancel = true;
+
+    private async Task CancelAsync()
+    {
+        if (_isCancelling || _reminder is null)
+        {
+            return;
+        }
+
+        _isCancelling = true;
+        _saveError = null;
+        try
+        {
+            var result = await ReminderService.CancelAsync(ReminderId!.Value, _model.ExpectedVersion);
+            if (result.Status == ReminderMutationStatus.Cancelled ||
+                result.Status == ReminderMutationStatus.AlreadyCancelled)
+            {
+                Navigation.NavigateTo("/reminders");
+            }
+            else if (result.Status == ReminderMutationStatus.Terminal)
+            {
+                ApplyReminder(result.Reminder);
+            }
+        }
+        catch (ReminderConcurrencyException)
+        {
+            await ReloadAfterConflictAsync("This reminder changed while it was being cancelled. Reload the latest version and try again.");
+        }
+        catch (ResourceNotFoundException)
+        {
+            _saveError = "The reminder could not be found. Please reload the page.";
+        }
+        catch (Exception)
+        {
+            _saveError = "The reminder could not be cancelled. Please try again.";
+        }
+        finally
+        {
+            _isCancelling = false;
+            _confirmCancel = false;
+        }
+    }
+
+    private async Task ReloadAfterConflictAsync(string message)
+    {
+        _saveError = message;
+        try
+        {
+            _reminder = await ReminderService.GetDetailsAsync(ReminderId!.Value);
+            ApplyReminder(_reminder);
+        }
+        catch (Exception)
+        {
+            _saveError = "The reminder changed and the latest version could not be loaded. Please retry.";
+        }
+    }
+
+    private void ApplyReminder(ReminderDetailsDto? reminder)
+    {
+        if (reminder is null)
+        {
+            _saveError = "The reminder could not be loaded.";
+            return;
+        }
+
+        _reminder = reminder;
+        _model = new ReminderFormModel
+        {
+            SourceType = reminder.SourceType,
+            SourceId = reminder.SourceId,
+            Title = reminder.Title,
+            Message = reminder.Message,
+            ScheduledLocalDate = reminder.ScheduledLocalDate,
+            ScheduledLocalTime = reminder.ScheduledLocalTime,
+            TimeZoneId = reminder.TimeZoneId,
+            ExpectedVersion = reminder.Version
+        };
+        _sourceDescription = FormatSource(reminder.SourceType, reminder.SourceTitle);
+        _isTerminal = reminder.Status != ReminderStatus.Pending;
+    }
+
+    private static string? FormatSource(ReminderSourceType sourceType, string? sourceTitle)
+    {
+        var label = sourceType switch
+        {
+            ReminderSourceType.Task => "Task",
+            ReminderSourceType.Habit => "Habit",
+            _ => "Custom"
+        };
+        return string.IsNullOrWhiteSpace(sourceTitle) ? $"Source: {label}" : $"Source: {label} — {sourceTitle}";
+    }
+
+    private static string ToUserValidationMessage(string message) => message switch
+    {
+        "Configure and confirm a time zone before scheduling reminders." => message,
+        "Reminder time zone is invalid." => "Choose a valid time zone.",
+        "Reminder local time does not exist." => "The selected local time does not exist in that time zone. Choose another time.",
+        "Reminder local time is ambiguous." => "The selected local time occurs twice in that time zone. Choose another time.",
+        "Reminder schedule must be in the future." => "Choose a future date and time.",
+        "Task was not found." => "The selected task was not found or is no longer active.",
+        "Habit was not found." => "The selected habit was not found or is no longer active.",
+        _ => "The reminder details are not valid. Check the fields and try again."
+    };
+
+    private void NavigateToReminders() => Navigation.NavigateTo("/reminders");
+}

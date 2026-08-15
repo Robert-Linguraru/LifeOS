@@ -1,0 +1,82 @@
+@using LifeOS.Core.DTOs.Reminders
+@using LifeOS.Core.Enums.Reminders
+@inject NavigationManager Navigation
+
+<article class="reminder-list-item">
+    <div class="reminder-list-item__content">
+        <h2>@Reminder.Title</h2>
+        <p class="reminder-list-item__schedule">
+            @Reminder.ScheduledLocalDate.ToString("yyyy-MM-dd") at
+            @Reminder.ScheduledLocalTime.ToString("HH:mm")
+            <span> (@Reminder.TimeZoneId)</span>
+        </p>
+        <p class="reminder-list-item__source">
+            Source: @SourceLabel
+            @if (!string.IsNullOrWhiteSpace(Reminder.SourceTitle))
+            {
+                <span> — @Reminder.SourceTitle</span>
+            }
+        </p>
+    </div>
+
+    <div class="reminder-list-item__actions">
+        <button type="button"
+                class="secondary-button"
+                @onclick="EditAsync">
+            Edit
+        </button>
+        <button type="button"
+                class="danger-button"
+                disabled="@IsCancelling"
+                @onclick="CancelAsync">
+            @(IsCancelling ? "Cancelling..." : _confirming ? "Confirm cancellation" : "Cancel reminder")
+        </button>
+        @if (_confirming && !IsCancelling)
+        {
+            <button type="button"
+                    class="secondary-button"
+                    @onclick="KeepReminder">
+                Keep reminder
+            </button>
+        }
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public ReminderSummaryDto Reminder { get; set; } = null!;
+
+    [Parameter]
+    public bool IsCancelling { get; set; }
+
+    [Parameter]
+    public EventCallback CancelRequested { get; set; }
+
+    private bool _confirming;
+
+    private string SourceLabel => Reminder.SourceType switch
+    {
+        ReminderSourceType.Task => "Task",
+        ReminderSourceType.Habit => "Habit",
+        _ => "Custom"
+    };
+
+    private Task EditAsync()
+    {
+        Navigation.NavigateTo($"/reminders/{Reminder.Id:D}/edit");
+        return Task.CompletedTask;
+    }
+
+    private Task CancelAsync()
+    {
+        if (!_confirming)
+        {
+            _confirming = true;
+            return Task.CompletedTask;
+        }
+
+        return CancelRequested.InvokeAsync();
+    }
+
+    private void KeepReminder() => _confirming = false;
+}
