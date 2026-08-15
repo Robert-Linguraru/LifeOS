@@ -8,6 +8,8 @@
 @using LifeOS.Core.Exceptions
 @using LifeOS.Web.Models.Reminders
 @inject IReminderService ReminderService
+@inject ITaskService TaskService
+@inject IHabitService HabitService
 @inject IUserSettingsService UserSettingsService
 @inject IDateTimeProvider DateTimeProvider
 @inject NavigationManager Navigation
@@ -246,7 +248,7 @@
             else
             {
                 _model = new ReminderFormModel { TimeZoneId = settings.TimeZoneId };
-                ApplySourceQuery();
+                await ApplySourceQueryAsync(settings.TimeZoneId);
             }
         }
         catch (ResourceNotFoundException)
@@ -267,23 +269,76 @@
         }
     }
 
-    private void ApplySourceQuery()
+    private async Task ApplySourceQueryAsync(string confirmedTimeZoneId)
     {
         if (!Enum.TryParse<ReminderSourceType>(SourceTypeQuery, true, out var sourceType) ||
             sourceType == ReminderSourceType.Custom ||
             SourceIdQuery is null || SourceIdQuery == Guid.Empty)
         {
-            _model.SourceType = ReminderSourceType.Custom;
-            _model.SourceId = null;
-            _sourceIsPrefilled = false;
-            _sourceDescription = null;
+            ResetToCustomSource();
             return;
         }
 
-        _model.SourceType = sourceType;
-        _model.SourceId = SourceIdQuery;
-        _sourceIsPrefilled = true;
-        _sourceDescription = $"{sourceType} source selected. It will be verified when you save.";
+        try
+        {
+            if (sourceType == ReminderSourceType.Task)
+            {
+                var task = await TaskService.GetTaskByIdAsync(SourceIdQuery.Value);
+                if (task.Status != LifeOS.Core.Enums.Tasks.TaskItemStatus.Active)
+                {
+                    ResetToCustomSource();
+                    return;
+                }
+
+                _model.SourceType = sourceType;
+                _model.SourceId = task.Id;
+                _model.Title = task.Title;
+                _sourceIsPrefilled = true;
+                _sourceDescription = $"Task - {task.Title}";
+
+                if (task.DueDate.HasValue && task.DueTime.HasValue)
+                {
+                    var conversion = DateTimeProvider.ConvertLocalToUtc(
+                        task.DueDate.Value,
+                        task.DueTime.Value,
+                        confirmedTimeZoneId);
+                    if (conversion.IsSuccess &&
+                        conversion.UtcInstant is not null &&
+                        conversion.UtcInstant > DateTimeProvider.UtcNow)
+                    {
+                        _model.ScheduledLocalDate = task.DueDate.Value;
+                        _model.ScheduledLocalTime = task.DueTime.Value;
+                    }
+                }
+
+                return;
+            }
+
+            var habit = await HabitService.GetHabitByIdAsync(SourceIdQuery.Value);
+            if (!habit.IsActive)
+            {
+                ResetToCustomSource();
+                return;
+            }
+
+            _model.SourceType = sourceType;
+            _model.SourceId = habit.Id;
+            _model.Title = habit.Name;
+            _sourceIsPrefilled = true;
+            _sourceDescription = $"Habit - {habit.Name}";
+        }
+        catch (ResourceNotFoundException)
+        {
+            ResetToCustomSource();
+        }
+    }
+
+    private void ResetToCustomSource()
+    {
+        _model.SourceType = ReminderSourceType.Custom;
+        _model.SourceId = null;
+        _sourceIsPrefilled = false;
+        _sourceDescription = null;
     }
 
     private void HandleSourceTypeChanged(ReminderSourceType sourceType)
@@ -291,9 +346,7 @@
         _model.SourceType = sourceType;
         if (sourceType == ReminderSourceType.Custom)
         {
-            _model.SourceId = null;
-            _sourceIsPrefilled = false;
-            _sourceDescription = null;
+            ResetToCustomSource();
         }
     }
 
