@@ -403,6 +403,12 @@ Selected-day, weekly, monthly, and multi-completion habits are valuable, but the
 
 V1 uses quest XP and progression only. DailyScore becomes useful after additional modules such as wellbeing, sleep, finance, fitness, and nutrition exist.
 
+Milestone 6 is the canonical Notifications and One-Time Reminders increment. It
+includes Task, Habit, and Custom reminders, explicit timezone confirmation,
+in-app notifications, the notification bell, Reminders/Notifications pages, and
+the widget-specific Dashboard Reminder projection. Recurrence, snooze, Quick Add,
+external delivery, and source-driven cancellation remain out of scope.
+
 ### Decision 7 - Finance formula clarified
 
 The monthly plan defines expected money available for the month. Manual transactions record expenses and optional extra income. The app must avoid double-counting the monthly allowance as both planned income and a separate income transaction.

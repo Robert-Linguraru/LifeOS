@@ -226,6 +226,129 @@ Scope:
 - idempotent reminder firing;
 - tests.
 
+### Frozen Milestone 6 contract
+
+Milestone 6 is limited to **Notifications and One-Time Reminders**. This section is
+the normative contract for all product, engineering, operations, and testing
+documents. Historical descriptions elsewhere are non-authoritative when they
+conflict with this section.
+
+#### Scope and lifecycle
+
+M6 requires persisted user-owned `Reminder` and `Notification` records; one-time
+creation, pending edit, pending cancellation, Task/Habit/custom entry points,
+local scheduling, due processing, in-app listing, unread count, mark-read, dismiss,
+the header bell, Reminders and Notifications pages, a read-only Dashboard
+Reminder widget, and level/echelon notifications. Recurring reminders, recurrence,
+snooze, delivery history, external channels, templates, Quick Add infrastructure,
+source-driven cancellation, generic related-object infrastructure, notification
+toast/sound, mark-all-read, undismiss, public deletion, Hangfire administration,
+Identity, full browser E2E automation, XP history/header XP, new XP sources or
+formula changes, reconciliation/outbox, and Finance/Calendar behavior are not M6.
+
+Reminder status is exactly `Pending = 0`, `Fired = 1`, and `Cancelled = 2`.
+The only transitions are `Pending -> Fired` and `Pending -> Cancelled`;
+`Fired` and `Cancelled` are terminal. `Triggered` is processing prose, never a
+persisted status. Fired or cancelled reminders cannot be edited, cancelled,
+reopened, or publicly deleted. Task completion, Habit completion, Task soft
+deletion, and Habit deactivation never cancel a reminder; the source-title
+snapshot remains and unavailable source links degrade safely.
+
+Source types are exactly `Task = 0`, `Habit = 1`, and `Custom = 2`. Task and Habit
+sources require a current-user-owned active source, a non-null `SourceId`, and a
+source-title snapshot (Task title, or the current Habit name/title). Custom
+requires a null `SourceId`. No generic source abstraction or polymorphic foreign
+key is introduced.
+
+#### Time and scheduling
+
+`UserSettings` gains `DateTimeOffset? TimeZoneConfiguredAtUtc`. Null means the user
+has not explicitly confirmed a timezone and reminders are disabled. Existing users
+migrate with null; saving any valid timezone, including `UTC`, sets the timestamp.
+The existing default remains `UTC`; browser, server, IP, and geographic timezone
+inference is forbidden. Existing Task/Habit BusinessDate behavior is not gated.
+
+Reminder input has one-minute precision and seconds are zero. The authoritative
+clock is `IDateTimeProvider.UtcNow`; `ScheduledForUtc` must be strictly later than
+it at save time, and due means `ScheduledForUtc <= UtcNow`. Invalid DST gap times
+and ambiguous DST overlap times are rejected with a clear request to choose
+another time; no offset is selected silently.
+
+Each reminder persists its original local date, local time, timezone ID snapshot,
+and resolved UTC instant. A later settings timezone change never moves an existing
+reminder. Editing a pending reminder displays the stored intent and timezone and
+reconverts/replaces the snapshot only when explicitly saved.
+
+#### Persistence contract
+
+`Reminder : UserOwnedEntity` has required `SourceType`, `Title` (max 200),
+`ScheduledLocalDate`, `ScheduledLocalTime` (minute precision), `TimeZoneId` (max
+100), `ScheduledForUtc`, `Status` (default Pending), `IdempotencyKey` (max 200,
+`ReminderFired:{ReminderId:N}` for firing), and `Version` (long, default 0,
+optimistic concurrency). `SourceId` is nullable but required for Task/Habit;
+`SourceTitle` is nullable but required for Task/Habit (max 200); `Message` is
+optional (max 2000); `FiredAtUtc` and `NotificationId` are nullable and required
+only when Fired. Inherited `Id`, `UserId`, lifecycle/audit, and soft-delete fields
+remain unchanged.
+
+Reminder invariants require source ID/title for Task/Habit and null source ID for
+Custom; Pending/Cancelled require null fired timestamp and notification ID; Fired
+requires both; and `Version >= 0`. Indexes are unique `(UserId, IdempotencyKey)`,
+`(UserId, Status, ScheduledForUtc)`, `(Status, ScheduledForUtc)` for workers, and
+a unique filtered non-null `NotificationId`. The optional
+`Reminder.NotificationId -> Notifications.Id` FK uses Restrict delete behavior.
+
+`Notification : UserOwnedEntity` has required `Type`, `Title` (max 200), `Message`
+(max 2000), optional paired `SourceType`/`SourceId`, nullable `ReadAtUtc`, nullable
+`DismissedAtUtc`, and required `IdempotencyKey` (max 200). Notification types are
+`ReminderDue = 0`, `LevelUp = 1`, and `EchelonChanged = 2`; source types are
+`Reminder = 0` and `XpTransaction = 1`. Source fields are both null or both
+non-null, and dismissal requires read. There is no persisted `IsRead`. Indexes
+are unique `(UserId, IdempotencyKey)`, `(UserId, DismissedAtUtc, CreatedAtUtc)`,
+and `(UserId, DismissedAtUtc, ReadAtUtc)`. There is no polymorphic FK.
+
+#### Processing and ownership
+
+Hangfire with PostgreSQL storage is the M6 implementation, using private schema
+`hangfire`, one recurring due-reminder job every minute, at most 100 candidates per
+invocation, three automatic retries, and Hangfire distributed execution
+protection. The Dashboard is not exposed. Database idempotency is the final
+correctness boundary. Interactive `IReminderService` and `INotificationService`
+are current-user scoped. `IReminderProcessingService` is separate; worker
+candidates carry explicit `UserId` and worker code never uses
+`ICurrentUserService`.
+
+Each candidate is processed in its own aggregate transaction. It rechecks
+identity, explicit user, status, version, and due state, inserts exactly one
+notification, changes Pending to Fired, sets `FiredAtUtc` and `NotificationId`,
+and commits together. The operation belongs to `IReminderRepository`, not a
+ReminderService-to-NotificationService sequence and not a Unit of Work. A failed
+item remains Pending; later candidates are attempted, and an aggregate batch
+failure is thrown after the batch so Hangfire retries. Successful items remain
+committed.
+
+#### XP, UI, and verification
+
+A committed XP award that increases level creates one `LevelUp` notification; an
+echelon change creates one `EchelonChanged` notification; crossing both creates
+two. Ordinary XP, duplicate requests, no-transaction requests, cap-zero outcomes,
+and historical Milestone 5 transactions create none. XP ledger transaction,
+progression mutation, and notifications share the existing XP aggregate
+transaction; the stable XP transaction ID supplies notification idempotency. The
+existing completion-before-XP partial-success boundary and XP formulas/caps remain
+unchanged; TD-006 stays open.
+
+The Dashboard keeps widget-specific architecture. Its independently loaded
+Reminder widget shows at most the next three pending reminders ordered by due
+instant, with loading/empty/error/retry states and `Open reminders`. Notification
+presence is only the header bell. The Reminders page reads the next 100 pending
+items; the Notifications page reads the newest 100 non-dismissed items. The bell
+polls unread count every 30 seconds while active and displays counts above 99 as
+`99+`. Task/Habit DTOs do not gain reminder fields and Task/Habit persistence is
+not transactional with reminder creation. M6 includes targeted bUnit coverage and
+mandatory manual browser verification; full browser E2E automation is future
+work. This partially mitigates TD-007, which remains open.
+
 Done when:
 
 - reminder set for a local time fires at that intended local time;

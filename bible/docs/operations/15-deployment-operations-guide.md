@@ -567,3 +567,12 @@ Future deployment enhancements may include
 - Infrastructure changes must be documented.
 - Application configuration should remain environment-specific.
 - Recovery procedures must be tested periodically.
+
+## Milestone 6 background processing contract
+
+Hangfire uses the private PostgreSQL `hangfire` schema. One recurring due-reminder
+job runs every minute, processes at most 100 candidates per invocation, has three
+automatic retries, and uses distributed execution protection. The Hangfire
+Dashboard is not exposed in M6 because administrative authorization/Identity does
+not yet exist. Database idempotency remains authoritative and each reminder
+failure is isolated so later candidates are attempted.

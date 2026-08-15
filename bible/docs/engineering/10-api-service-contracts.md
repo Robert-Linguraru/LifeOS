@@ -1537,49 +1537,16 @@ InvalidXPSourceException
 
 # Notification Integration
 
-XPService emits
-
-- Level Up
-- Echelon Changed
-
-through
-
-```text
-INotificationService
-```
-
-XPService never creates notifications directly.
+Committed level and echelon transitions create the required progression
+notifications inside the existing XP aggregate transaction. They are not
+best-effort post-XP calls through `INotificationService`; duplicate XP requests
+create no duplicate notifications.
 
 ---
 
 ### Notification Delivery Policy
 
-Notification delivery follows a best-effort retry strategy.
-
-- Maximum retry attempts: **3**
-- Retry interval: **Exponential backoff** (1 min, 5 min, 15 min)
-- Notifications marked as **Delivered** are never retried.
-- Notifications marked as **Expired** are never retried.
-- After the final failed attempt, the notification status is set to **Failed**.
-- Failed notifications are retained for audit purposes but are not automatically reprocessed.
-
-#### Notification Status Flow
-
-```text
-Pending
-   │
-   ▼
-Sent
-   │
-   ▼
-Delivered
-
-Pending ─────────► Failed
-      (after 3 retries)
-
-Pending ─────────► Expired
-   (scheduled time no longer valid)
-```
+> Historical/non-authoritative: this prototype delivery policy is not part of Milestone 6. M6 notifications are in-app only and have the `Unread`, `Read`, and `Dismissed` user lifecycle. Sent, Delivered, Failed, and Expired are not persisted M6 states.
 
 # Repository Usage
 
@@ -1824,13 +1791,11 @@ A reminder
 
 ## Processing
 
-When a reminder becomes due
-
-ReminderService
-
-- validates reminder;
-- creates notification;
-- marks reminder fired.
+When a reminder becomes due, `IReminderProcessingService` supplies an explicit
+UserId to the repository. `IReminderRepository` performs validation, notification
+insert, and the Pending-to-Fired transition in one aggregate transaction. The
+interactive ReminderService is current-user scoped and does not call
+NotificationService to fire a reminder.
 
 A reminder can only fire once.
 
@@ -1889,7 +1854,7 @@ ReminderService validates
 ```text
 ReminderNotFoundException
 
-ReminderAlreadyTriggeredException
+ReminderAlreadyFiredException
 
 ReminderOwnershipException
 
@@ -1900,13 +1865,8 @@ ReminderValidationException
 
 # Notification Integration
 
-ReminderService requests notification creation through
-
-```text
-INotificationService
-```
-
-ReminderService never creates Notification entities directly.
+Reminder firing is not delegated to `INotificationService`; the repository owns
+the atomic aggregate operation. `Triggered` is not a persisted status.
 
 ---
 
@@ -2039,7 +1999,9 @@ Task MarkAsReadAsync(Guid notificationId);
 
 Task DismissAsync(Guid notificationId);
 
-Task DeleteNotificationAsync(Guid notificationId); // Future
+// No public notification delete or undismiss operation exists in Milestone 6.
+
+No public notification delete or undismiss operation exists in Milestone 6.
 ```
 
 ---
@@ -2112,6 +2074,23 @@ Future versions
 - AI Insight Notifications
 
 ---
+
+# Milestone 6 contract addendum
+
+`IReminderService` and `INotificationService` are current-user scoped. Background
+due discovery uses `IReminderProcessingService`, explicit candidate UserIds, and
+never `ICurrentUserService`. Reminder firing is an `IReminderRepository`
+aggregate operation: it rechecks user, status, version, and due state, inserts
+one notification, sets Fired/FiredAtUtc/NotificationId, and commits atomically.
+Each candidate has its own transaction; failures leave Pending, later candidates
+are attempted, and the batch reports an aggregate failure for Hangfire retry.
+
+Interactive queries are bounded: 100 pending reminders ordered by
+`ScheduledForUtc`, 100 newest non-dismissed notifications, and three pending
+Dashboard reminders. Reminder notifications link to the reminder and safely
+resolve a Task/Habit source only when available for the current user;
+progression notifications link to `/` or have no source link. No generic deep-link
+or polymorphic source infrastructure is introduced.
 
 # 17. FinanceService
 
@@ -2485,7 +2464,7 @@ Owns sleep tracking, sleep analytics, and sleep history.
 
 - Create sleep entries
 - Update sleep entries
-- Delete sleep entries
+- CancelPending
 - Retrieve sleep history
 - Calculate sleep statistics
 

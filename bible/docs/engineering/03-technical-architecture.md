@@ -578,3 +578,13 @@ The rebuild must avoid these prototype failure patterns:
 - reminder local-time values treated as UTC;
 - background jobs added before idempotency rules;
 - feature milestones considered done without migrations, constraints, and tests.
+
+## Milestone 6 architecture boundary
+
+M6 preserves the three-project pragmatic Clean Architecture: Core owns entities,
+DTOs, enums, mappings, and interfaces; Infrastructure owns EF configuration,
+migrations, repositories, service implementations, and Hangfire PostgreSQL
+storage; Web consumes interfaces and DTOs. There is no Application project,
+generic repository, Unit of Work, outbox, event bus, message broker, or separate
+worker. Reminder firing is a repository-owned aggregate transaction and worker
+ownership uses explicit UserIds rather than `ICurrentUserService`.

@@ -92,49 +92,33 @@ Stored Once
 # Reminder Lifecycle
 
 ```
-Created
-    │
-    ▼
-Pending
-    │
-    ▼
-Triggered
-    │
-    ▼
-Notification Created
-    │
-    ├────────────► Read
-    │
-    └────────────► Dismissed
+Pending ─────────────► Fired
+   │
+   └──────────────────► Cancelled
 ```
 
 ### Rules
 
 - Pending reminders wait until the scheduled UTC instant.
-- Triggering a reminder creates exactly one notification.
-- Triggering must be idempotent.
-- Future recurring reminders create new reminder occurrences rather than resetting the existing reminder.
-
----
+- Firing a reminder creates exactly one notification in the same transaction.
+- Firing must be idempotent.
+- Fired and Cancelled are terminal; recurring reminders are outside Milestone 6.
 
 # Notification Lifecycle
 
 ```
-Created
-    │
-    ▼
-Unread
- ├──────────┐
- ▼          ▼
-Read    Dismissed
+Unread ─────────────► Read
+   │                     │
+   └─────────────────────┴──► Dismissed
 ```
 
 ### Rules
 
 - Notifications are created only by services.
-- Users may read or dismiss notifications.
-- Notifications are never edited.
-- Future notification channels do not change the notification lifecycle.
+- Mark-read is idempotent.
+- Dismiss is idempotent and terminal; dismissal also sets ReadAtUtc when needed.
+- Dismissed notifications are excluded from the default list and unread count.
+- There are no external-delivery states in Milestone 6.
 
 ---
 

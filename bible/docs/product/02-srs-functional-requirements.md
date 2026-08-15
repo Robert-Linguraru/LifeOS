@@ -32,7 +32,7 @@ Requirement labels:
 
 - `V1` The system shall store true instants in UTC.
 - `V1` The system shall store calendar-only values as date-only values.
-- `V1` The system shall store user time zone as an IANA time zone ID, such as `Europe/Bucharest`.
+ - `V1` The system shall store user time zone as an IANA time zone ID, defaulting to `UTC`; explicit confirmation is separately recorded for reminders.
 - `Milestone 6` The system shall configure the user's time zone before reminders are enabled.
 - `V1` The system shall convert user-entered local reminder times to UTC using the user's configured time zone.
 - `V1` The system shall not treat an unspecified local `datetime-local` input as UTC.
@@ -135,7 +135,7 @@ Requirement labels:
 
 ### 5.1 One-time reminders
 
-- `Milestone 6` The system shall allow the user to create a one-time reminder for a task or habit.
+ - `Milestone 6` The system shall allow the user to create a one-time reminder for a Task, Habit, or Custom source.
 - `Milestone 6` A reminder shall have a local date/time entered by the user.
 - `Milestone 6` The system shall convert the local date/time to UTC for storage.
 - `Milestone 6` The system shall display reminder times back in the user's local time.
@@ -147,7 +147,7 @@ Requirement labels:
 - `V1` The system shall display unread notifications.
 - `V1` The system shall allow notifications to be marked as read or dismissed.
 - `V1` Notifications shall be user-scoped.
-- `V1` The system may create notifications for reminder due events, level-up events, and echelon changes.
+ - `Milestone 6` The system shall create persisted notifications for reminder due events and committed level/echelon transitions.
 
 ### 5.3 Future reminder behavior
 
@@ -202,7 +202,7 @@ Requirement labels:
 - `Milestone 3` The dashboard shall display today's tasks and overdue tasks.
 - `Milestone 4` The dashboard shall display today's habits and habit completion progress through a widget-specific capability.
 - `Milestone 5` The dashboard shall display current XP, level, and echelon.
-- `Milestone 6` The dashboard shall display unread notifications.
+ - `Milestone 6` The header notification bell shall display the unread count; the Dashboard shall not add a notification widget.
 - `V1` The dashboard shall display a simple finance monthly summary.
 - `V1` The dashboard shall provide quick-add actions.
 - `Future` The dashboard shall support sleep, workout, nutrition, study, wellbeing, and AI insight widgets.

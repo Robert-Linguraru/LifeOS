@@ -72,7 +72,7 @@ Constraints:
 
 ### 3.4 UserSettings
 
-`UserSettings` is a separate `UserOwnedEntity`, with exactly one row per user enforced by a unique `UserId` constraint. It currently stores `TimeZoneId`, an IANA time zone ID such as `Europe/Bucharest`. Future preferences, such as currency or theme, belong here rather than on `ApplicationUser`.
+`UserSettings` is a separate `UserOwnedEntity`, with exactly one row per user enforced by a unique `UserId` constraint. It stores `TimeZoneId` (default `UTC`) and, for Milestone 6, `DateTimeOffset? TimeZoneConfiguredAtUtc`; only the latter proves explicit confirmation. Future preferences, such as currency or theme, belong here rather than on `ApplicationUser`.
 
 `UserSettings` has no independent application-level delete lifecycle. Settings must not be reset or removed by deleting the row. Default settings are created only when a user genuinely has no settings row. Future account deletion may handle settings as part of the user/account lifecycle, but that is outside the current scope. Generic soft-delete infrastructure remains applicable to entities with a valid independent delete lifecycle.
 
@@ -171,38 +171,29 @@ Indexes:
 
 Purpose: schedule a future in-app notification.
 
-Fields:
-
-- `Id`;
-- `UserId`;
-- `SourceType` enum: Task, Habit, Custom;
-- `SourceId` nullable;
-- `Title` required;
-- `Message` nullable;
-- `ScheduledForUtc` required UTC instant;
-- `OriginalLocalTimeText` nullable for debugging;
-- `TimeZoneId` required IANA time zone ID;
-- `Status` enum: Pending, Fired, Cancelled;
-- `FiredAtUtc` nullable UTC instant;
-- `NotificationId` nullable;
-- `IdempotencyKey` required for fire event, such as `ReminderFired:{ReminderId}`;
-- audit fields.
+Fields are the inherited `UserOwnedEntity` fields plus required `SourceType`,
+`Title` (max 200), `ScheduledLocalDate`, `ScheduledLocalTime` (minute precision),
+`TimeZoneId` (max 100), `ScheduledForUtc`, `Status` (Pending by default),
+`IdempotencyKey` (max 200), and `Version` (long, default 0). `SourceId` is
+required for Task/Habit and null for Custom; `SourceTitle` is required for
+Task/Habit and max 200; `Message` is optional and max 2000; `FiredAtUtc` and
+`NotificationId` are required only for Fired.
 
 Indexes:
 
+- unique `(UserId, IdempotencyKey)`;
 - `(UserId, Status, ScheduledForUtc)`;
-- `(ScheduledForUtc, Status)`.
+- `(Status, ScheduledForUtc)` for worker discovery;
+- unique filtered non-null `NotificationId`.
 
 Constraints:
 
-- unique `(UserId, IdempotencyKey)` where `IdempotencyKey` is not null.
+- Task/Habit requires source ID and title; Custom requires null source ID;
+  Pending/Cancelled require null firing fields; Fired requires both; `Version >= 0`.
+- Optional `NotificationId -> Notifications.Id` uses Restrict delete behavior.
 
-Future fields:
-
-- recurrence rule;
-- snooze until;
-- parent reminder ID;
-- delivery attempts.
+Recurring reminders, snooze, parent reminders, and delivery attempts are outside
+Milestone 6 and are not schema fields.
 
 ### 4.5 Notification
 
@@ -212,27 +203,21 @@ Fields:
 
 - `Id`;
 - `UserId`;
-- `Type` enum: ReminderDue, LevelUp, EchelonChanged, System, FutureInsight;
-- `Title`;
-- `Message`;
-- `SourceType` nullable;
-- `SourceId` nullable;
-- `CreatedAtUtc`;
-- `ReadAtUtc` nullable;
-- `DismissedAtUtc` nullable;
-- `IsRead` computed or stored;
-- `IdempotencyKey` nullable string;
-- audit fields.
+Fields are the inherited `UserOwnedEntity` fields plus required `Type`, `Title`
+(max 200), `Message` (max 2000), required `IdempotencyKey` (max 200), optional
+paired `SourceType`/`SourceId`, nullable `ReadAtUtc`, and nullable
+`DismissedAtUtc`. There is no persisted `IsRead`.
 
 Indexes:
 
-- `(UserId, ReadAtUtc)`;
-- `(UserId, CreatedAtUtc)`;
-- `(UserId, DismissedAtUtc)`.
+- `(UserId, DismissedAtUtc, CreatedAtUtc)`;
+- `(UserId, DismissedAtUtc, ReadAtUtc)`.
 
 Constraints:
 
-- unique `(UserId, IdempotencyKey)` where `IdempotencyKey` is not null.
+- unique `(UserId, IdempotencyKey)`; SourceType and SourceId are both null or
+  both non-null; dismissal requires a non-null ReadAtUtc. No public delete or
+  undismiss behavior exists in Milestone 6.
 
 ### 4.6 XpTransaction
 

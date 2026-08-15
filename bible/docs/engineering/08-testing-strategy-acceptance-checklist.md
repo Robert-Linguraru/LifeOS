@@ -12,7 +12,8 @@ V1 does not need enormous test coverage, but it does need tests for high-risk be
 - Database-backed tests should use PostgreSQL through a test database, Docker, or Testcontainers when practical.
 - Unit tests are acceptable for pure calculation logic.
 - Every milestone must run `dotnet build` and `dotnet test` before it is accepted.
-- Date/time tests must include at least UTC and Europe/Bucharest.
+- Date/time tests must include explicit UTC confirmation, local wall-time
+  conversion, rejected DST gaps, rejected DST overlaps, and timezone snapshots.
 
 ## 3. Test categories
 
@@ -221,6 +222,9 @@ Future AI features need qualitative review plus structured checks for:
 - Reminder UTC value matches local time conversion.
 - User time zone is used.
 - Invalid reminder time shows validation error.
+- Reminder functionality is disabled until `TimeZoneConfiguredAtUtc` is non-null.
+- A scheduled instant is strictly after authoritative `IDateTimeProvider.UtcNow`.
+- Task, Habit, and Custom source rules and source-title snapshots are enforced.
 
 ### 8.2 Reminder firing
 
@@ -228,6 +232,8 @@ Future AI features need qualitative review plus structured checks for:
 - Reminder status changes to fired.
 - Fired timestamp is stored.
 - Running job twice does not create duplicate notification.
+- Failed items remain Pending while later batch candidates are attempted.
+- The atomic fire operation commits Notification and Fired Reminder together.
 - User cannot see another user's reminder or notification.
 
 ### 8.3 Notification behavior
@@ -237,6 +243,9 @@ Future AI features need qualitative review plus structured checks for:
 - User can mark notification as read.
 - User can dismiss notification.
 - Dismissed notification no longer appears in default unread list.
+- Level/echelon notifications are atomic with the committed XP aggregate.
+- The Dashboard Reminder widget is capped at three and the bell polls every 30 seconds.
+- Targeted bUnit coverage and manual browser verification are required; full browser E2E is future scope.
 
 ## 9. Finance acceptance checklist
 

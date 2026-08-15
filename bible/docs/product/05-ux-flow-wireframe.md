@@ -37,7 +37,7 @@ Secondary navigation or header elements:
 
 - XP Progress widget (Dashboard only; no global/header XP chip in Milestone 5)
 - Notification bell
-- Quick add button
+ - Notification bell
 - Profile/settings menu
 
 ### 3.2 Future navigation
@@ -63,7 +63,7 @@ Purpose: prevent core features from working with missing assumptions.
 First-run fields:
 
 - display name;
-- time zone, defaulting to Europe/Bucharest unless changed;
+- time zone, defaulting to `UTC` until the user explicitly confirms a valid time zone;
 - default currency;
 - planned monthly allowance or expected monthly income.
 
@@ -79,14 +79,14 @@ Desktop layout:
 
 ```text
 +--------------------------------------------------------------+
-| Header: LifeOS | Quick Add | Notifications                    |
+| Header: LifeOS | Notification bell                    |
 +----------------------+----------------------+----------------+
 | Today's Tasks        | Today's Habits       | XP Progress    |
 | - due task           | - habit checkboxes   | level bar      |
 | - overdue task       | completion percent   | echelon badge  |
 +----------------------+----------------------+----------------+
 | Reminders            | Finance Snapshot     | Quick Actions  |
-| - next reminders     | income/expense/bal   | task/habit/tx  |
+| - next 3 reminders   | income/expense/bal   | task/habit/tx  |
 +----------------------+----------------------+----------------+
 ```
 
@@ -97,9 +97,7 @@ Dashboard
 XP Progress widget
 Today tasks card
 Today habits card
-Quick add buttons
 Finance card
-Notifications card
 ```
 
 Dashboard rules:
@@ -232,14 +230,14 @@ Entry points:
 - task form;
 - habit form;
 - reminder page;
-- quick add.
+- reminders page (global Quick Add is future scope).
 
 Fields:
 
 - title/message;
-- associated task/habit optional;
+- associated Task, Habit, or Custom source;
 - local date/time;
-- time zone display.
+- explicitly confirmed scheduling time zone display.
 
 Save behavior:
 
@@ -265,14 +263,11 @@ Items display:
 - message;
 - created local time;
 - source link if available;
-- read/dismiss action.
+- mark-read/dismiss action; dismissed items are absent from the default list.
 
-Future actions:
-
-- snooze;
-- open related object;
-- recurring reminder controls;
-- browser push permission.
+Reminder snooze, recurring controls, browser push, and external delivery are
+future scope. Reminder notifications link to the reminder and expose a source
+link only when the current-user source remains safely available.
 
 ## 9. V1 finance flow
 

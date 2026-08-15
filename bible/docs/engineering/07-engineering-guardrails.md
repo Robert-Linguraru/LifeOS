@@ -51,7 +51,8 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 - Store calendar dates as date-only values.
 - Convert reminder local times using the user's time zone.
 - Finance transaction dates are date-only unless a source provides a real timestamp.
-- Tests must cover local-time reminder conversion, including UTC and Europe/Bucharest.
+- Tests must cover local-time reminder conversion, including explicit UTC and
+  invalid/ambiguous DST cases. UTC is the default, not proof of confirmation.
 
 ## 6. XP and gamification guardrails
 
@@ -82,10 +83,13 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 - One-time reminders must work before recurring reminders.
 - In-app notifications must work before browser push.
 - Reminder firing must be idempotent.
+- Reminder firing inserts the Notification and transitions the Reminder to Fired
+  in one repository-owned transaction; `Triggered` is not a persisted state.
 - Reminder local-time conversion must be tested.
 - Reminder jobs must not duplicate business rules already in services.
 - Snooze is future scope until basic reminders are reliable.
-- Reminder delivery history is future scope but should be considered in schema design.
+- Reminder delivery history, external delivery states, and notification channels
+  are outside Milestone 6 and must not be added to its schema.
 
 ## 9. Finance guardrails
 

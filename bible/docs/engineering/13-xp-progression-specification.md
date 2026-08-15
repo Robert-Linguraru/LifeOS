@@ -6,6 +6,17 @@ Persisted notifications belong to Milestone 6. Milestone 5 detects and reports l
 
 ## Scope boundary
 
+## Milestone 6 progression notification boundary
+
+Level/echelon notifications are required M6 behavior. Ordinary XP, duplicate or
+no-op requests, cap-zero outcomes, and historical Milestone 5 transactions create
+none. A committed level increase creates one `LevelUp` notification and a
+committed echelon change creates one `EchelonChanged` notification; crossing both
+creates two. XP transaction, progression mutation, and these notifications share
+the existing XP aggregate transaction and stable XP transaction idempotency key.
+The existing completion-before-XP partial-success boundary and XP formulas/caps
+are unchanged; TD-006 remains open.
+
 Milestone 5 includes:
 
 - positive `QuestCompletion` awards for new Task and Habit completion events;
@@ -134,3 +145,14 @@ Source completion is persisted first, then XP is invoked synchronously. XP trans
 ## Testing and acceptance
 
 Tests cover all 12 XP combinations, invalid enums, cap underflow/crossing/exhaustion, exact level and echelon boundaries and large `long` values, deterministic keys, defaults and mappings, uniqueness, concurrency, append-only behavior, no polymorphic FK, service idempotency/retries/history/time-zone behavior, PostgreSQL transactions/races/DateOnly/DateTimeOffset/bigint/user isolation, Task/Habit integration, partial success, and responsive accessible widget states. PostgreSQL/Testcontainers is used for relational behavior; EF InMemory is not used for it. Manual browser verification confirms `XpWidget` is a Razor component rather than a literal custom element, including loading/error/retry and refresh behavior. No UI test package is added solely for this ticket.
+
+## Milestone 6 progression notification boundary
+
+Level/echelon notifications are required M6 behavior. Ordinary XP, duplicate or
+no-op requests, cap-zero outcomes, and historical Milestone 5 transactions create
+none. A committed level increase creates one `LevelUp` notification and a
+committed echelon change creates one `EchelonChanged` notification; crossing both
+creates two. XP transaction, progression mutation, and these notifications share
+the existing XP aggregate transaction and stable XP transaction idempotency key.
+The existing completion-before-XP partial-success boundary and XP formulas/caps
+are unchanged; TD-006 remains open.

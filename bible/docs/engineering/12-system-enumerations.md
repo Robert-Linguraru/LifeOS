@@ -164,8 +164,14 @@ public enum NotificationType
     ReminderDue = 0,
     LevelUp = 1,
     EchelonChanged = 2,
-    System = 3,
-    FutureInsight = 4
+}
+```
+
+```csharp
+public enum NotificationSourceType
+{
+    Reminder = 0,
+    XpTransaction = 1
 }
 ```
 

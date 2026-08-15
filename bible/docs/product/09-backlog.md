@@ -82,6 +82,14 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 - `Milestone 6` In-app notification bell.
 - `Milestone 6` Mark read/dismiss.
 
+Milestone 6 also freezes Custom reminders, explicit timezone confirmation and
+DST validation, pending-only edit/cancel, one-minute scheduling, Hangfire
+PostgreSQL processing (one minute, 100 candidates, three retries), atomic
+idempotent firing, level/echelon notifications, the three-item Dashboard
+Reminder widget, bell polling every 30 seconds, and targeted bUnit coverage.
+Global Quick Add, recurring reminders, snooze, external delivery, and full
+browser automation remain future scope.
+
 ### Simple finance
 
 - `V1` Manual income transaction.

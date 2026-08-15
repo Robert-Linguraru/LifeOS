@@ -6,6 +6,22 @@ A technical debt item should only be addressed when it provides a measurable imp
 
 Avoid refactoring solely for the sake of abstraction.
 
+## Milestone 6 debt alignment
+
+- **TD-001 remains open:** Reminder and Notification inherit centralized
+  `AppDbContext` lifecycle behavior; M6 does not extract or refactor it.
+- **TD-004 remains open:** interactive Reminder/Notification services use the
+  current-user abstraction, while background processing carries explicit
+  persisted UserIds and never uses the ambient current user. Identity is future.
+- **TD-005 remains open:** M6 does not redesign accepted Task/Habit in-memory
+  aggregation.
+- **TD-006 remains open:** Task/Habit completion still persists before XP. If XP
+  fails, completion succeeds but XP and its transition notification are absent;
+  M6 adds no reconciliation or outbox behavior.
+- **TD-007 remains open:** targeted bUnit coverage is required in M6 and partly
+  mitigates the UI defects that escaped lower-level tests. Manual browser
+  verification remains mandatory; full browser automation is future work.
+
 ---
 
 # Architecture
@@ -422,6 +438,10 @@ Milestone 5 performs synchronous XP awarding after authoritative Task or Habit c
 - structured logging;
 - atomic XP transaction and progression persistence.
 
+Milestone 6 preserves the completion-before-XP boundary: if XP fails after Task
+or Habit completion, completion remains successful and progression notifications
+are absent. No reconciliation or outbox behavior is added; TD-006 remains open.
+
 ### Revisit triggers
 
 Revisit if real XP-loss incidents occur, transient database failures become material, more event-driven reward sources are added, asynchronous processing is introduced, or reliability requirements demand guaranteed eventual award.
@@ -449,6 +469,12 @@ Before adding further interactive Dashboard coordination or more cross-widget be
 
 No UI automation framework is introduced during Milestone 5 closure. Manual verification remains the current acceptance mechanism for the existing UI scope.
 
-### Status
+## M6 scope decision
 
-Open - targeted future testing revisit.
+Targeted bUnit coverage is required for the highest-risk M6 components and
+partially mitigates this debt. Manual browser verification remains mandatory.
+No complete Playwright/Selenium platform is introduced in M6.
+
+## Status
+
+Open - full browser automation remains future work.

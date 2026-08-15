@@ -180,12 +180,13 @@ Displays
 Actions
 
 - Open
-- Dismiss Notification
 
-Future
+The Reminder widget is read-only. Notification presence is provided by the
+header bell, not by a Dashboard notification widget.
 
-- Snooze
-- Recurring reminders
+The widget displays at most the next three pending reminders, ordered by due
+instant, and independently handles loading, empty, error, and retry states. It
+provides an `Open reminders` action.
 
 ---
 

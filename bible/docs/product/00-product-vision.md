@@ -160,9 +160,14 @@ Long-term capabilities include:
 - browser push notifications;
 - email or external channels later;
 - level-up and echelon-change notifications;
-- background scheduling via Hangfire or similar.
+- background scheduling via Hangfire with PostgreSQL storage, one due-reminder
+  invocation per minute, batches of at most 100, and three automatic retries.
 
-V1 includes in-app notifications and one-time reminders only. Browser push and recurring reminders are future features.
+V1 includes in-app notifications and one-time reminders only. Milestone 6 freezes
+the Reminder/Notification persistence, timezone, DST, idempotency, worker, XP
+transition, Dashboard bell/widget, and bUnit/manual verification contracts in
+the Milestone 6 build plan. Browser push and recurring reminders are future
+features.
 
 ### 6.5 Dashboard
 
