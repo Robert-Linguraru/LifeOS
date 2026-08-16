@@ -257,17 +257,8 @@ public enum FinanceCategoryType
 }
 ```
 
----
-
-## FinanceSource
-
-```csharp
-public enum FinanceSource
-{
-    Manual = 0,
-    Imported = 1
-}
-```
+`FinanceSource` and imported-record enumerations are not part of M7. M7
+transactions are manual by definition.
 
 ---
 

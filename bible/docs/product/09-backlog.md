@@ -95,11 +95,12 @@ browser automation remain future scope.
 - `V1` Manual income transaction.
 - `V1` Manual expense transaction.
 - `V1` Default categories.
-- `V1` Monthly planned income/allowance.
 - `V1` Monthly income total.
 - `V1` Monthly expense total.
-- `V1` Remaining planned balance.
+- `V1` Monthly net cash flow.
 - `V1` Spending by category.
+- `V1` Selected-year income, expense, and net cash-flow aggregate.
+- `V1` User-level finance currency preference.
 - `V1` Finance dashboard card.
 
 ### V1 polish

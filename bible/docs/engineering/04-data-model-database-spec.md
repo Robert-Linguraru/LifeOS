@@ -20,8 +20,8 @@ The future schema is not a command to build everything now. It is a reference so
 - Use database constraints for uniqueness and integrity.
 - Do not rely only on UI guards for important business rules.
 - Keep XP append-only through `XPTransaction`.
-- Keep import metadata when future imports are added.
-- Preserve source of data where manual and imported records may coexist.
+- Future import metadata belongs to separately approved future module schemas;
+  it is not part of M7 finance persistence.
 
 ### 2.1 PostgreSQL type conventions
 
@@ -285,44 +285,41 @@ Progression defaults are lifetime XP 0, level 1, echelon Iron, daily Quest XP 0,
 
 ### 4.8 FinanceCategory
 
-Purpose: finance categorization.
+Purpose: stable global reference categories for M7 transaction
+classification. These are not personal user-owned financial records.
 
 Fields:
 
 - `Id`;
-- `UserId` nullable if system default category;
+- no `UserId` for M7 global reference categories;
 - `Name` required;
 - `Type` enum: Income, Expense, Both;
-- `IsSystemDefault` bool;
 - `SortOrder` int;
 - `IsActive` bool;
-- audit fields.
+- reference-data lifecycle fields as appropriate.
 
 Constraints:
 
-- unique `(UserId, Name)` for user categories;
-- unique `(Name)` for system defaults if separated.
+- unique `Name`;
+- categories are immutable and not user-managed in M7.
 
 Default V1 expense categories:
 
-- Rent;
-- Food and groceries;
+- Housing/Rent;
+- Food;
 - Transport;
-- Subscriptions;
-- Going out/social;
-- Clothes;
-- Gym and fitness;
-- Personal care;
-- School/study;
-- Miscellaneous.
+- Fitness/Gym;
+- Travel;
+- Shopping;
+- Entertainment;
+- Bills/Utilities;
+- Health;
+- Other.
 
 Default V1 income categories:
 
-- Allowance;
-- Gift;
-- Refund;
-- Side income;
-- Other income.
+- Salary;
+- Other Income.
 
 ### 4.9 FinanceTransaction
 
@@ -335,17 +332,15 @@ Fields:
 - `TransactionDate` date-only;
 - `Type` enum: Income, Expense;
 - `Amount` decimal(18,2), positive only;
-- `Currency` string;
 - `CategoryId` required;
 - `Description` nullable;
-- `Source` enum: Manual, FutureImport;
-- `Notes` nullable;
 - audit fields.
 
 Constraints:
 
 - amount must be greater than zero;
-- source must be Manual for V1-created records.
+- category type must be compatible with transaction type;
+- all M7-created records are manual by definition.
 
 Indexes:
 
@@ -353,28 +348,14 @@ Indexes:
 - `(UserId, CategoryId, TransactionDate)`;
 - `(UserId, Type, TransactionDate)`.
 
-### 4.10 MonthlyFinancePlan
+Finance calculations use transaction data only:
 
-Purpose: simple monthly allowance or planned monthly income.
+- monthly net cash flow = income transactions - expense transactions;
+- yearly net cash flow = income transactions - expense transactions;
+- transaction membership uses `TransactionDate`, never audit timestamps.
 
-Fields:
-
-- `Id`;
-- `UserId`;
-- `Month` date-only as first day of month;
-- `PlannedIncomeAmount` decimal(18,2) nullable;
-- `ExpenseTarget` decimal(18,2) nullable;
-- `Currency` string;
-- audit fields.
-
-Constraints:
-
-- unique `(UserId, Month)`.
-
-Finance formula:
-
-- remaining planned balance = planned income amount + income transactions - expense transactions.
-- The monthly allowance should not be entered twice as both planned income and an income transaction unless the product decision changes.
+M7 does not contain `MonthlyFinancePlan`, planned income, allowance, expense
+targets, persisted monthly/yearly totals, or aggregate correction records.
 
 ### 4.11 DailyScore - future, not V1
 
@@ -417,7 +398,7 @@ Recommended migration sequence:
 3. Habits and HabitLogs with unique constraint.
 4. XPTransaction and UserProgression.
 5. Notifications and Reminders.
-6. Finance categories, transactions, monthly plan.
+6. Finance reference categories, transactions, and currency preference.
 
 ## 4.13 Seed data
 
@@ -436,7 +417,8 @@ Seed behavior must be idempotent.
 - XP award must be idempotent.
 - Reminder firing must be idempotent.
 - Finance monthly summaries must use transaction dates, not created dates.
-- Finance remaining balance must not double-count planned allowance/income and income transactions.
+- Finance monthly and yearly net cash flow must equal income transactions minus expense transactions.
+- Deleted finance transactions must not affect ordinary summaries or dashboard counts.
 - User progression must match XP transactions or be reconstructable.
 - Soft-deleted records should not affect active dashboard counts unless explicitly included.
 
@@ -863,7 +845,7 @@ The following uniqueness rules apply:
 | Entity | Constraint |
 |---------|------------|
 | User | Email |
-| FinanceCategory | (UserId, Name) |
+| FinanceCategory | Name |
 | UserSettings | UserId (one settings record per user) |
 
 ---
@@ -912,11 +894,6 @@ The following uniqueness rules apply:
 - Date
 - CategoryId
 
-#### MonthlyBudget
-
-- UserId
-- Month
-
 --- 
 
 ### Notes
@@ -937,7 +914,7 @@ Archive and soft delete are distinct concepts. `AppDbContext` converts normal EF
 | Task | Archiving changes `TaskItemStatus` to `Archived`; it does not set `IsDeleted`. Soft deletion sets `IsDeleted` and `DeletedAtUtc`. Associated reminder behavior is future Milestone 6 scope. |
 | Habit | Archiving sets `IsActive = false`; the habit and its immutable logs remain persisted. Archived habits are read-only and cannot create new logs. User-facing habit deletion/soft deletion is not a Milestone 4 operation. |
 | Reminder | Notification history is retained. |
-| Finance Category | Cannot be archived while referenced by existing transactions. |
+| Finance Category | Global immutable reference data; no user-facing archive operation in M7. |
 | User | All user-owned data follows the account deletion policy. |
 
 ### General Rules

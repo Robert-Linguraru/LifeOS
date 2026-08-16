@@ -49,7 +49,7 @@ LifeOS should not become a noisy data-entry burden. The central design challenge
 The primary user is:
 
 - a Computer Science and Economics student;
-- currently receiving a monthly allowance rather than earning regular income;
+- managing personal finances alongside study, training, and other responsibilities;
 - training at the gym and pursuing an aesthetic physique;
 - technically capable and comfortable with structured tracking;
 - building a productivity system from scratch;
@@ -303,14 +303,14 @@ Finance should exist, but V1 finance must be simple.
 V1 finance capabilities include:
 
 - manual income and expense entry;
-- planned monthly allowance or planned monthly income tracking;
-- manual extra income and expense entries;
-- categories;
-- monthly totals;
-- remaining monthly balance using a documented formula;
-- spending by category;
-- simple notes;
-- no bank import.
+- stable default categories;
+- one user-level finance currency preference;
+- selected-month income, expense, and net cash-flow totals;
+- expense totals grouped by category;
+- selected-month transactions;
+- a small selected-year income, expense, and net cash-flow aggregate;
+- optional transaction descriptions;
+- no bank import, budgeting, or forecasting.
 
 Future finance capabilities may include:
 
@@ -325,7 +325,10 @@ Future finance capabilities may include:
 - net worth snapshots;
 - AI spending summaries.
 
-The advanced finance scope is preserved, but it is not part of V1. V1 should avoid duplicate financial concepts: the monthly plan defines expected money available for the month, while transactions record actual income/expenses.
+The richer finance scope is preserved, but it is not part of V1. M7 Simple
+Finance is a lightweight personal tracker: authoritative transaction data is
+used to derive monthly and yearly aggregates. It does not implement budgeting,
+planned income, allowance tracking, or enterprise accounting concepts.
 
 ### 6.12 Study and project tracker
 
@@ -428,7 +431,8 @@ Planned future capabilities include:
 - optional body metric sync where available;
 - coexistence between manual entries and imported data.
 
-The database should use nullable fields and source tracking where relevant so manual and imported data can coexist later.
+Future import milestones may define source metadata when that capability is
+actually approved. M7 finance remains manual-only and has no import metadata.
 
 ### 6.18 Import/export strategy
 

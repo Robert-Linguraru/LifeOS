@@ -202,11 +202,13 @@ Provide an `IFinanceService` for:
 
 - creating manual transactions;
 - editing manual transactions;
-- monthly totals;
+- deleting manual transactions through the normal soft-delete infrastructure;
+- monthly and yearly totals;
 - category summaries;
-- monthly plan and remaining-balance calculations.
+- monthly net cash-flow calculations.
 
-Future import services should not bypass finance service rules.
+Future personal-finance capabilities require separately approved contracts and
+must not expand M7 into budgeting, imports, forecasting, or accounting.
 
 ## 7. Entity and database conventions
 
@@ -387,26 +389,21 @@ Do not start a feature with only UI.
 
 ## 12. Finance architecture
 
-V1 finance is manual-only.
+M7 Simple Finance is manual-only and transaction-based. It is a lightweight
+personal tracker, not a budgeting, accounting, forecasting, or banking system.
 
-V1 finance services:
+M7 finance services:
 
 - transaction CRUD;
-- category handling;
-- monthly finance plan;
-- monthly summary;
-- remaining balance calculation using planned income/allowance plus manual income transactions minus expenses;
-- no import pipeline.
+- stable global immutable default categories;
+- selected-month income, expense, net, and expense-category summaries;
+- selected-year income, expense, and net summaries;
+- one user-level finance currency preference;
+- no import, budget, allowance, or planned-income pipeline.
 
-Future finance import architecture:
-
-- source-specific parser service;
-- import batch entity;
-- preview step;
-- duplicate detection;
-- normalization service;
-- transaction confirmation step;
-- AI categorization only after deterministic import is reliable.
+Future Finance may add richer personal-finance capabilities through separately
+approved milestones. M7 does not define import, budget, analytics, or
+accounting architecture in advance.
 
 ## 13. AI architecture
 

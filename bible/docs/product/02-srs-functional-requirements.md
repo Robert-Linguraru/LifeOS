@@ -217,58 +217,49 @@ Requirement labels:
 - `V1` Transaction amount shall be a positive decimal value.
 - `V1` Income/expense meaning shall come from transaction type, not negative amounts.
 - `V1` The system shall allow editing manual transactions.
-- `V1` The system shall allow archiving or deleting manual transactions.
+- `V1` The system shall allow deleting manual transactions; deleted records shall be excluded from ordinary history and calculations.
 - `V1` The system shall store currency preference.
 
 ### 8.2 Categories
 
 - `V1` The system shall provide default finance categories.
-- `V1` The system may allow user-defined categories if low complexity.
-- `V1` Categories shall be user-scoped if editable.
+- `V1` The system shall provide stable global immutable default categories.
+- `V1` User-created, renamed, or deleted categories are out of scope.
 
 Default expense categories:
 
-- Rent;
-- Food and groceries;
+- Housing/Rent;
+- Food;
 - Transport;
-- Subscriptions;
-- Going out/social;
-- Clothes;
-- Gym and fitness;
-- Personal care;
-- School/study;
-- Miscellaneous.
+- Fitness/Gym;
+- Travel;
+- Shopping;
+- Entertainment;
+- Bills/Utilities;
+- Health;
+- Other.
 
 Default income categories:
 
-- Allowance;
-- Gift;
-- Refund;
-- Side income;
-- Other income.
+- Salary;
+- Other Income.
 
-### 8.3 Monthly summary
+### 8.3 Monthly and yearly summaries
 
-- `V1` The system shall allow a monthly planned income or allowance value to be configured.
 - `V1` The system shall calculate total income transactions for a selected month.
 - `V1` The system shall calculate total expenses for a selected month.
-- `V1` The system shall calculate remaining planned balance as: planned monthly income or allowance + income transactions - expense transactions.
+- `V1` The system shall calculate monthly net cash flow as income transactions minus expense transactions.
 - `V1` The system shall show spending by expense category for a selected month.
-- `V1` The system shall not double-count allowance as both monthly plan and income transaction.
+- `V1` The system shall calculate selected-year income, expenses, and net cash flow using transaction dates.
+- `V1` Deleted transactions shall be excluded from all ordinary summaries.
+- `V1` Historical transactions may be edited or deleted; no financial periods are locked.
 
-### 8.4 Future finance requirements
+### 8.4 Future finance possibilities
 
-- `Future` The system shall support Revolut CSV import.
-- `Future` The system shall support Raiffeisen CSV/XLS import.
-- `Future` The system shall show import preview before committing imported transactions.
-- `Future` The system shall detect duplicate imports.
-- `Future` The system shall support merchant normalization.
-- `Future` The system shall support monthly budgets by category.
-- `Future` The system shall support budget alerts at configured thresholds.
-- `Future` The system shall support subscription tracking.
-- `Future` The system shall support savings goals.
-- `Future` The system shall support net worth snapshots.
-- `Future` The AI assistant may summarize spending patterns after reliable transaction data exists.
+Future finance milestones may deliberately add richer personal-finance
+analytics, trends, comparisons, simple budgets, savings goals, recurring
+expenses, category management, imports, or AI summaries. None are M7
+requirements, and no M7 schema is reserved for them.
 
 ## 9. Sleep and health requirements
 

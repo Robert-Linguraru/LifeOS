@@ -198,10 +198,9 @@ Provide quick monthly financial awareness.
 
 Displays
 
-- Expected Income / Allowance
 - Total Income
 - Total Expenses
-- Remaining Balance
+- Net Cash Flow
 - Largest Spending Category
 
 Actions
@@ -215,7 +214,7 @@ Empty State
 ```
 No transactions recorded this month.
 
-Add your first transaction.
+Add your first income or expense.
 ```
 
 ---
@@ -251,6 +250,7 @@ The dashboard should refresh automatically after:
 - Reminder firing
 - Notification dismissal
 - Finance transaction creation
+- Finance transaction editing or deletion
 - XP award
 - User progression update
 

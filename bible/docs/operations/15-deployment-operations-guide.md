@@ -228,15 +228,17 @@ Development
 Seed
 
 - Development User
-- Default Finance Categories
 - Initial User Progression
 
 Production
 
 Seed only
 
-- System Categories
 - Required Configuration
+
+M7 finance categories are global immutable reference data and are installed
+through the application migration. They are not user-owned records and must
+not be recreated per user or overwritten in production.
 
 Never overwrite production data.
 

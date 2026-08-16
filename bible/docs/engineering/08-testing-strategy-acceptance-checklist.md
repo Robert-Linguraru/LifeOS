@@ -258,22 +258,31 @@ Future AI features need qualitative review plus structured checks for:
 - Type is required.
 - Category saves correctly.
 - Description saves correctly.
+- User can edit a transaction.
+- User can delete a transaction.
+- Deleted transactions disappear from ordinary history and calculations.
 
 ### 9.2 Monthly summary
 
 - Total income transactions for selected month are correct.
 - Total expenses for selected month are correct.
-- Remaining planned balance uses planned income/allowance + income transactions - expenses.
-- Planned allowance/income is not double-counted.
+- Net cash flow equals income minus expenses.
 - Category breakdown is correct.
 - Transactions outside selected month are excluded.
 - Created date does not affect monthly grouping.
+- Month-end dates are assigned to the correct month.
 
-### 9.3 Monthly allowance
+### 9.3 Year summary and data integrity
 
-- User can set monthly allowance.
-- Dashboard displays planned allowance/income and remaining balance.
 - Currency displays according to settings.
+- Selected-year income, expenses, and net are correct.
+- Transactions from other years are excluded.
+- Database decimal precision and positive-amount constraints are enforced.
+- Category foreign-key/reference integrity is enforced.
+- User ownership/isolation applies to all reads and mutations.
+- Historical transactions can be edited or deleted without period locking.
+- No banking-grade race matrix is required unless implementation introduces a
+  concrete concurrency boundary beyond normal persistence behavior.
 
 ## 10. Dashboard acceptance checklist
 

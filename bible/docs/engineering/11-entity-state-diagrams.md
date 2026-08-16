@@ -170,33 +170,16 @@ Active
     │
     ├────────────► Updated
     │
-    └────────────► Archived
+    └────────────► Deleted (soft-deleted)
 ```
 
 ### Rules
 
 - Finance transactions may be edited.
-- Archived transactions remain in historical reporting if required.
-- Imported transactions follow the same lifecycle.
-
----
-
-# Monthly Finance Plan Lifecycle
-
-```
-Created
-    │
-    ▼
-Active
-    │
-    ▼
-Updated
-```
-
-### Rules
-
-- One monthly plan exists per user per month.
-- Updating a plan never modifies historical months.
+- Deleted transactions are absent from ordinary history, monthly totals,
+  yearly totals, and category breakdowns.
+- Historical transactions may be edited or deleted; financial periods are not
+  locked.
 
 ---
 

@@ -359,59 +359,50 @@ Done when:
 
 ## Milestone 7 - Simple finance
 
-Goal: add practical monthly manual finance tracking.
+Goal: add lightweight manual personal income-and-expense tracking.
 
 Scope:
 
 - FinanceCategory entity;
 - FinanceTransaction entity;
-- MonthlyFinancePlan entity;
-- default categories;
+- global immutable default categories;
 - finance service;
 - add/edit/delete manual transaction;
-- monthly plan with planned income/allowance;
-- monthly totals;
-- category summary;
-- remaining planned balance formula;
+- selected-month income, expense, net, category, and transaction views;
+- selected-year income, expense, and net aggregate;
+- user-level finance currency preference;
 - dashboard finance card;
-- settings for allowance/currency;
 - tests.
 
 Done when:
 
 - user can enter income and expenses;
 - monthly totals are correct;
+- monthly net equals income minus expenses;
 - category totals are correct;
-- remaining allowance/balance is correct;
-- allowance/planned income is not double-counted;
+- selected-year totals are correct;
+- deleted transactions are absent from ordinary history and calculations;
 - no import features are added;
 - build/tests pass.
 
-## Milestone 8 - V1 polish and release hardening
+## Milestone 8 - Fitness and Nutrition domain foundations
 
-Goal: make V1 pleasant and safe enough to use daily.
+Goal: deliberately establish the Fitness and Nutrition domains before the
+eventual major V1 UI/UX overhaul and polish.
 
 Scope:
 
-- responsive layout pass;
-- empty states;
-- loading states;
-- validation messages;
-- error boundaries;
-- PWA manifest verification;
-- navigation cleanup;
-- dashboard polish;
-- final database review;
-- test pass;
-- documentation update;
-- backlog triage.
+- Fitness and Nutrition domain contracts and implementation scope;
+- approved persistence and service slices for those domains;
+- focused testing and Dashboard implications as separately specified.
 
 Done when:
 
-- V1 acceptance checklist passes;
-- clean database setup works;
-- app can be used for a week without data integrity issues;
-- docs reflect actual behavior.
+- Fitness and Nutrition milestones are complete and validated;
+- the subsequent V1 UI/UX overhaul has an approved scope.
+
+The major V1 UI/UX polish pass follows the Fitness and Nutrition milestones;
+its detailed scope is not invented here.
 
 ## 4. Future milestones
 

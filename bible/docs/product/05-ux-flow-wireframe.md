@@ -65,12 +65,11 @@ First-run fields:
 - display name;
 - time zone, defaulting to `UTC` until the user explicitly confirms a valid time zone;
 - default currency;
-- planned monthly allowance or expected monthly income.
 
 Rules:
 
 - reminders should not be enabled until time zone is configured;
-- finance dashboard should show a helpful empty state until a monthly plan or transaction exists;
+- finance dashboard should show a helpful empty state until a transaction exists;
 - seed data should be development-only unless explicitly enabled.
 
 ## 5. V1 dashboard wireframe
@@ -278,10 +277,9 @@ Purpose: simple monthly money awareness.
 Sections:
 
 - selected month;
-- planned monthly allowance/income;
 - total income;
 - total expenses;
-- remaining planned balance;
+- net cash flow;
 - category breakdown;
 - recent transactions.
 
@@ -293,30 +291,19 @@ Fields:
 
 - Type: income or expense;
 - Amount;
-- Currency;
 - Date;
 - Category;
-- Description;
-- Notes optional.
+- Description optional.
 
 After save:
 
 - monthly summary updates;
 - transaction appears in recent list.
 
-### 9.3 Monthly plan flow
+### 9.3 Year summary flow
 
-User can set:
-
-- planned monthly allowance/income;
-- optional expense target.
-
-The dashboard shows:
-
-- manual income transactions;
-- spent so far;
-- remaining planned balance;
-- simple category totals.
+User can select a year and see total income, total expenses, and net cash flow.
+The year summary is a small aggregate, not an analytics dashboard.
 
 ## 10. V1 settings flow
 
@@ -325,7 +312,6 @@ Settings sections:
 - profile;
 - time zone;
 - currency;
-- monthly allowance;
 - theme preference;
 - data reset/export future placeholder if desired.
 
@@ -574,5 +560,5 @@ Examples:
 
 - no tasks: suggest adding one task;
 - no habits: suggest starting with one habit;
-- no finance transactions: suggest adding monthly allowance or first expense;
+- no finance transactions: suggest adding a first income or expense;
 - reminder conversion error: ask user to confirm time zone.

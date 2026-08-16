@@ -35,7 +35,7 @@ The V1 user is the same primary user from the vision document:
 - student;
 - training-focused;
 - no current salary;
-- monthly allowance;
+- personal finance tracking;
 - building a productivity system from scratch;
 - comfortable with a structured app;
 - motivated by progression systems.
@@ -154,16 +154,17 @@ V1 includes:
 
 - manual transaction entry;
 - income and expense transaction types;
-- monthly allowance or planned monthly income configuration;
-- manual income entries for extra income/refunds/gifts;
+- manual income and expense entries;
 - categories;
 - transaction date;
-- amount;
-- description/notes;
+- positive amount;
+- optional description;
+- one user-level finance currency preference;
 - monthly total income;
 - monthly total expenses;
-- remaining monthly balance using the formula defined in the SRS;
+- monthly net cash flow (`Income - Expenses`);
 - spending by category;
+- selected-year total income, total expenses, and net cash flow;
 - simple finance dashboard card.
 
 V1 does not include:
@@ -173,8 +174,10 @@ V1 does not include:
 - CSV/XLS parsing;
 - AI categorization;
 - merchant normalization;
+- category budgets;
 - subscriptions;
-- savings projections;
+- savings goals;
+- projections and forecasting;
 - budget alerts;
 - net worth snapshots;
 - financial advice.
@@ -186,8 +189,7 @@ V1 includes:
 - user profile basics;
 - time zone setting;
 - theme preference if practical;
-- finance default currency;
-- monthly allowance configuration;
+- finance currency preference;
 - XP display preferences if needed.
 
 
@@ -200,7 +202,7 @@ These decisions remove ambiguity before implementation:
 - V1 task due dates are calendar dates, with optional local due time for planning. Reminder delivery is handled by the Reminder module, not by task due-time shortcuts.
 - V1 quest XP uses the documented Time Base times Friction Multiplier formula.
 - V1 does not implement the full DailyScore engine or streak bonus XP job.
-- V1 finance uses one monthly plan amount for expected money available, plus manual transactions for actual expenses and optional extra income.
+- M7 Simple Finance uses only manual income and expense transactions. Net cash flow is income minus expenses; there is no planned-income or allowance source.
 - V1 reminders are one-time in-app reminders only.
 - V1 UI pages use services for feature workflows.
 
@@ -262,7 +264,7 @@ As the user, I want reminders to appear at the time I selected so that I can tru
 
 ### 7.6 Finance awareness
 
-As the user, I want to manually log income and expenses so that I know how much of my monthly allowance remains.
+As the user, I want to manually log income and expenses so that I can see my monthly and yearly net cash flow.
 
 ### 7.7 Progression motivation
 
@@ -409,6 +411,11 @@ in-app notifications, the notification bell, Reminders/Notifications pages, and
 the widget-specific Dashboard Reminder projection. Recurrence, snooze, Quick Add,
 external delivery, and source-driven cancellation remain out of scope.
 
-### Decision 7 - Finance formula clarified
+### Decision 7 - M7 Simple Finance contract
 
-The monthly plan defines expected money available for the month. Manual transactions record expenses and optional extra income. The app must avoid double-counting the monthly allowance as both planned income and a separate income transaction.
+M7 is a lightweight manual personal income-and-expense tracker. Transactions
+have a positive amount and a type; `Income - Expenses` is the authoritative
+monthly and yearly calculation. There is no `MonthlyFinancePlan`, planned
+income, allowance, expense target, import source, or per-transaction currency.
+The configured user-level finance currency is a display/base convention only;
+changing it does not convert historical amounts.

@@ -442,7 +442,6 @@ Containing
 - Theme
 - TimeZone
 - Currency
-- Monthly Allowance
 - Display Preferences
 
 ---
@@ -2092,13 +2091,14 @@ resolve a Task/Habit source only when available for the current user;
 progression notifications link to `/` or have no source link. No generic deep-link
 or polymorphic source infrastructure is introduced.
 
-# 17. FinanceService
+# 17. FinanceService — M7 Simple Finance
 
 ## Purpose
 
 FinanceService owns all financial business logic inside LifeOS.
 
-It manages manual transactions, monthly summaries, category breakdowns, and financial calculations.
+It manages manual transactions, selected-month summaries, a small selected-year
+aggregate, category breakdowns, and finance calculations.
 
 FinanceService is the only service allowed to calculate financial summaries.
 
@@ -2110,11 +2110,10 @@ FinanceService is responsible for
 
 - Creating transactions
 - Updating transactions
-- Archiving transactions
+- Deleting transactions through the normal soft-delete infrastructure
 - Monthly summaries
+- Yearly summaries
 - Category summaries
-- Remaining balance
-- Monthly plan
 - Default finance categories
 
 ---
@@ -2163,14 +2162,6 @@ Task UpdateTransactionAsync(UpdateFinanceTransactionDto dto);
 
 ---
 
-## Archive Transaction
-
-```csharp
-Task ArchiveTransactionAsync(Guid transactionId);
-```
-
----
-
 ## Delete Transaction
 
 ```csharp
@@ -2208,22 +2199,10 @@ GetCategoryBreakdownAsync(
 
 ---
 
-## Get Monthly Plan
+## Get Year Summary
 
 ```csharp
-Task<MonthlyFinancePlanDto>
-GetMonthlyPlanAsync(
-    int year,
-    int month);
-```
-
----
-
-## Save Monthly Plan
-
-```csharp
-Task SaveMonthlyPlanAsync(
-    MonthlyFinancePlanDto dto);
+Task<FinanceYearSummaryDto> GetYearSummaryAsync(int year);
 ```
 
 ---
@@ -2236,8 +2215,6 @@ Input
 CreateFinanceTransactionDto
 
 UpdateFinanceTransactionDto
-
-MonthlyFinancePlanDto
 ```
 
 Output
@@ -2246,6 +2223,8 @@ Output
 FinanceTransactionDto
 
 FinanceSummaryDto
+
+FinanceYearSummaryDto
 
 CategorySummaryDto
 
@@ -2258,23 +2237,19 @@ FinanceDashboardDto
 
 FinanceService owns
 
-- Remaining Balance
 - Monthly Totals
+- Monthly Net Cash Flow
+- Yearly Totals
+- Yearly Net Cash Flow
 - Category Totals
-- Monthly Allowance
-- Monthly Plan
 
 ---
 
-## Remaining Balance
+## Net Cash Flow
 
 Formula
 
 ```
-Expected Income
-
-+
-
 Income Transactions
 
 -
@@ -2283,7 +2258,7 @@ Expense Transactions
 
 =
 
-Remaining Balance
+Net Cash Flow
 ```
 
 ---
@@ -2324,9 +2299,11 @@ Expense.
 
 Categories are
 
-- user scoped;
-- configurable;
-- reusable.
+- global reference data;
+- immutable and stable in M7;
+- compatible with either income or expense transactions as defined by type.
+
+Users do not create, rename, archive, or delete categories in M7.
 
 ---
 
@@ -2373,7 +2350,6 @@ GetByCategory
 
 GetTransaction
 
-GetMonthlyPlan
 ```
 
 Repositories never calculate totals.
@@ -2405,7 +2381,6 @@ Log
 - Transaction Created
 - Transaction Updated
 - Transaction Deleted
-- Monthly Plan Updated
 - Validation Failure
 - Unexpected Failure
 
@@ -2433,16 +2408,10 @@ FinanceService must never
 
 Future versions may extend FinanceService with
 
-- Revolut Import
-- Raiffeisen Import
-- Import Preview
-- Duplicate Detection
-- Merchant Normalisation
-- Budgets
-- Subscription Manager
-- Savings Goals
-- Net Worth
-- AI Finance Reports
+richer personal-finance analytics, trends, comparisons, simple budgets,
+savings goals, recurring expenses, category management, optional imports, or
+AI summaries. These require separately approved contracts and are not M7
+requirements.
 
 # Future Services
 
