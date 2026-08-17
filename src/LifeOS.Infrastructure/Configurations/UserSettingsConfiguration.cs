@@ -1,4 +1,5 @@
 ﻿using LifeOS.Core.Entities;
+using LifeOS.Core.Constants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,7 +11,11 @@ public sealed class UserSettingsConfiguration
     public void Configure(
         EntityTypeBuilder<UserSettings> builder)
     {
-        builder.ToTable("UserSettings");
+        builder.ToTable(
+            "UserSettings",
+            tableBuilder => tableBuilder.HasCheckConstraint(
+                "CK_UserSettings_CurrencyCode",
+                "char_length(\"Currency\") = 3 AND \"Currency\" = upper(\"Currency\")"));
 
         builder.HasKey(settings => settings.Id);
 
@@ -27,6 +32,11 @@ public sealed class UserSettingsConfiguration
         builder.Property(settings => settings.TimeZoneConfiguredAtUtc)
             .HasColumnType("timestamp with time zone")
             .IsRequired(false);
+
+        builder.Property(settings => settings.Currency)
+            .HasMaxLength(FinanceConstants.CurrencyCodeMaxLength)
+            .HasDefaultValue(FinanceConstants.DefaultCurrency)
+            .IsRequired();
 
         builder.Property(settings => settings.CreatedAtUtc)
             .IsRequired();

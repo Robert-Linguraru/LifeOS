@@ -1,4 +1,6 @@
-﻿namespace LifeOS.Core.DTOs;
+﻿using LifeOS.Core.Constants;
+
+namespace LifeOS.Core.DTOs;
 
 public sealed class UserSettingsDto
 {
@@ -7,4 +9,6 @@ public sealed class UserSettingsDto
     public string TimeZoneId { get; set; } = string.Empty;
 
     public DateTimeOffset? TimeZoneConfiguredAtUtc { get; set; }
+
+    public string Currency { get; set; } = FinanceConstants.DefaultCurrency;
 }

@@ -23,6 +23,8 @@ public class AppDbContext : DbContext
     public DbSet<UserProgression> UserProgressions => Set<UserProgression>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Reminder> Reminders => Set<Reminder>();
+    public DbSet<FinanceCategory> FinanceCategories => Set<FinanceCategory>();
+    public DbSet<FinanceTransaction> FinanceTransactions => Set<FinanceTransaction>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
