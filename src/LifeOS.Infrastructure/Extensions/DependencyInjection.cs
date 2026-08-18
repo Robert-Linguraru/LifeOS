@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IXpService, XpService>();
 
         services.AddScoped<IFinanceRepository, FinanceRepository>();
+        services.AddScoped<IFinanceService, FinanceService>();
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
