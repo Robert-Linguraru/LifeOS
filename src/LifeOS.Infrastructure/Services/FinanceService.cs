@@ -2,6 +2,7 @@ using LifeOS.Core.Abstractions;
 using LifeOS.Core.Abstractions.Finance;
 using LifeOS.Core.DTOs.Finance;
 using LifeOS.Core.Entities;
+using LifeOS.Core.Enums.Finance;
 using LifeOS.Core.Exceptions;
 using LifeOS.Core.Mappings;
 using LifeOS.Core.Services;
@@ -157,21 +158,142 @@ public sealed class FinanceService : IFinanceService
             userId);
     }
 
-    public Task<FinanceSummaryDto> GetMonthlySummaryAsync(
+    public async Task<FinanceSummaryDto> GetMonthlySummaryAsync(
         int year,
         int month,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException(
-            "Finance summaries are not implemented yet.");
+        var userId = GetCurrentUserId();
+        var (monthStart, monthEndExclusive) = GetMonthBounds(year, month);
+        var transactions = await _repository.GetTransactionsByMonthAsync(
+            userId,
+            monthStart,
+            monthEndExclusive,
+            cancellationToken);
+
+        if (transactions.Count == 0)
+        {
+            return new FinanceSummaryDto
+            {
+                Year = year,
+                Month = month
+            };
+        }
+
+        var categories = await GetCategoriesByIdAsync(cancellationToken);
+        var totalIncome = transactions
+            .Where(transaction => transaction.Type == FinanceTransactionType.Income)
+            .Sum(transaction => transaction.Amount);
+        var totalExpenses = transactions
+            .Where(transaction => transaction.Type == FinanceTransactionType.Expense)
+            .Sum(transaction => transaction.Amount);
+        var expenseCategories = transactions
+            .Where(transaction => transaction.Type == FinanceTransactionType.Expense)
+            .GroupBy(transaction => transaction.CategoryId)
+            .Select(group =>
+            {
+                var category = GetCategory(categories, group.Key);
+                return new FinanceCategorySummaryDto
+                {
+                    CategoryId = category.Id,
+                    CategoryName = category.Name,
+                    TotalExpenses = group.Sum(transaction => transaction.Amount)
+                };
+            })
+            .OrderBy(summary => categories[summary.CategoryId].SortOrder)
+            .ThenBy(summary => summary.CategoryName)
+            .ThenBy(summary => summary.CategoryId)
+            .ToList();
+        var transactionDtos = transactions
+            .Select(transaction => transaction.ToDto(
+                GetCategory(categories, transaction.CategoryId).Name))
+            .ToList();
+
+        return new FinanceSummaryDto
+        {
+            Year = year,
+            Month = month,
+            TotalIncome = totalIncome,
+            TotalExpenses = totalExpenses,
+            ExpenseCategories = expenseCategories,
+            Transactions = transactionDtos
+        };
     }
 
-    public Task<FinanceYearSummaryDto> GetYearSummaryAsync(
+    public async Task<FinanceYearSummaryDto> GetYearSummaryAsync(
         int year,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException(
-            "Finance summaries are not implemented yet.");
+        var userId = GetCurrentUserId();
+        var (yearStart, yearEndExclusive) = GetYearBounds(year);
+        var transactions = await _repository.GetTransactionsByYearAsync(
+            userId,
+            yearStart,
+            yearEndExclusive,
+            cancellationToken);
+
+        var totalIncome = transactions
+            .Where(transaction => transaction.Type == FinanceTransactionType.Income)
+            .Sum(transaction => transaction.Amount);
+        var totalExpenses = transactions
+            .Where(transaction => transaction.Type == FinanceTransactionType.Expense)
+            .Sum(transaction => transaction.Amount);
+
+        return new FinanceYearSummaryDto
+        {
+            Year = year,
+            TotalIncome = totalIncome,
+            TotalExpenses = totalExpenses
+        };
+    }
+
+    private async Task<Dictionary<Guid, FinanceCategory>> GetCategoriesByIdAsync(
+        CancellationToken cancellationToken)
+    {
+        var categories = await _repository.GetCategoriesAsync(cancellationToken);
+        return categories.ToDictionary(category => category.Id);
+    }
+
+    private static FinanceCategory GetCategory(
+        IReadOnlyDictionary<Guid, FinanceCategory> categories,
+        Guid categoryId)
+    {
+        return categories.TryGetValue(categoryId, out var category)
+            ? category
+            : throw new ResourceNotFoundException(
+                "Finance category was not found.");
+    }
+
+    private static (DateOnly Start, DateOnly EndExclusive) GetMonthBounds(
+        int year,
+        int month)
+    {
+        ValidateYear(year);
+
+        if (month is < 1 or > 12)
+        {
+            throw new ArgumentOutOfRangeException(nameof(month));
+        }
+
+        var start = new DateOnly(year, month, 1);
+        return (start, start.AddMonths(1));
+    }
+
+    private static (DateOnly Start, DateOnly EndExclusive) GetYearBounds(int year)
+    {
+        ValidateYear(year);
+
+        return (
+            new DateOnly(year, 1, 1),
+            new DateOnly(year + 1, 1, 1));
+    }
+
+    private static void ValidateYear(int year)
+    {
+        if (year is < 1 or >= 9999)
+        {
+            throw new ArgumentOutOfRangeException(nameof(year));
+        }
     }
 
     private async Task<FinanceCategory> GetActiveCategoryAsync(

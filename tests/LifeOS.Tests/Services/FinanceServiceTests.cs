@@ -186,14 +186,133 @@ public sealed class FinanceServiceTests
     }
 
     [Fact]
-    public async Task SummaryMethods_ExplicitlyRemainUnimplementedForTicket6()
+    public async Task SummaryMethods_ReturnEmptyMonthAndCalculateYear()
     {
         var service = CreateService();
 
-        await Assert.ThrowsAsync<NotSupportedException>(
-            () => service.GetMonthlySummaryAsync(2026, 9));
-        await Assert.ThrowsAsync<NotSupportedException>(
-            () => service.GetYearSummaryAsync(2026));
+        _repository.Setup(item => item.GetTransactionsByMonthAsync(
+                UserId,
+                new DateOnly(2026, 9, 1),
+                new DateOnly(2026, 10, 1),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<FinanceTransaction>());
+        _repository.Setup(item => item.GetTransactionsByYearAsync(
+                UserId,
+                new DateOnly(2026, 1, 1),
+                new DateOnly(2027, 1, 1),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                Transaction(
+                    UserId,
+                    new DateOnly(2026, 2, 1),
+                    FinanceTransactionType.Income,
+                    100,
+                    FinanceCategoryDefaults.SalaryId,
+                    "Salary")
+            });
+
+        var monthly = await service.GetMonthlySummaryAsync(2026, 9);
+        Assert.Equal(0, monthly.TotalIncome);
+        Assert.Equal(0, monthly.TotalExpenses);
+        Assert.Empty(monthly.ExpenseCategories);
+        Assert.Empty(monthly.Transactions);
+
+        var yearly = await service.GetYearSummaryAsync(2026);
+        Assert.Equal(100, yearly.TotalIncome);
+        Assert.Equal(0, yearly.TotalExpenses);
+        Assert.Equal(100, yearly.NetCashFlow);
+    }
+
+    [Fact]
+    public async Task GetMonthlySummaryAsync_CalculatesTotalsCategoriesAndPreservesOrdering()
+    {
+        var salary = Category(
+            FinanceCategoryDefaults.SalaryId,
+            "Salary",
+            FinanceCategoryType.Income,
+            1);
+        var food = Category(
+            FinanceCategoryDefaults.FoodId,
+            "Food",
+            FinanceCategoryType.Expense,
+            102);
+        var transport = Category(
+            FinanceCategoryDefaults.TransportId,
+            "Transport",
+            FinanceCategoryType.Expense,
+            103);
+        _repository.Setup(item => item.GetCategoriesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { salary, food, transport });
+
+        var newest = Transaction(
+            UserId,
+            new DateOnly(2026, 9, 30),
+            FinanceTransactionType.Expense,
+            15,
+            FinanceCategoryDefaults.FoodId,
+            "Groceries");
+        var income = Transaction(
+            UserId,
+            new DateOnly(2026, 9, 10),
+            FinanceTransactionType.Income,
+            1000,
+            FinanceCategoryDefaults.SalaryId,
+            "Salary");
+        var sameCategory = Transaction(
+            UserId,
+            new DateOnly(2026, 9, 5),
+            FinanceTransactionType.Expense,
+            25,
+            FinanceCategoryDefaults.FoodId,
+            "Market");
+        var otherCategory = Transaction(
+            UserId,
+            new DateOnly(2026, 9, 1),
+            FinanceTransactionType.Expense,
+            10,
+            FinanceCategoryDefaults.TransportId,
+            "Bus");
+        var transactions = new[] { newest, income, sameCategory, otherCategory };
+        _repository.Setup(item => item.GetTransactionsByMonthAsync(
+                UserId,
+                new DateOnly(2026, 9, 1),
+                new DateOnly(2026, 10, 1),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(transactions);
+
+        var result = await CreateService().GetMonthlySummaryAsync(2026, 9);
+
+        Assert.Equal(1000, result.TotalIncome);
+        Assert.Equal(50, result.TotalExpenses);
+        Assert.Equal(950, result.NetCashFlow);
+        Assert.Equal(
+            new[] { FinanceCategoryDefaults.FoodId, FinanceCategoryDefaults.TransportId },
+            result.ExpenseCategories.Select(category => category.CategoryId));
+        Assert.Equal(
+            new[] { 40m, 10m },
+            result.ExpenseCategories.Select(category => category.TotalExpenses));
+        Assert.Equal(50, result.ExpenseCategories.Sum(category => category.TotalExpenses));
+        Assert.Equal(
+            transactions.Select(transaction => transaction.Id),
+            result.Transactions.Select(transaction => transaction.Id));
+        Assert.Equal("Salary", result.Transactions[1].CategoryName);
+        _repository.Verify(item => item.GetTransactionsByMonthAsync(
+            UserId,
+            new DateOnly(2026, 9, 1),
+            new DateOnly(2026, 10, 1),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SummaryMethods_RejectInvalidDates()
+    {
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetMonthlySummaryAsync(2026, 13));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetYearSummaryAsync(0));
     }
 
     private static FinanceCategory Category(
@@ -203,5 +322,22 @@ public sealed class FinanceServiceTests
         int sortOrder)
     {
         return new FinanceCategory(id, name, type, sortOrder);
+    }
+
+    private static FinanceTransaction Transaction(
+        Guid userId,
+        DateOnly date,
+        FinanceTransactionType type,
+        decimal amount,
+        Guid categoryId,
+        string description)
+    {
+        return new FinanceTransaction(
+            userId,
+            date,
+            type,
+            amount,
+            categoryId,
+            description);
     }
 }
