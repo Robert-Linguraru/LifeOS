@@ -1,0 +1,95 @@
+@using LifeOS.Core.Abstractions
+@using LifeOS.Core.DTOs.Dashboard
+@using LifeOS.Core.Exceptions
+@using LifeOS.Core.Services
+
+@inject IDashboardService DashboardService
+@inject IUserSettingsService UserSettingsService
+
+<section class="finance-widget" aria-labelledby="finance-widget-title">
+    <div class="finance-widget__header">
+        <h2 id="finance-widget-title">Finance</h2>
+        <div class="finance-widget__actions">
+            <a class="secondary-button" href="/finance">Open Finance</a>
+            <a class="primary-button" href="/finance/transactions/new?type=income">Add income</a>
+            <a class="secondary-button" href="/finance/transactions/new?type=expense">Add expense</a>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading Finance...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="finance-widget__error" role="alert">
+            <p>@_loadError</p>
+            <button type="button" @onclick="LoadWidgetAsync">Try again</button>
+        </div>
+    }
+    else if (_widget is not null && !_widget.HasTransactions)
+    {
+        <div class="finance-widget__empty">
+            <p>No transactions recorded this month.</p>
+            <div class="finance-widget__summary">
+                <div><span>Income</span><strong>@FormatAmount(_widget.TotalIncome)</strong></div>
+                <div><span>Expenses</span><strong>@FormatAmount(_widget.TotalExpenses)</strong></div>
+                <div><span>Net</span><strong>@FormatAmount(_widget.NetCashFlow)</strong></div>
+            </div>
+            <a class="primary-button" href="/finance/transactions/new?type=income">Add income</a>
+        </div>
+    }
+    else if (_widget is not null)
+    {
+        <div class="finance-widget__summary">
+            <div><span>Income</span><strong>@FormatAmount(_widget.TotalIncome)</strong></div>
+            <div><span>Expenses</span><strong>@FormatAmount(_widget.TotalExpenses)</strong></div>
+            <div><span>Net</span><strong>@FormatAmount(_widget.NetCashFlow)</strong></div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_widget.LargestExpenseCategory))
+        {
+            <p class="finance-widget__category">Largest expense category: <strong>@_widget.LargestExpenseCategory</strong></p>
+        }
+    }
+</section>
+
+@code {
+    private DashboardFinanceWidgetDto? _widget;
+    private string _currency = "USD";
+    private bool _isLoading = true;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWidgetAsync();
+    }
+
+    private async Task LoadWidgetAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            var settingsTask = UserSettingsService.GetCurrentUserSettingsAsync();
+            var widgetTask = DashboardService.GetFinanceWidgetAsync();
+            await Task.WhenAll(settingsTask, widgetTask);
+            _currency = settingsTask.Result.Currency;
+            _widget = widgetTask.Result;
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError = "Finance could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string FormatAmount(decimal amount) => $"{_currency} {amount:N2}";
+}

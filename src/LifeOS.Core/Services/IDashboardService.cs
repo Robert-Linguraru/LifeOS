@@ -15,4 +15,7 @@ public interface IDashboardService
 
     Task<DashboardReminderWidgetDto> GetReminderWidgetAsync(
         CancellationToken cancellationToken = default);
+
+    Task<DashboardFinanceWidgetDto> GetFinanceWidgetAsync(
+        CancellationToken cancellationToken = default);
 }

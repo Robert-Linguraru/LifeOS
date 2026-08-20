@@ -1,4 +1,5 @@
-﻿using LifeOS.Core.DTOs.Habits;
+﻿using LifeOS.Core.Abstractions;
+using LifeOS.Core.DTOs.Habits;
 using LifeOS.Core.DTOs.Reminders;
 using LifeOS.Core.DTOs.Tasks;
 using LifeOS.Core.DTOs.Xp;
@@ -6,6 +7,8 @@ using LifeOS.Core.Constants;
 using LifeOS.Core.Enums.Reminders;
 using LifeOS.Core.Enums.Habits;
 using LifeOS.Core.Enums.Xp;
+using LifeOS.Core.DTOs;
+using LifeOS.Core.DTOs.Finance;
 using LifeOS.Core.Services;
 using LifeOS.Infrastructure.Services;
 using Moq;
@@ -18,6 +21,89 @@ public sealed class DashboardServiceTests
     private readonly Mock<IHabitService> _habitService = new();
     private readonly Mock<IXpService> _xpService = new();
     private readonly Mock<IReminderService> _reminderService = new();
+    private readonly Mock<IFinanceService> _financeService = new();
+    private readonly Mock<IUserSettingsService> _userSettingsService = new();
+    private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+
+    [Fact]
+    public async Task GetFinanceWidgetAsync_ProjectsCurrentMonthFromFinanceSummary()
+    {
+        var currentDate = new DateOnly(2026, 9, 15);
+        var categoryId = Guid.NewGuid();
+        _userSettingsService.Setup(service => service.GetCurrentUserSettingsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserSettingsDto { TimeZoneId = "UTC" });
+        _dateTimeProvider.Setup(service => service.GetCurrentDate("UTC"))
+            .Returns(currentDate);
+        _financeService.Setup(service => service.GetMonthlySummaryAsync(
+                2026, 9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FinanceSummaryDto
+            {
+                TotalIncome = 3000,
+                TotalExpenses = 1450,
+                ExpenseCategories =
+                [
+                    new FinanceCategorySummaryDto
+                    {
+                        CategoryId = categoryId,
+                        CategoryName = "Housing/Rent",
+                        TotalExpenses = 900
+                    },
+                    new FinanceCategorySummaryDto
+                    {
+                        CategoryId = Guid.NewGuid(),
+                        CategoryName = "Food",
+                        TotalExpenses = 550
+                    }
+                ],
+                Transactions =
+                [new FinanceTransactionDto { Id = Guid.NewGuid() }]
+            });
+
+        var service = new DashboardService(
+            _taskService.Object,
+            _habitService.Object,
+            _xpService.Object,
+            financeService: _financeService.Object,
+            userSettingsService: _userSettingsService.Object,
+            dateTimeProvider: _dateTimeProvider.Object);
+
+        var result = await service.GetFinanceWidgetAsync();
+
+        Assert.True(result.HasTransactions);
+        Assert.Equal(3000, result.TotalIncome);
+        Assert.Equal(1450, result.TotalExpenses);
+        Assert.Equal(1550, result.NetCashFlow);
+        Assert.Equal("Housing/Rent", result.LargestExpenseCategory);
+        _financeService.Verify(service => service.GetMonthlySummaryAsync(
+            2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetFinanceWidgetAsync_ProjectsEmptySummary()
+    {
+        _userSettingsService.Setup(service => service.GetCurrentUserSettingsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserSettingsDto { TimeZoneId = "UTC" });
+        _dateTimeProvider.Setup(service => service.GetCurrentDate("UTC"))
+            .Returns(new DateOnly(2026, 9, 15));
+        _financeService.Setup(service => service.GetMonthlySummaryAsync(
+                2026, 9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FinanceSummaryDto());
+
+        var service = new DashboardService(
+            _taskService.Object,
+            _habitService.Object,
+            _xpService.Object,
+            financeService: _financeService.Object,
+            userSettingsService: _userSettingsService.Object,
+            dateTimeProvider: _dateTimeProvider.Object);
+
+        var result = await service.GetFinanceWidgetAsync();
+
+        Assert.False(result.HasTransactions);
+        Assert.Null(result.LargestExpenseCategory);
+    }
 
     [Fact]
     public async Task GetTaskWidgetAsync_ReturnsOnlyOverdueAndTodayTasks()
