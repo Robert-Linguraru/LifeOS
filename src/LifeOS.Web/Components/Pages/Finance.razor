@@ -5,6 +5,7 @@
 @using LifeOS.Core.Enums.Finance
 @using LifeOS.Core.Exceptions
 @using LifeOS.Core.Services
+@using System.Globalization
 
 @inject IFinanceService FinanceService
 @inject IUserSettingsService UserSettingsService
@@ -138,7 +139,18 @@
 
     private DateOnly SelectedMonth => _selectedMonth;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    [SupplyParameterFromQuery(Name = "month")]
+    public string? Month { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TryParseMonth(Month, out var selectedMonth))
+        {
+            _selectedMonth = selectedMonth;
+        }
+
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -191,11 +203,14 @@
         }
     }
 
-    private void AddIncome() => Navigation.NavigateTo("/finance/transactions/new?type=income");
+    private void AddIncome() => Navigation.NavigateTo(
+        $"/finance/transactions/new?type=income&date={_selectedMonth:yyyy-MM-01}&returnMonth={_selectedMonth:yyyy-MM}");
 
-    private void AddExpense() => Navigation.NavigateTo("/finance/transactions/new?type=expense");
+    private void AddExpense() => Navigation.NavigateTo(
+        $"/finance/transactions/new?type=expense&date={_selectedMonth:yyyy-MM-01}&returnMonth={_selectedMonth:yyyy-MM}");
 
-    private void EditTransaction(Guid transactionId) => Navigation.NavigateTo($"/finance/transactions/{transactionId}/edit");
+    private void EditTransaction(Guid transactionId) => Navigation.NavigateTo(
+        $"/finance/transactions/{transactionId}/edit?returnMonth={_selectedMonth:yyyy-MM}");
 
     private void RequestDelete(Guid transactionId) => _deletePendingId = transactionId;
 
@@ -235,4 +250,21 @@
     private string FormatAmount(decimal amount) => $"{_settings?.Currency ?? "USD"} {amount:N2}";
 
     private static string GetTypeLabel(FinanceTransactionType type) => type == FinanceTransactionType.Income ? "Income" : "Expense";
+
+    private static bool TryParseMonth(string? value, out DateOnly month)
+    {
+        if (DateOnly.TryParseExact(
+                value,
+                "yyyy-MM",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed))
+        {
+            month = new DateOnly(parsed.Year, parsed.Month, 1);
+            return true;
+        }
+
+        month = default;
+        return false;
+    }
 }

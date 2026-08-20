@@ -101,7 +101,9 @@ public sealed class FinanceTests : IDisposable
         cut.WaitForAssertion(() => Assert.Contains("Add income", cut.Markup));
 
         cut.FindAll("button").Single(button => button.TextContent.Contains("Add income")).Click();
-        Assert.EndsWith("/finance/transactions/new?type=income", _context.Services.GetRequiredService<NavigationManager>().Uri);
+        var uri = _context.Services.GetRequiredService<NavigationManager>().Uri;
+        Assert.StartsWith("http://localhost/finance/transactions/new?type=income", uri);
+        Assert.Contains("returnMonth=", uri);
     }
 
     [Fact]
@@ -119,6 +121,45 @@ public sealed class FinanceTests : IDisposable
             Assert.Contains("No transactions in this month.", cut.Markup);
             Assert.Contains("EUR 0.00", cut.Markup);
         });
+    }
+
+    [Fact]
+    public void FinancePage_DecemberToJanuary_UpdatesSelectedYearSummary()
+    {
+        _context.Services.GetRequiredService<NavigationManager>()
+            .NavigateTo("/finance?month=2026-12");
+        _finance.Setup(service => service.GetMonthlySummaryAsync(
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int year, int month, CancellationToken _) =>
+                new FinanceSummaryDto { Year = year, Month = month });
+        _finance.Setup(service => service.GetYearSummaryAsync(
+                It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int year, CancellationToken _) =>
+                new FinanceYearSummaryDto { Year = year });
+
+        var cut = _context.Render<FinancePage>();
+        cut.WaitForAssertion(() => Assert.Contains("December 2026", cut.Markup));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Next month")).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("January 2027", cut.Markup);
+            _finance.Verify(service => service.GetYearSummaryAsync(
+                2027, It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        });
+    }
+
+    [Fact]
+    public void FinancePage_DeleteRequiresConfirmationBeforeCallingService()
+    {
+        var cut = _context.Render<FinancePage>();
+        cut.WaitForAssertion(() => Assert.Contains("Delete", cut.Markup));
+
+        cut.FindAll("button").Single(button => button.TextContent == "Delete").Click();
+        _finance.Verify(service => service.DeleteTransactionAsync(
+            It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("Confirm delete", cut.Markup);
     }
 
     public void Dispose()

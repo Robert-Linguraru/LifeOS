@@ -6,6 +6,7 @@
 @using LifeOS.Core.Exceptions
 @using LifeOS.Core.Services
 @using LifeOS.Web.Models.Finance
+@using System.Globalization
 
 @inject IFinanceService FinanceService
 @inject NavigationManager Navigation
@@ -94,6 +95,12 @@
     [SupplyParameterFromQuery(Name = "type")]
     public string? Type { get; set; }
 
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? Date { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnMonth")]
+    public string? ReturnMonth { get; set; }
+
     private FinanceTransactionFormModel _model = new();
     private IReadOnlyList<FinanceCategoryDto> _categories = [];
     private bool _isLoading = true;
@@ -138,7 +145,8 @@
                 _model = new FinanceTransactionFormModel
                 {
                     Type = ParseType(Type),
-                    TransactionDate = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day)
+                    TransactionDate = ParseDate(Date) ??
+                        new DateOnly(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day)
                 };
             }
         }
@@ -184,7 +192,7 @@
                 await FinanceService.CreateTransactionAsync(ToCreateDto());
             }
 
-            Navigation.NavigateTo("/finance");
+            Navigation.NavigateTo($"/finance?month={GetReturnMonth()}");
         }
         catch (ValidationException exception)
         {
@@ -228,6 +236,31 @@
         string.Equals(type, "expense", StringComparison.OrdinalIgnoreCase)
             ? FinanceTransactionType.Expense
             : FinanceTransactionType.Income;
+
+    private string GetReturnMonth() =>
+        DateOnly.TryParseExact(
+            ReturnMonth,
+            "yyyy-MM",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var month)
+            ? month.ToString("yyyy-MM", CultureInfo.InvariantCulture)
+            : (ParseDate(Date) ?? new DateOnly(
+                DateTime.Today.Year,
+                DateTime.Today.Month,
+                DateTime.Today.Day)).ToString(
+                "yyyy-MM",
+                CultureInfo.InvariantCulture);
+
+    private static DateOnly? ParseDate(string? date) =>
+        DateOnly.TryParseExact(
+            date,
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var parsed)
+            ? parsed
+            : null;
 
     private static string GetTypeLabel(FinanceTransactionType type) =>
         type == FinanceTransactionType.Income ? "Income" : "Expense";
