@@ -1,0 +1,234 @@
+@page "/finance/transactions/new"
+@page "/finance/transactions/{TransactionId:guid}/edit"
+
+@using LifeOS.Core.DTOs.Finance
+@using LifeOS.Core.Enums.Finance
+@using LifeOS.Core.Exceptions
+@using LifeOS.Core.Services
+@using LifeOS.Web.Models.Finance
+
+@inject IFinanceService FinanceService
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="finance-editor">
+    <div class="page-header">
+        <div>
+            <h1>@HeadingText</h1>
+            <p>Enter the transaction amount in your configured currency.</p>
+        </div>
+        <button type="button" class="secondary-button" disabled="@_isSaving" @onclick="NavigateToFinance">Cancel</button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading transaction editor...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="NavigateToFinance">Back to Finance</button>
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            @if (_saveError is not null)
+            {
+                <div class="error-message" role="alert">@_saveError</div>
+            }
+
+            <div class="form-field">
+                <label for="finance-transaction-type">Type</label>
+                <InputSelect id="finance-transaction-type" class="form-control" @bind-Value="_model.Type" @bind-Value:after="TypeChangedAsync" disabled="@_isSaving">
+                    <option value="@FinanceTransactionType.Income">Income</option>
+                    <option value="@FinanceTransactionType.Expense">Expense</option>
+                </InputSelect>
+            </div>
+
+            <div class="form-field">
+                <label for="finance-transaction-amount">Amount</label>
+                <InputNumber id="finance-transaction-amount" class="form-control" @bind-Value="_model.Amount" disabled="@_isSaving" />
+                <ValidationMessage For="() => _model.Amount" />
+            </div>
+
+            <div class="form-field">
+                <label for="finance-transaction-date">Date</label>
+                <InputDate id="finance-transaction-date" class="form-control" @bind-Value="_model.TransactionDate" disabled="@_isSaving" />
+                <ValidationMessage For="() => _model.TransactionDate" />
+            </div>
+
+            <div class="form-field">
+                <label for="finance-transaction-category">Category</label>
+                <InputSelect id="finance-transaction-category" class="form-control" @bind-Value="_model.CategoryId" disabled="@_isSaving">
+                    <option value="">Select a category</option>
+                    @foreach (var category in CompatibleCategories)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => _model.CategoryId" />
+            </div>
+
+            <div class="form-field">
+                <label for="finance-transaction-description">Description (optional)</label>
+                <InputTextArea id="finance-transaction-description" class="form-control" @bind-Value="_model.Description" disabled="@_isSaving" />
+                <ValidationMessage For="() => _model.Description" />
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="primary-button" disabled="@_isSaving">
+                    @(_isSaving ? "Saving..." : SaveButtonText)
+                </button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? TransactionId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? Type { get; set; }
+
+    private FinanceTransactionFormModel _model = new();
+    private IReadOnlyList<FinanceCategoryDto> _categories = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _loadError;
+    private string? _saveError;
+
+    private bool IsEditMode => TransactionId.HasValue;
+    private string PageTitleText => IsEditMode ? "Edit transaction" : "New transaction";
+    private string HeadingText => IsEditMode ? "Edit transaction" : $"Add {GetTypeLabel(_model.Type)}";
+    private string SaveButtonText => IsEditMode ? "Save changes" : "Create transaction";
+
+    private IEnumerable<FinanceCategoryDto> CompatibleCategories =>
+        _categories.Where(category =>
+            category.Type == FinanceCategoryType.Both ||
+            (category.Type == FinanceCategoryType.Income && _model.Type == FinanceTransactionType.Income) ||
+            (category.Type == FinanceCategoryType.Expense && _model.Type == FinanceTransactionType.Expense));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loadError = null;
+        _saveError = null;
+        _isLoading = true;
+
+        try
+        {
+            _categories = await FinanceService.GetCategoriesAsync();
+            if (IsEditMode)
+            {
+                var transaction = await FinanceService.GetTransactionAsync(TransactionId!.Value);
+                _model = new FinanceTransactionFormModel
+                {
+                    Amount = transaction.Amount,
+                    TransactionDate = transaction.TransactionDate,
+                    CategoryId = transaction.CategoryId,
+                    Type = transaction.Type,
+                    Description = transaction.Description
+                };
+            }
+            else
+            {
+                _model = new FinanceTransactionFormModel
+                {
+                    Type = ParseType(Type),
+                    TransactionDate = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day)
+                };
+            }
+        }
+        catch (ResourceNotFoundException)
+        {
+            _loadError = "The transaction could not be found.";
+        }
+        catch (Exception)
+        {
+            _loadError = "The transaction editor could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private Task TypeChangedAsync()
+    {
+        if (_model.CategoryId is not null &&
+            !CompatibleCategories.Any(category => category.Id == _model.CategoryId))
+        {
+            _model.CategoryId = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        _saveError = null;
+        try
+        {
+            if (IsEditMode)
+            {
+                await FinanceService.UpdateTransactionAsync(
+                    TransactionId!.Value,
+                    ToUpdateDto());
+            }
+            else
+            {
+                await FinanceService.CreateTransactionAsync(ToCreateDto());
+            }
+
+            Navigation.NavigateTo("/finance");
+        }
+        catch (ValidationException exception)
+        {
+            _saveError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _saveError = "The transaction or category could not be found.";
+        }
+        catch (Exception)
+        {
+            _saveError = "The transaction could not be saved. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private CreateFinanceTransactionDto ToCreateDto() => new()
+    {
+        Amount = _model.Amount,
+        CategoryId = _model.CategoryId!.Value,
+        Description = _model.Description,
+        TransactionDate = _model.TransactionDate!.Value,
+        Type = _model.Type
+    };
+
+    private UpdateFinanceTransactionDto ToUpdateDto() => new()
+    {
+        Amount = _model.Amount,
+        CategoryId = _model.CategoryId!.Value,
+        Description = _model.Description,
+        TransactionDate = _model.TransactionDate!.Value,
+        Type = _model.Type
+    };
+
+    private void NavigateToFinance() => Navigation.NavigateTo("/finance");
+
+    private static FinanceTransactionType ParseType(string? type) =>
+        string.Equals(type, "expense", StringComparison.OrdinalIgnoreCase)
+            ? FinanceTransactionType.Expense
+            : FinanceTransactionType.Income;
+
+    private static string GetTypeLabel(FinanceTransactionType type) =>
+        type == FinanceTransactionType.Income ? "Income" : "Expense";
+}

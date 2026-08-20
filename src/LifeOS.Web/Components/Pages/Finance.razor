@@ -1,7 +1,238 @@
-ï»¿@page "/finance"
+@page "/finance"
+
+@using LifeOS.Core.DTOs
+@using LifeOS.Core.DTOs.Finance
+@using LifeOS.Core.Enums.Finance
+@using LifeOS.Core.Exceptions
+@using LifeOS.Core.Services
+
+@inject IFinanceService FinanceService
+@inject IUserSettingsService UserSettingsService
+@inject NavigationManager Navigation
 
 <PageTitle>Finance</PageTitle>
 
-<h1>Finance</h1>
+<div class="finance-page">
+    <div class="page-header">
+        <div>
+            <h1>Finance</h1>
+            <p>Track your income and expenses for the selected month.</p>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="primary-button" @onclick="AddIncome">Add income</button>
+            <button type="button" class="secondary-button" @onclick="AddExpense">Add expense</button>
+        </div>
+    </div>
 
-<p>Coming soon...</p>
+    @if (_isLoading)
+    {
+        <p role="status">Loading Finance...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">Retry</button>
+    }
+    else
+    {
+        <div class="form-actions finance-month-controls" aria-label="Month navigation">
+            <button type="button" class="secondary-button" @onclick="PreviousMonthAsync">Previous month</button>
+            <h2>@SelectedMonth.ToString("MMMM yyyy")</h2>
+            <button type="button" class="secondary-button" @onclick="NextMonthAsync">Next month</button>
+        </div>
+
+        @if (_refreshError is not null)
+        {
+            <div class="error-message" role="alert">@_refreshError</div>
+        }
+
+        <section aria-labelledby="monthly-summary-heading">
+            <h2 id="monthly-summary-heading">Monthly summary</h2>
+            <div class="finance-summary-grid">
+                <div><span>Income</span><strong>@FormatAmount(_summary!.TotalIncome)</strong></div>
+                <div><span>Expenses</span><strong>@FormatAmount(_summary.TotalExpenses)</strong></div>
+                <div><span>Net</span><strong>@FormatAmount(_summary.NetCashFlow)</strong></div>
+            </div>
+        </section>
+
+        <section aria-labelledby="expense-categories-heading">
+            <h2 id="expense-categories-heading">Expense categories</h2>
+            @if (_summary.ExpenseCategories.Count == 0)
+            {
+                <p>No expenses in this month.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var category in _summary.ExpenseCategories)
+                    {
+                        <li>@category.CategoryName — @FormatAmount(category.TotalExpenses)</li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section aria-labelledby="transactions-heading">
+            <h2 id="transactions-heading">Transactions</h2>
+            @if (_summary.Transactions.Count == 0)
+            {
+                <p>No transactions in this month. Add income or an expense to get started.</p>
+            }
+            else
+            {
+                <div class="finance-transactions" role="list">
+                    @foreach (var transaction in _summary.Transactions)
+                    {
+                        <article class="finance-transaction" role="listitem">
+                            <div>
+                                <strong>@transaction.CategoryName</strong>
+                                <span>@transaction.TransactionDate.ToString("dd MMM yyyy")</span>
+                                @if (!string.IsNullOrWhiteSpace(transaction.Description))
+                                {
+                                    <span>@transaction.Description</span>
+                                }
+                            </div>
+                            <div>
+                                <span>@GetTypeLabel(transaction.Type)</span>
+                                <strong>@FormatAmount(transaction.Amount)</strong>
+                                <button type="button" class="secondary-button" @onclick="() => EditTransaction(transaction.Id)">Edit</button>
+                                @if (_deletePendingId == transaction.Id)
+                                {
+                                    <button type="button" class="secondary-button" disabled="@_isDeleting" @onclick="() => ConfirmDeleteAsync(transaction.Id)">
+                                        @(_isDeleting ? "Deleting..." : "Confirm delete")
+                                    </button>
+                                    <button type="button" class="secondary-button" disabled="@_isDeleting" @onclick="CancelDelete">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="secondary-button" disabled="@_isDeleting" @onclick="() => RequestDelete(transaction.Id)">Delete</button>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+        <section aria-labelledby="year-summary-heading">
+            <h2 id="year-summary-heading">Year @SelectedMonth.Year</h2>
+            <div class="finance-summary-grid">
+                <div><span>Income</span><strong>@FormatAmount(_yearSummary!.TotalIncome)</strong></div>
+                <div><span>Expenses</span><strong>@FormatAmount(_yearSummary.TotalExpenses)</strong></div>
+                <div><span>Net</span><strong>@FormatAmount(_yearSummary.NetCashFlow)</strong></div>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private DateOnly _selectedMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private FinanceSummaryDto? _summary;
+    private FinanceYearSummaryDto? _yearSummary;
+    private UserSettingsDto? _settings;
+    private string? _loadError;
+    private string? _refreshError;
+    private bool _isLoading = true;
+    private bool _isDeleting;
+    private Guid? _deletePendingId;
+
+    private DateOnly SelectedMonth => _selectedMonth;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        _refreshError = null;
+        try
+        {
+            await LoadAuthoritativeDataAsync();
+        }
+        catch (Exception)
+        {
+            _loadError = "Finance could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadAuthoritativeDataAsync()
+    {
+        _settings = await UserSettingsService.GetCurrentUserSettingsAsync();
+        _summary = await FinanceService.GetMonthlySummaryAsync(_selectedMonth.Year, _selectedMonth.Month);
+        _yearSummary = await FinanceService.GetYearSummaryAsync(_selectedMonth.Year);
+    }
+
+    private async Task PreviousMonthAsync()
+    {
+        _selectedMonth = _selectedMonth.AddMonths(-1);
+        await RefreshAsync();
+    }
+
+    private async Task NextMonthAsync()
+    {
+        _selectedMonth = _selectedMonth.AddMonths(1);
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _refreshError = null;
+        try
+        {
+            await LoadAuthoritativeDataAsync();
+        }
+        catch (Exception)
+        {
+            _refreshError = "The selected month could not be loaded. Please try again.";
+        }
+    }
+
+    private void AddIncome() => Navigation.NavigateTo("/finance/transactions/new?type=income");
+
+    private void AddExpense() => Navigation.NavigateTo("/finance/transactions/new?type=expense");
+
+    private void EditTransaction(Guid transactionId) => Navigation.NavigateTo($"/finance/transactions/{transactionId}/edit");
+
+    private void RequestDelete(Guid transactionId) => _deletePendingId = transactionId;
+
+    private void CancelDelete() => _deletePendingId = null;
+
+    private async Task ConfirmDeleteAsync(Guid transactionId)
+    {
+        _isDeleting = true;
+        _refreshError = null;
+        try
+        {
+            await FinanceService.DeleteTransactionAsync(transactionId);
+            _deletePendingId = null;
+            try
+            {
+                await LoadAuthoritativeDataAsync();
+            }
+            catch (Exception)
+            {
+                _refreshError = "Transaction deleted, but the updated Finance view could not be loaded.";
+            }
+        }
+        catch (ResourceNotFoundException exception)
+        {
+            _refreshError = exception.Message;
+        }
+        catch (Exception)
+        {
+            _refreshError = "Transaction could not be deleted. Please try again.";
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private string FormatAmount(decimal amount) => $"{_settings?.Currency ?? "USD"} {amount:N2}";
+
+    private static string GetTypeLabel(FinanceTransactionType type) => type == FinanceTransactionType.Income ? "Income" : "Expense";
+}
