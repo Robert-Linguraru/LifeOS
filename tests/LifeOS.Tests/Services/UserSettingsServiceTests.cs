@@ -51,6 +51,7 @@ public sealed class UserSettingsServiceTests
         Assert.Equal(UserId, result.UserId);
         Assert.Equal("Europe/Bucharest", result.TimeZoneId);
         Assert.Null(result.TimeZoneConfiguredAtUtc);
+        Assert.Equal("USD", result.Currency);
 
         _repository.Verify(
             x => x.AddAsync(It.IsAny<UserSettings>(), It.IsAny<CancellationToken>()),
@@ -215,6 +216,81 @@ public sealed class UserSettingsServiceTests
 
         Assert.Equal("UTC", settings.TimeZoneId);
         Assert.Equal(SavedAtUtc, settings.TimeZoneConfiguredAtUtc);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserSettingsAsync_MissingSettings_UsesUsdDefault()
+    {
+        _repository
+            .Setup(x => x.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UserSettings?)null);
+
+        var result = await CreateService().GetCurrentUserSettingsAsync();
+
+        Assert.Equal("USD", result.Currency);
+        _repository.Verify(
+            x => x.AddAsync(
+                It.Is<UserSettings>(settings =>
+                    settings.UserId == UserId && settings.Currency == "USD"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateCurrencyAsync_NormalizesAndPreservesTimezone()
+    {
+        var settings = new UserSettings
+        {
+            UserId = UserId,
+            TimeZoneId = "Europe/Bucharest",
+            TimeZoneConfiguredAtUtc = SavedAtUtc,
+            Currency = "USD"
+        };
+        _repository
+            .Setup(x => x.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        await CreateService().UpdateCurrencyAsync(" eur ");
+
+        Assert.Equal("EUR", settings.Currency);
+        Assert.Equal("Europe/Bucharest", settings.TimeZoneId);
+        Assert.Equal(SavedAtUtc, settings.TimeZoneConfiguredAtUtc);
+        _repository.Verify(
+            x => x.UpdateAsync(settings, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("US")]
+    [InlineData("EURO")]
+    public async Task UpdateCurrencyAsync_InvalidValue_DoesNotPersist(
+        string currency)
+    {
+        await Assert.ThrowsAsync<ValidationException>(
+            () => CreateService().UpdateCurrencyAsync(currency));
+
+        _repository.Verify(
+            x => x.GetByUserIdAsync(
+                It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repository.Verify(
+            x => x.UpdateAsync(
+                It.IsAny<UserSettings>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateCurrencyAsync_UnauthenticatedUser_ThrowsAndDoesNotAccessRepository()
+    {
+        var service = CreateService();
+        _currentUser.Setup(x => x.IsAuthenticated).Returns(false);
+
+        await Assert.ThrowsAsync<CurrentUserUnavailableException>(
+            () => service.UpdateCurrencyAsync("EUR"));
+
+        VerifyRepositoryNotCalled();
     }
 
     [Fact]

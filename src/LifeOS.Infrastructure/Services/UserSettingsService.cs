@@ -1,4 +1,5 @@
 ﻿using LifeOS.Core.Abstractions;
+using LifeOS.Core.Constants;
 using LifeOS.Core.DTOs;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Exceptions;
@@ -56,7 +57,8 @@ public sealed class UserSettingsService : IUserSettingsService
         {
             UserId = settings.UserId,
             TimeZoneId = settings.TimeZoneId,
-            TimeZoneConfiguredAtUtc = settings.TimeZoneConfiguredAtUtc
+            TimeZoneConfiguredAtUtc = settings.TimeZoneConfiguredAtUtc,
+            Currency = settings.Currency
         };
     }
 
@@ -97,6 +99,49 @@ public sealed class UserSettingsService : IUserSettingsService
             "Updated time zone for user {UserId} to {TimeZoneId}",
             settings.UserId,
             settings.TimeZoneId);
+    }
+
+    public async Task UpdateCurrencyAsync(
+        string currency,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+        var normalizedCurrency = NormalizeCurrency(currency);
+
+        var settings = await _repository.GetByUserIdAsync(
+            userId,
+            cancellationToken);
+
+        if (settings is null)
+        {
+            throw new ResourceNotFoundException(
+                "User settings were not found.");
+        }
+
+        settings.Currency = normalizedCurrency;
+
+        await _repository.UpdateAsync(
+            settings,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Updated currency for user {UserId} to {Currency}",
+            settings.UserId,
+            settings.Currency);
+    }
+
+    private static string NormalizeCurrency(string currency)
+    {
+        var normalizedCurrency = currency?.Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(normalizedCurrency) ||
+            normalizedCurrency.Length != FinanceConstants.CurrencyCodeMaxLength)
+        {
+            throw new ValidationException(
+                "Currency must be a three-character code.");
+        }
+
+        return normalizedCurrency;
     }
 
     private Guid GetCurrentUserId()

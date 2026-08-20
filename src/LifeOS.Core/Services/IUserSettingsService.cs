@@ -10,4 +10,8 @@ public interface IUserSettingsService
     Task UpdateTimeZoneAsync(
         string timeZoneId,
         CancellationToken cancellationToken = default);
+
+    Task UpdateCurrencyAsync(
+        string currency,
+        CancellationToken cancellationToken = default);
 }

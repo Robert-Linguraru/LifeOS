@@ -79,18 +79,63 @@
                 </button>
             </EditForm>
         </section>
+
+        <section aria-labelledby="finance-heading">
+            <h2 id="finance-heading">Finance</h2>
+
+            <p>Choose the currency used to display Finance amounts. Changing it does not convert existing values.</p>
+
+            <EditForm Model="_model" OnValidSubmit="SaveCurrencyAsync">
+                <DataAnnotationsValidator />
+
+                @if (_currencySaveError is not null)
+                {
+                    <div class="error-message" role="alert">@_currencySaveError</div>
+                }
+
+                @if (_currencySaveMessage is not null)
+                {
+                    <div class="success-message" role="status">@_currencySaveMessage</div>
+                }
+
+                <div class="form-field">
+                    <label for="currency">Currency</label>
+                    <InputSelect id="currency"
+                                 class="form-control"
+                                 @bind-Value="_model.Currency"
+                                 disabled="@_isCurrencySaving">
+                        @foreach (var currency in SupportedCurrencies)
+                        {
+                            <option value="@currency">@currency</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => _model.Currency" />
+                </div>
+
+                <button type="submit"
+                        class="primary-button"
+                        disabled="@_isCurrencySaving">
+                    @(_isCurrencySaving ? "Saving..." : "Save currency")
+                </button>
+            </EditForm>
+        </section>
     }
 </div>
 
 @code {
     private readonly TimeZoneSettingsModel _model = new();
+    private static readonly IReadOnlyList<string> SupportedCurrencies =
+        ["USD", "EUR", "GBP", "RON"];
     private IReadOnlyList<string> _timeZoneIds = [];
     private UserSettingsDto? _settings;
     private string? _loadError;
     private string? _saveError;
     private string? _saveMessage;
+    private string? _currencySaveError;
+    private string? _currencySaveMessage;
     private bool _isLoading = true;
     private bool _isSaving;
+    private bool _isCurrencySaving;
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,12 +148,15 @@
         _loadError = null;
         _saveError = null;
         _saveMessage = null;
+        _currencySaveError = null;
+        _currencySaveMessage = null;
 
         try
         {
             _timeZoneIds = DateTimeProvider.GetTimeZoneIds();
             _settings = await UserSettingsService.GetCurrentUserSettingsAsync();
             _model.TimeZoneId = _settings.TimeZoneId;
+            _model.Currency = _settings.Currency;
         }
         catch (Exception)
         {
@@ -117,6 +165,34 @@
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task SaveCurrencyAsync()
+    {
+        _isCurrencySaving = true;
+        _currencySaveError = null;
+        _currencySaveMessage = null;
+
+        try
+        {
+            await UserSettingsService.UpdateCurrencyAsync(_model.Currency);
+            _settings = await UserSettingsService.GetCurrentUserSettingsAsync();
+            _model.TimeZoneId = _settings.TimeZoneId;
+            _model.Currency = _settings.Currency;
+            _currencySaveMessage = "Currency saved.";
+        }
+        catch (ValidationException exception)
+        {
+            _currencySaveError = exception.Message;
+        }
+        catch (Exception)
+        {
+            _currencySaveError = "Currency could not be saved. Please try again.";
+        }
+        finally
+        {
+            _isCurrencySaving = false;
         }
     }
 
