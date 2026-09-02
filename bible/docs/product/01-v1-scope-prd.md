@@ -206,30 +206,24 @@ These decisions remove ambiguity before implementation:
 - V1 reminders are one-time in-app reminders only.
 - V1 UI pages use services for feature workflows.
 
-## 6. V1 out of scope
+## 6. Deferred from the approved operational V1 roadmap
 
-The following modules remain part of the product vision but are out of scope for V1 implementation:
+In this document, the completed M0-M7 baseline and the approved M8-M13 roadmap together define the operational V1 product. Fitness, Nutrition, Health, Calendar, and the M13 UI/UX overhaul are planned V1 work, not out of scope. The following remain deferred beyond that roadmap:
 
-- Sleep tracking;
-- health markers;
 - selected-day, weekly, and monthly habit frequencies;
 - advanced daily score across all life domains;
-- workout plan builder;
-- workout session logger;
-- progressive overload tracker;
+- multi-week workout programming, periodization, automated progression, RPE/RIR, and custom exercises;
 - body metrics and progress photos;
-- nutrition logging;
 - meal prep planner;
 - study tracker;
 - project tracker;
 - Pomodoro/focus timer;
-- wellbeing daily check-in;
 - journal;
 - weekly intentions;
 - AI assistant;
 - weekly AI review;
 - cross-domain correlation engine;
-- Garmin import;
+- Garmin, Strava, wearable, and other device imports;
 - finance imports;
 - subscriptions;
 - savings goals;
@@ -238,7 +232,7 @@ The following modules remain part of the product vision but are out of scope for
 - offline-first support;
 - public multi-user/social features.
 
-Out of scope does not mean deleted. These modules are preserved in the roadmap and backlog.
+Deferred does not mean deleted. These modules are preserved as future work in the canonical roadmap and backlog.
 
 ## 7. V1 user stories
 
@@ -285,99 +279,19 @@ V1 is successful if:
 - migrations work from a clean database;
 - future modules can be added without major restructuring.
 
-## 9. Version roadmap themes
+## 9. Approved post-M7 roadmap
 
-Separate V2 and V3 PRDs should not be fully locked before V1 is used. However, the following release themes preserve the long-term direction.
+M0–M7 are complete. The approved remaining sequence is:
 
-### 9.1 V1.1 - Lightweight life logs
+1. M8 — Strength & Calisthenics Training;
+2. M9 — Activity & Fitness Progression;
+3. M10 — Nutrition;
+4. M11 — Health;
+5. M12 — Calendar;
+6. M13 — V1 UI/UX Overhaul & Polish;
+7. M14 — Analytics.
 
-Candidate modules:
-
-- daily wellbeing check-in;
-- basic sleep log;
-- simple journal;
-- weekly intentions.
-
-Purpose:
-
-- add subjective and recovery data;
-- improve future daily score;
-- prepare data for AI reviews.
-
-### 9.2 V2 - Training and physique foundation
-
-Candidate modules:
-
-- workout plan builder;
-- session logger;
-- progressive overload tracker;
-- exercise library;
-- body metrics;
-- phase tagging.
-
-Purpose:
-
-- support the user's gym and aesthetic physique goals;
-- create high-value structured performance data.
-
-### 9.3 V2.5 - Nutrition and meal prep
-
-Candidate modules:
-
-- meal logging;
-- estimated macros;
-- protein/calorie/water targets;
-- meal templates;
-- meal prep planner.
-
-Purpose:
-
-- connect nutrition to fitness and body metrics;
-- keep tracking practical without building a full food database.
-
-### 9.4 V3 - Study, projects, and focus
-
-Candidate modules:
-
-- study subjects;
-- weekly targets;
-- study sessions;
-- personal projects;
-- project work sessions;
-- Pomodoro/focus timer;
-- neglect detection.
-
-Purpose:
-
-- support university work, internships, and personal project consistency.
-
-### 9.5 V4 - AI assistant and cross-domain insight
-
-Candidate modules:
-
-- AI chat;
-- weekly review;
-- data-aware recommendations;
-- confidence-aware insights;
-- finance summaries;
-- physique reports;
-- study/project summaries;
-- correlation engine.
-
-Purpose:
-
-- turn accumulated structured data into useful reflection and recommendations.
-
-### 9.6 Later - Advanced integrations
-
-Candidate modules:
-
-- finance imports;
-- Garmin import;
-- export/reporting;
-- offline capture;
-- multi-user support;
-- external notification channels.
+`16-post-m7-domain-roadmap.md` is the canonical requirements source for these planned milestones. The product principle is to capture high-quality structured data and implement useful deterministic domain capabilities before deeper analytics or AI. AI is future work after Analytics and has no assigned milestone number.
 
 ## 10. Product decision log
 
@@ -393,9 +307,9 @@ V1 finance is manual tracking only. Complex finance features are future backlog 
 
 AI is not in V1 because the app needs clean data first.
 
-### Decision 4 - Future modules preserved
+### Decision 4 - Planned and future modules preserved
 
-Sleep, health, fitness, nutrition, body metrics, study, projects, wellbeing, AI, Garmin, and advanced finance remain part of the official product vision and backlog.
+Fitness is approved for M8-M9, Nutrition for M10, Health for M11 including body weight, sleep, and structured wellbeing, Calendar for M12, UI/UX overhaul and polish for M13, and Analytics for M14. Broader body metrics, study, projects, journals, AI, Garmin/device integrations, advanced Finance, and other deferred ideas remain future work in the official product vision and backlog.
 
 ### Decision 5 - Daily habits only in V1
 

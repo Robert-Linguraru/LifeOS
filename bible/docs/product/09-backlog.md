@@ -8,12 +8,10 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 
 ## 2. Status labels
 
-- `V1` - required for first rebuild.
-- `V1.1` - likely next after V1.
-- `V2` - major post-V1 module.
-- `V3` - later expansion.
-- `V4` - AI and advanced insight layer.
+- `Completed` - implemented and verified through M7.
+- `Planned M8` through `Planned M14` - approved roadmap work in the stated milestone.
 - `Future` - preserved, not scheduled yet.
+- `V1.1`, `V2`, `V2.5`, `V3`, `V4`, and `V5` - legacy historical labels only; they are not current planning statuses.
 
 ## 3. V1 backlog
 
@@ -50,14 +48,14 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 
 ### Habits
 
-- `Completed — Milestone 4` Habit create, read, update, and archive workflows.
-- `Completed — Milestone 4` Active/archive lifecycle using `IsActive`; no restore/reactivate or user-facing delete.
-- `Completed — Milestone 4` Daily habits only.
-- `Completed — Milestone 4` Binary completion with optional quantity-target metadata and no achieved-quantity entry.
-- `Completed — Milestone 4` Immutable HabitLog.
-- `Completed — Milestone 4` Unique `(UserId, HabitId, CompletionDate)` constraint with idempotent duplicate completion.
-- `Completed — Milestone 4` Basic current daily streak and newest-first completion history.
-- `Completed — Milestone 4` Dashboard Habit widget with completion progress.
+- `Completed â€” Milestone 4` Habit create, read, update, and archive workflows.
+- `Completed â€” Milestone 4` Active/archive lifecycle using `IsActive`; no restore/reactivate or user-facing delete.
+- `Completed â€” Milestone 4` Daily habits only.
+- `Completed â€” Milestone 4` Binary completion with optional quantity-target metadata and no achieved-quantity entry.
+- `Completed â€” Milestone 4` Immutable HabitLog.
+- `Completed â€” Milestone 4` Unique `(UserId, HabitId, CompletionDate)` constraint with idempotent duplicate completion.
+- `Completed â€” Milestone 4` Basic current daily streak and newest-first completion history.
+- `Completed â€” Milestone 4` Dashboard Habit widget with completion progress.
 - `Milestone 5` Habit completion XP integration.
 - `Milestone 6` Habit reminder integration.
 
@@ -113,7 +111,24 @@ browser automation remain future scope.
 - `V1` Error handling.
 - `V1` Clean install verification.
 
-## 4. V1.1 backlog - lightweight life logs
+## 4. Authoritative post-M7 backlog
+
+The approved sequence and detailed requirements are in `16-post-m7-domain-roadmap.md`.
+
+- `Planned M8` Shared strength/calisthenics Exercise Library, templates, persistent active sessions, logging modes, working/warm-up sets, substitutions/skips, rest timer, history, and session completion.
+- `Planned M9` Activity records, steps, sports/other activity, PRs, performance Fitness Goals, unified read-projection history, operational summaries, and Fitness widget.
+- `Planned M10` Seeded/custom foods, immutable historical food logs, reusable meals, quick add, macro/water targets, hydration, simple supplements, summaries, and Nutrition widget.
+- `Planned M11` Health-owned weight, sleep, structured wellbeing, history, simple summaries/goals, and Health widget.
+- `Planned M12` Native Calendar Events and Month/Week/Day projections for dated domain records; no workout scheduling, Finance projection, or Calendar widget.
+- `Planned M13` Cross-product V1 UI/UX overhaul and polish.
+- `Planned M14` Deterministic domain and justified cross-domain analytics after real data accumulation.
+- `Future` AI after Analytics; Accolades/Achievements; external/device integrations; advanced Finance; study/projects/focus; exports, offline support, and Identity.
+
+## 5. Historical legacy backlog (superseded)
+
+The remaining sections preserve older ideas for reference only. Their `V1.1`, `V2`, `V2.5`, `V3`, `V4`, and `V5` labels are obsolete and must not be used for planning or implementation. Where they conflict with the authoritative post-M7 backlog or canonical requirements, the latter wins.
+
+### Legacy lightweight life logs
 
 ### Habit schedule expansion
 

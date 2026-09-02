@@ -323,32 +323,32 @@ Future AI features need qualitative review plus structured checks for:
 
 - Sleep duration calculates correctly across midnight.
 - Sleep date uses user local date.
-- Manual and imported records do not conflict unexpectedly.
-- Weekly average is correct.
+- Backfilled manual entries retain their selected date.
+- Structured wellbeing values are validated; Health does not accept medical/vital fields in M11.
 
 ### 13.2 Fitness
 
-- Workout plan can be created.
-- Only one active plan per user.
-- Session logs sets correctly.
-- Total volume calculation is correct.
-- Bodyweight exercises allow null weight.
-- PR detection works.
-- Stall detection triggers only after defined threshold.
+- Active strength sessions persist across application return.
+- Template edits never rewrite completed session snapshots.
+- Logging modes accept only their appropriate measurements; warm-up sets do not generate PRs.
+- Session substitutions/skips are historical truth.
+- Derived PRs are recalculated after Fitness corrections/deletions; assisted-weight sets have no V1 PR.
+- Running PRs require actual recorded standard-distance evidence; no longer-run inference.
+- Unified history is a read projection across domain records, not a duplicate timeline table.
 
 ### 13.3 Body metrics
 
-- Weight trend uses correct dates.
-- Measurement deltas are correct.
-- Phase tag applies to correct period.
-- Progress photo metadata is stored without exposing private paths.
+- Health-owned body weight uses correct selected dates and supports safe backfill.
+- Current weight and 30-day change use authoritative Health entries.
+- Body measurements, physique phases, and photos remain deferred.
 
 ### 13.4 Nutrition
 
-- Meal macros sum correctly by day.
-- Protein target progress is correct.
-- Meal template quick-add creates expected meal entry.
-- Meal prep planned versus actual is correct.
+- Food-log macros sum correctly by date and meal grouping.
+- Editing a reusable Food does not alter historical Food Log entries.
+- Reusable-meal logging creates constituent historical food entries.
+- Hydration increments, target comparisons, and Taken/Not Taken supplements behave correctly.
+- Barcode, external databases, dosage/pill tracking, and meal-prep planning remain deferred.
 
 ### 13.5 Study/projects
 
@@ -361,17 +361,13 @@ Future AI features need qualitative review plus structured checks for:
 ### 13.6 Wellbeing/journal
 
 - One daily wellbeing record per user/date.
-- Mood, energy, stress must be 1-5.
+- M11 wellbeing accepts only its documented structured Energy, Mood, Stress, and Overall values.
 - Journal text is private and user-scoped.
 - Weekly intention is unique per user/week.
 
 ### 13.7 AI
 
-- AI uses only current user's data.
-- AI states time period used.
-- AI identifies low sample size.
-- AI avoids medical/financial certainty.
-- AI explains the basis for recommendations.
+- AI has no M8–M14 implementation requirement. When separately approved after Analytics, it must be user-scoped, data-grounded, and avoid medical/financial certainty.
 
 ### 13.8 Advanced finance
 

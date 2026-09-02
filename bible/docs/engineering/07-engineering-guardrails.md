@@ -8,11 +8,9 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 
 ## 2. Product scope guardrails
 
-- Do not build outside V1 without explicit approval.
-- Do not add AI in V1.
-- Do not add bank import in V1.
-- Do not add browser push in V1.
-- Do not add workout, nutrition, study, body metrics, or Garmin modules in V1.
+- Implement M8-M14 only in their approved sequence and according to `16-post-m7-domain-roadmap.md`.
+- Do not add AI, bank import, browser push, Garmin/device integrations, advanced body metrics, journal/weekly intentions, study/projects, or focus modules without separately approved future scope.
+- Do not implement Fitness, Nutrition, Health, or Calendar capabilities before their owning milestone.
 - Do not add selected-day habits in V1.
 - Do not add the DailyScore engine in V1.
 - Do not delete future modules from the official roadmap just because they are not in V1.
@@ -101,7 +99,7 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 - Do not build savings projections in V1.
 - Do not build net worth in V1.
 - Finance summaries must group by transaction date, not created date.
-- Finance calculations must not double-count planned allowance/income and income transactions.
+- Finance calculations must use manual income and expense transactions only in M7; plans and allowances do not exist.
 - Money must use decimal, not floating point.
 - AI finance commentary is future scope and must not sound like professional financial advice.
 
@@ -120,21 +118,20 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 
 ### 11.1 Fitness
 
-- Do not add workout features until core task/habit/XP patterns are stable.
-- Session logging must model sets properly.
-- Progressive overload requires reliable historical data.
+- M8 uses one Exercise Library for strength and calisthenics; do not create a separate calisthenics domain.
+- Active workouts must persist outside Blazor component memory; completed sessions are immutable historical snapshots.
+- Templates are reusable recipes, not multi-week programs; do not add RPE/RIR, custom exercises, device schemas, or generic metrics.
+- M9 unified Fitness history is a read projection, not a duplicate persistence table. PRs derive from Working-set/activity evidence and Fitness Goals are performance outcomes, not cumulative/frequency challenges.
 
 ### 11.2 Body metrics
 
-- Progress photos need a storage abstraction.
-- Body analysis must avoid medical certainty.
-- Phase context matters for interpreting trends.
+- M11 Health owns body weight. Measurements, physique phases, and photos remain future work.
+- Do not add medical interpretation, vitals, diagnoses, readiness scores, or device sync.
 
 ### 11.3 Nutrition
 
-- Keep nutrition practical.
-- Do not build a full food database unless explicitly decided later.
-- Estimated macros are acceptable.
+- M10 Food definitions and historical Food Log Entries are distinct; reusable-food edits cannot rewrite historical intake.
+- Keep Nutrition practical: no barcode/external food database, deep micronutrients, prescriptions, supplement dosage/pill tracking, or generic conversions.
 
 ### 11.4 Study/projects
 
@@ -148,8 +145,14 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 
 ### 11.6 Garmin
 
-- Imported and manual records must be distinguishable.
-- Imports must preview before mutating lots of data.
+- Garmin, Strava, wearables, health platforms, imported data, and associated provenance/synchronization/deduplication schemas are future work.
+
+### 11.7 Calendar and Analytics
+
+- M12 Calendar owns native Events only. It projects dated domain records without duplicating them, does not schedule workouts, and does not project ordinary Finance transactions.
+- Calendar has no Dashboard widget; its Day navigation delegates to originating domains.
+- M14 Analytics follows accumulated data and M13 UI/UX polish. Do not add generic analytics infrastructure before M14.
+- AI is future work after Analytics and has no milestone number.
 
 ## 12. Testing guardrails
 
@@ -163,7 +166,7 @@ Minimum V1 test areas:
 - daily XP cap;
 - reminder local-time conversion;
 - reminder idempotent firing;
-- finance monthly totals and remaining-balance formula;
+- finance monthly income, expenses, and net-cash-flow formula;
 - migration from clean database.
 
 ## 13. Documentation guardrails

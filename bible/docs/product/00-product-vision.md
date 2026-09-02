@@ -214,49 +214,31 @@ Long-term system elements include:
 
 Milestone 5 includes the append-only XP ledger, user progression, task/habit Quest XP, a shared 500-XP daily cap, exact levels and echelons, and transition metadata. It does not create persisted notifications or add a global/header XP chip. Notification persistence belongs to Milestone 6. The full DailyScore engine should wait until more life-domain modules exist; V1 should not create misleading zero-based daily scores for modules that are not implemented.
 
-### 6.7 Sleep and health
+### 6.7 Health
 
-Sleep and health tracking should eventually provide the base for energy and readiness analysis.
+M11 Health is deliberately manual, lightweight, and non-medical. It owns authoritative body weight, sleep, and daily wellbeing. Sleep captures bedtime, wake time, calculated duration, and optional categorical quality. The rapid wellbeing check-in captures categorical Energy, Mood, Stress, and Overall values as defined in the canonical roadmap. Medical data, caffeine/symptom markers, readiness scoring, device-derived health data, and trend/correlation analytics remain future work.
 
-Long-term capabilities include:
+### 6.8 Fitness
 
-- sleep duration;
-- bedtime;
-- wake time;
-- sleep quality;
-- energy level;
-- caffeine indicator;
-- symptoms or custom markers;
-- weekly sleep averages;
-- trend charts;
-- correlation with workouts, mood, study, and task completion;
-- Garmin import compatibility later.
-
-This module is not required for V1. It should be added once the core daily system is stable.
-
-### 6.8 Fitness and progressive overload
-
-Fitness is a high-priority future module.
+Fitness is a high-priority planned domain, beginning with M8 Strength & Calisthenics Training and broadening in M9 Activity & Fitness Progression.
 
 Long-term capabilities include:
 
-- workout plan builder;
-- named plans such as Push Pull Legs or custom phases;
-- training days with labels such as Push, Pull, Legs, Upper, Lower, Rest, or Custom;
-- planned exercises with target sets, reps, and weights;
+- one shared gym/strength and calisthenics Exercise Library;
+- reusable workout templates rather than multi-week programs;
+- mode-appropriate set logging and persisted active sessions;
 - session logging;
 - set-level logging;
-- gym and home workout support;
+- gym and calisthenics support through the same domain architecture;
 - bodyweight exercise support;
 - rest timer;
 - notes;
 - total volume calculation;
 - personal record detection;
-- stall detection;
-- lift history charts;
-- AI suggestions for deloads, exercise changes, or volume changes.
+- exercise history, derived PRs, and performance Fitness Goals;
+- M9 running, walking, steps, sports, and other activity.
 
-This module should not be squeezed into V1. It deserves its own milestone because it has complex data and UX.
+Templates are recipes and completed sessions are historical truth. Programming, RPE/RIR, custom exercises, device data, advanced analytics, and AI coaching are deferred.
 
 ### 6.9 Body metrics and physique tracking
 
@@ -275,9 +257,9 @@ Long-term capabilities include:
 - monthly physique progress reports;
 - AI analysis with phase context.
 
-This should be built after the fitness and nutrition foundations are stable.
+Health owns authoritative body weight in M11. Broader physique measurements, photos, and phase tracking are future work.
 
-### 6.10 Nutrition and meal prep
+### 6.10 Nutrition
 
 Nutrition should stay practical and not become a full food database in early versions.
 
@@ -294,7 +276,7 @@ Long-term capabilities include:
 - nutrition contribution to daily score;
 - correlations with training, energy, and body metrics.
 
-V1 does not include this module. It should be a later physique-support module.
+M10 Nutrition is a practical food/macro/hydration/supplement tracker with seeded/custom foods, historical food logs, reusable meals, targets, and operational summaries. It does not recreate a full food database, meal-planning platform, or prescription system.
 
 ### 6.11 Finance
 
@@ -367,25 +349,15 @@ Long-term capabilities include:
 
 This module can be added before or alongside study/project tracking.
 
-### 6.14 Wellbeing, daily log, journal, and weekly intentions
+### 6.14 Journal and weekly intentions
 
-Wellbeing provides subjective context for AI and reflection.
+M11 includes structured daily wellbeing; it is not a separate Wellbeing module. Free-form journals, guided prompts, draining-factor notes, and weekly intentions remain future work and require their own approved scope. They must not be treated as an M11 requirement or automatic AI context.
 
-Long-term capabilities include:
+### 6.15 Calendar, Analytics, and AI
 
-- daily mood score from 1 to 5;
-- daily energy score from 1 to 5;
-- daily stress score from 1 to 5;
-- free-form daily journal;
-- optional guided prompts;
-- quick field: what drained me today;
-- Monday weekly intentions;
-- Sunday review of intentions;
-- AI correlation with sleep, study, spending, workouts, and habits.
+M12 Calendar is a first-class temporal overview. It owns native Calendar Events and projects dated authoritative records from other domains without duplicating their persistence; it does not schedule workouts or project ordinary Finance transactions. M13 then reviews the operational modules as one product. M14 Analytics follows real data accumulation and begins with deterministic domain analytics before justified cross-domain analysis.
 
-This module is a strong candidate for V1.1 because it is low complexity and high AI value, but it is not required for the V1 foundation.
-
-### 6.15 AI assistant and insight engine
+AI is future work after Analytics; it has no milestone number. It should consume structured data and deterministic domain/analytics capabilities rather than calculate raw histories itself.
 
 AI should be added only after clean data exists.
 
@@ -402,7 +374,7 @@ Long-term capabilities include:
 - study neglect alerts;
 - cross-domain correlation insights.
 
-AI should not be built in V1. The architecture should prepare for it, but the implementation should wait.
+AI is not part of the M8-M14 implementation roadmap. Its architecture and implementation wait for separately approved post-Analytics scope.
 
 ### 6.16 PWA and mobile strategy
 
@@ -460,7 +432,7 @@ Long-term analytics should include:
 
 This should come after enough real data exists.
 
-## 7. Product success criteria by phase
+## 7. Product success criteria by approved roadmap phase
 
 ### 7.1 V1 success
 
@@ -474,30 +446,17 @@ V1 succeeds if:
 - data integrity is strong;
 - the codebase is clean enough to add modules later.
 
-### 7.2 V1.1 success
+### 7.2 M8-M12 success
 
-V1.1 succeeds if:
+M8-M12 succeed when LifeOS captures useful structured Fitness, Nutrition, Health, and Calendar data through clear domain ownership, without premature generic analytics, AI, or integration architecture.
 
-- the system adds one or two lightweight life logs without destabilizing the core;
-- sleep/wellbeing or similar modules feed future daily score calculations;
-- dashboard widgets can be extended without becoming cluttered.
+### 7.3 M13 success
 
-### 7.3 V2 success
+M13 succeeds when the completed operational domains work together as one accessible, responsive, low-friction product.
 
-V2 succeeds if:
+### 7.4 M14 and later success
 
-- the app supports fitness, body metrics, or study tracking as a dedicated module;
-- new modules follow the same service, data, and UX patterns as V1;
-- cross-domain data starts becoming useful without AI overreach.
-
-### 7.4 V3 success
-
-V3 succeeds if:
-
-- AI can reference reliable historical data;
-- weekly reviews are actually useful;
-- insights are explainable and confidence-aware;
-- the app starts feeling like an assistant, not just a tracker.
+M14 succeeds when deterministic analytics answer real questions from accumulated historical data. AI remains later future work and succeeds only when it can use those deterministic capabilities safely and explainably.
 
 ## 8. What this vision document protects
 

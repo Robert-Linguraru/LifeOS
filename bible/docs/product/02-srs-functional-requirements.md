@@ -7,7 +7,7 @@ This document defines how LifeOS should behave. It separates V1 requirements fro
 Requirement labels:
 
 - `V1` means required for the first rebuilt version.
-- `V1.1` means likely next after V1, but not required for first release.
+- `M8` through `M14` mean planned work in the approved milestone; detailed planned requirements are canonical in `16-post-m7-domain-roadmap.md`.
 - `Future` means preserved in the official roadmap but not part of V1.
 
 ## 2. Global system requirements
@@ -261,52 +261,19 @@ analytics, trends, comparisons, simple budgets, savings goals, recurring
 expenses, category management, imports, or AI summaries. None are M7
 requirements, and no M7 schema is reserved for them.
 
-## 9. Sleep and health requirements
+## 9. M8–M12 domain requirements
 
-- `Future` The system shall allow sleep entry creation and editing.
-- `Future` Sleep entries shall include sleep date, bedtime, wake time, duration, and quality.
-- `Future` The system shall allow energy rating and optional caffeine indicator.
-- `Future` The system shall allow custom health markers.
-- `Future` The system shall display weekly sleep averages.
-- `Future` The system shall support manual entries and imported Garmin-derived entries.
-- `Future` Sleep and health data may contribute to daily score.
+The canonical planned requirements are in `16-post-m7-domain-roadmap.md`. M8 requires one shared strength/calisthenics exercise library, reusable templates, persisted active/historical sessions, mode-appropriate sets, warm-up/working distinction, substitutions/skips, prior performance, rest timer, feeling, and explicit completed/discarded lifecycle. Workout programming, RPE/RIR, custom exercises, and device data are deferred.
 
-## 10. Fitness and progressive overload requirements
+M9 requires domain-specific activity records, optional intensity, read-projected unified history, derived recalculable PRs, performance Fitness Goals, summaries, and a Fitness widget. It excludes GPS/device features, a duplicate timeline, cumulative/frequency Fitness Goals, and advanced analytics.
 
-- `Future` The system shall allow creation of workout plans.
-- `Future` The system shall allow workout plans to contain training days.
-- `Future` The system shall allow training days to contain planned exercises.
-- `Future` The system shall allow workout session logging against a plan or as a free session.
-- `Future` The system shall allow set-level logging with reps, weight, and status.
-- `Future` The system shall support bodyweight exercises without weight fields.
-- `Future` The system shall calculate session duration and total volume.
-- `Future` The system shall track exercise performance over time.
-- `Future` The system shall detect personal records.
-- `Future` The system shall detect stalls after repeated non-progression.
-- `Future` Workout sessions may contribute to daily score and XP.
+M10 requires practical Food/Food Log separation, seeded and custom foods, meal grouping, reusable meals, quick add, targets, hydration, simple supplements, summaries, and its widget. Barcode, external databases, dosage/pill tracking, prescription, and deep analytics are deferred.
 
-## 11. Body metrics and physique requirements
+M11 requires manual Health-owned body weight, sleep, and rapid structured wellbeing, with history and a Health widget. It excludes medical/vital/device features.
 
-- `Future` The system shall allow body weight logging.
-- `Future` The system shall allow body measurements such as chest, waist, hips, arms, thighs, and shoulders.
-- `Future` The system shall allow optional body fat percentage.
-- `Future` The system shall support phase tagging: bulk, cut, maintain.
-- `Future` The system shall display trend lines and deltas.
-- `Future` The system shall calculate rate of weight change.
-- `Future` The system may support progress photo storage.
-- `Future` The AI assistant may generate physique progress reports.
+M12 requires Month/Week/Day views and native Calendar Events. Calendar projects, but never owns or duplicates, dated records from Tasks, Habits, Fitness, Nutrition, and Health. It does not schedule workouts, project ordinary Finance transactions, or require a Dashboard widget.
 
-## 12. Nutrition and meal prep requirements
-
-- `Future` The system shall allow meal logging.
-- `Future` Meal entries shall support estimated protein, carbs, fat, calories, and water.
-- `Future` The system shall support daily nutrition targets.
-- `Future` The system shall support common meal templates.
-- `Future` The system shall support a weekly meal prep planner.
-- `Future` The system shall compare planned and actual meals.
-- `Future` Nutrition logging may contribute to daily score.
-
-## 13. Study and project requirements
+## 10. Study and project requirements
 
 - `Future` The system shall allow study subjects to be defined.
 - `Future` A study subject may have a weekly target.
@@ -318,43 +285,30 @@ requirements, and no M7 schema is reserved for them.
 - `Future` The system shall calculate lifetime hours per project.
 - `Future` The system shall surface neglected subjects or projects.
 
-## 14. Focus session requirements
+## 11. Focus session requirements
 
 - `Future` The system shall provide a configurable Pomodoro timer.
 - `Future` The system shall support focus duration, short break, and long break settings.
 - `Future` Completed focus sessions shall auto-log study or project sessions.
 - `Future` The system shall allow manual session logging without timer.
 
-## 15. Wellbeing and journal requirements
+## 12. Wellbeing and journal requirements
 
-- `V1.1` The system may support daily wellbeing check-in after V1.
-- `Future` The system shall record mood, energy, and stress scores from 1 to 5.
+- `M11` The system shall support the documented structured daily wellbeing check-in; it is not a journal or generic 1–5 score model.
 - `Future` The system shall support a free-form daily journal entry.
 - `Future` The system shall support optional guided prompts.
 - `Future` The system shall support a quick field for what drained the user today.
 - `Future` The system shall support weekly intention setting with three priorities.
 - `Future` Weekly intentions may be reviewed by the AI assistant in a weekly review.
 
-## 16. AI requirements
+## 13. Analytics, AI, and integrations
 
-- `Future` The system shall provide an AI chat interface.
-- `Future` The AI assistant shall answer questions against structured user data.
-- `Future` The AI assistant shall generate weekly reviews.
-- `Future` The AI assistant shall explain which data influenced a recommendation.
-- `Future` The AI assistant shall avoid strong conclusions when data is sparse.
-- `Future` The AI assistant shall distinguish facts from suggestions.
-- `Future` The AI assistant shall avoid professional medical or financial certainty.
-- `Future` AI tool functions shall be exposed through interfaces and not direct database access from prompts.
+- `M14` The system shall add deterministic analytics only after real historical data exists; the design is intentionally deferred.
+- `Future` AI shall follow Analytics, has no milestone number, and shall consume structured data and deterministic capabilities rather than directly querying raw storage.
+- `Future` Garmin, Strava, wearables, health platforms, device data, Google/Outlook/Teams Calendar, large food databases, barcode lookup, and related import/provenance/synchronization schemas require separately approved work.
+- `Future` A cross-domain Accolades/Achievements system may recognize cumulative records; it is distinct from Fitness Goals.
 
-## 17. Garmin and import/export requirements
-
-- `Future` The system shall support Garmin Connect CSV import for sleep data.
-- `Future` The system may support Garmin workout import for cardio sessions.
-- `Future` The system may import HRV and recovery data.
-- `Future` The system shall distinguish manual records from imported records.
-- `Future` The system shall support export of selected data to CSV or JSON.
-
-## 18. Service boundary requirements
+## 14. Service boundary requirements
 
 - `V1` Task workflows shall be exposed through a task service.
 - `V1` Habit workflows shall be exposed through a habit service.

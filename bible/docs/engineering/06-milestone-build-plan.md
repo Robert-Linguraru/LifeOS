@@ -129,7 +129,7 @@ Done when:
 
 ## Milestone 4 - Habits vertical slice
 
-Status: Complete � Ticket 16 verification passed
+Status: Complete — Ticket 16 verification passed
 
 Goal: habits and completion logs work reliably.
 
@@ -385,133 +385,47 @@ Done when:
 - no import features are added;
 - build/tests pass.
 
-## Milestone 8 - Fitness and Nutrition domain foundations
+## Milestone 8 - Strength & Calisthenics Training
 
-Goal: deliberately establish the Fitness and Nutrition domains before the
-eventual major V1 UI/UX overhaul and polish.
+Goal: establish the shared, deep strength/calisthenics Fitness foundation: seeded Exercise Library, reusable workout templates, persisted active sessions, mode-appropriate set logging, warm-up/working set distinction, substitutions/skips, history/previous performance, rest timer, session feeling, and completed/discarded lifecycle.
 
-Scope:
+Done when historical completed sessions are immutable snapshots, active progress survives application closure, templates remain reusable recipes, and Fitness V1 does not introduce programming, RPE/RIR, custom exercises, device integrations, or generic metric infrastructure.
 
-- Fitness and Nutrition domain contracts and implementation scope;
-- approved persistence and service slices for those domains;
-- focused testing and Dashboard implications as separately specified.
+## Milestone 9 - Activity & Fitness Progression
 
-Done when:
+Goal: add runs/sprints/intervals, walking, daily steps, sport/other activities, optional intensity, derived PRs, performance Fitness Goals, unified read-projection history, operational summaries, and Fitness Dashboard widget.
 
-- Fitness and Nutrition milestones are complete and validated;
-- the subsequent V1 UI/UX overhaul has an approved scope.
+Done when historical corrections maintain PR/goal consistency and the milestone does not create cumulative activity Goals, GPS/device features, a duplicate Fitness timeline, or advanced analytics.
 
-The major V1 UI/UX polish pass follows the Fitness and Nutrition milestones;
-its detailed scope is not invented here.
+## Milestone 10 - Nutrition
 
-## 4. Future milestones
+Goal: add practical food/macro logging, seeded/custom food definitions, historical food logs, meals, reusable meals, quick add, targets, hydration, supplements, summaries, and Dashboard widget.
 
-## V1.1 - Lightweight life logs
+Done when logging is frictionless and historical nutrition truth remains independent from edited reusable food definitions; barcode, external databases, prescriptions, and deep analytics remain deferred.
 
-Candidate scope:
+## Milestone 11 - Health
 
-- daily wellbeing check-in;
-- basic sleep logging;
-- simple journal;
-- weekly intentions;
-- dashboard widgets for these modules;
-- first DailyScore implementation using configured modules only.
+Goal: add lightweight manual body weight, sleep, and structured daily wellbeing with history, simple summaries, goals where specified, and a Dashboard projection.
 
-Purpose:
+Done when Health remains non-medical and low-friction; vitals, diagnoses, wearable sync, and readiness scoring are absent.
 
-- capture high-signal subjective and recovery data;
-- prepare for AI weekly review.
+## Milestone 12 - Calendar
 
-## V2 - Fitness and progressive overload
+Goal: add Month (default), Week, and Day Calendar views and native Events, then project dated Task, Habit, Fitness, Nutrition, and Health records without changing their ownership.
 
-Candidate scope:
+Done when Calendar owns only Events, uses navigation rather than duplicate workflows, does not schedule workouts, and does not project ordinary Finance transactions.
 
-- exercise library;
-- workout plan builder;
-- workout days;
-- planned exercises;
-- session logger;
-- set logging;
-- rest timer;
-- PR detection;
-- stall detection;
-- lift charts;
-- workout dashboard widget.
+## Milestone 13 - V1 UI/UX Overhaul & Polish
 
-Purpose:
+Goal: review all operational V1 modules as one product, improving navigation, responsive/mobile use, consistency, Dashboard composition, forms, states, accessibility, histories, landing pages, design language, and friction.
 
-- support gym programming and aesthetic physique goals.
+## Milestone 14 - Analytics
 
-## V2.5 - Body metrics and nutrition
+Goal: after real data has accumulated, introduce useful deterministic domain analytics and then justified cross-domain analysis. Do not design the complete analytics architecture before this milestone. AI is later future work, not a numbered milestone.
 
-Candidate scope:
+## 4. Deferred future work
 
-- body weight and measurement logs;
-- phase tagging;
-- progress photo support;
-- nutrition targets;
-- meal logs;
-- meal templates;
-- meal prep planner;
-- physique dashboard.
-
-Purpose:
-
-- connect training, food, and physique progress.
-
-## V3 - Study, projects, and focus
-
-Candidate scope:
-
-- study subjects;
-- weekly targets;
-- study sessions;
-- projects;
-- project work sessions;
-- Pomodoro timer;
-- neglected subject/project alerts;
-- portfolio progress reports.
-
-Purpose:
-
-- support academic consistency and internship readiness.
-
-## V4 - AI assistant and insight engine
-
-Candidate scope:
-
-- AI chat;
-- approved tool functions;
-- weekly review generation;
-- confidence-aware insights;
-- finance summaries;
-- physique reports;
-- study summaries;
-- cross-domain correlations;
-- insight inbox.
-
-Purpose:
-
-- turn clean historical data into recommendations and explanations.
-
-## V5 - Advanced finance and integrations
-
-Candidate scope:
-
-- Revolut CSV import;
-- Raiffeisen CSV/XLS import;
-- import preview;
-- duplicate detection;
-- budgets;
-- subscriptions;
-- savings goals;
-- net worth snapshots;
-- Garmin imports;
-- export/reporting.
-
-Purpose:
-
-- add automation after manual systems are trusted.
+`16-post-m7-domain-roadmap.md` is canonical for M8–M14 and deferred scope. Future work includes AI after Analytics, Accolades/Achievements, study/projects/focus, advanced Finance, device/external integrations, external calendars, food databases/barcode lookup, exports, offline support, and Identity. None has a post-M7 milestone number unless later approved.
 
 ## 5. Codex ticket breakdown pattern
 

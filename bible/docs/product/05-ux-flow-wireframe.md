@@ -40,19 +40,16 @@ Secondary navigation or header elements:
  - Notification bell
 - Profile/settings menu
 
-### 3.2 Future navigation
+### 3.2 Planned and deferred navigation
 
-Future modules may add:
+The approved M8-M12 navigation modules are:
 
-- Sleep/Health
-- Fitness
-- Body Metrics
-- Nutrition
-- Study
-- Projects
-- Wellbeing/Journal
-- AI Assistant
-- Reports/Insights
+- Fitness;
+- Nutrition;
+- Health;
+- Calendar.
+
+Journal, broader Body Metrics, Study, Projects, AI, and Reports/Insights are future concepts. They are not planned navigation modules in M8-M14.
 
 Navigation should support module groups so the sidebar does not become too long.
 
@@ -317,222 +314,25 @@ Settings sections:
 
 Time zone setting must be obvious because reminders depend on it.
 
-## 11. Future module UX flows
+## 11. Planned M8–M12 UX flows
 
-### 11.1 Sleep and health flow
+Detailed planned requirements are canonical in `16-post-m7-domain-roadmap.md`.
 
-Future screens:
+### 11.1 Fitness
 
-- Sleep log
-- Sleep trends
-- Health markers
+Fitness uses a dedicated active-workout logger rather than generic CRUD: choose a template or Custom Workout, log mode-appropriate sets, see prior performance, use a rest timer, substitute/skip exercises, complete with feeling and summary, then review historical sessions/exercise history. M9 extends the same landing experience with activity entry, PRs, Goals, and unified history. It is not a workout-programming UI.
 
-Daily sleep form:
+### 11.2 Nutrition and Health
 
-- sleep date;
-- bedtime;
-- wake time;
-- quality;
-- energy;
-- notes.
+Nutrition Today combines daily macros, meal-grouped food logs, hydration, supplements, targets, recent/favourites, reusable meals, and Quick Add. Health Today supports rapid weight, sleep, and four-value wellbeing capture; historical review is separate. Both use compact domain-projection Dashboard widgets and avoid medical, barcode, or device workflows.
 
-Dashboard widget:
+### 11.3 Calendar
 
-- last night's sleep;
-- weekly average;
-- target status.
+Calendar defaults to Month and also provides Week/Day. It creates only Events and delegates `+ Task` to the existing task flow with the selected date. Dated Tasks/Habits and recorded Fitness/Nutrition/Health data appear as projections with domain navigation; Calendar does not create workouts, meals, or health data, schedule workouts, or show ordinary Finance transactions.
 
-### 11.2 Fitness and progressive overload flow
+### 11.4 M13, Analytics, and AI
 
-Future screens:
-
-- Workout plans
-- Active plan
-- Start workout
-- Session logger
-- Exercise library
-- Lift history
-
-Workout session wireframe:
-
-```text
-Workout: Push Day
-Exercise 1: Bench Press
-Set | Target | Actual Reps | Weight | Status
-1   | 8      | [ ]         | [ ]    | Completed/Failed/Skipped
-2   | 8      | [ ]         | [ ]    | Completed/Failed/Skipped
-Rest timer
-Notes
-Finish Session
-```
-
-Progressive overload view:
-
-- exercise selector;
-- weight trend;
-- volume trend;
-- PR markers;
-- stall warnings.
-
-### 11.3 Body metrics and physique flow
-
-Future screens:
-
-- Body metrics log
-- Measurement trends
-- Progress photo timeline
-- Phase settings
-
-Entry flow:
-
-- date;
-- weight;
-- measurements;
-- body fat optional;
-- phase;
-- photo optional.
-
-Dashboard widget:
-
-- current weight;
-- weekly change;
-- phase;
-- trend indicator.
-
-### 11.4 Nutrition and meal prep flow
-
-Future screens:
-
-- Daily nutrition
-- Add meal
-- Meal templates
-- Meal prep planner
-- Targets
-
-Daily nutrition wireframe:
-
-```text
-Protein: 120 / 160g
-Calories: 2100 / 2500 kcal
-Water: 1800 / 2500 ml
-Meals:
-- Breakfast
-- Lunch
-- Dinner
-Quick add template
-```
-
-Meal prep planner:
-
-- week selector;
-- planned meals;
-- portions;
-- target days;
-- planned versus actual.
-
-### 11.5 Study and project flow
-
-Future screens:
-
-- Study subjects
-- Study session log
-- Projects
-- Project work log
-- Focus timer
-
-Study flow:
-
-1. Select subject.
-2. Start focus timer or manual session.
-3. Log topic and method.
-4. Session adds to weekly target.
-
-Project flow:
-
-1. Select project.
-2. Start work session.
-3. Log notes and duration.
-4. Project lifetime hours update.
-
-### 11.6 Pomodoro/focus flow
-
-Future timer states:
-
-- ready;
-- focusing;
-- short break;
-- long break;
-- completed;
-- abandoned.
-
-Timer completion creates a study or project session if linked.
-
-### 11.7 Wellbeing and journal flow
-
-Future daily check-in:
-
-```text
-Mood:   1 2 3 4 5
-Energy: 1 2 3 4 5
-Stress: 1 2 3 4 5
-What drained me today? [optional]
-Journal [optional]
-```
-
-Weekly intentions:
-
-- Monday: set three priorities;
-- dashboard: display priorities;
-- Sunday: review alignment.
-
-### 11.8 AI assistant flow
-
-Future AI screens:
-
-- AI chat;
-- weekly review;
-- insight inbox;
-- module reports.
-
-AI response UX rules:
-
-- show time period used;
-- show data basis;
-- show confidence;
-- distinguish suggestion from fact;
-- provide links to relevant records where safe.
-
-### 11.9 Advanced finance flow
-
-Future advanced finance screens:
-
-- import transactions;
-- import preview;
-- duplicate review;
-- budget setup;
-- subscription manager;
-- savings goals;
-- net worth snapshots;
-- AI finance summary.
-
-Import preview flow:
-
-1. Upload file.
-2. Parser extracts rows.
-3. User reviews category suggestions.
-4. Duplicates are highlighted.
-5. User confirms import.
-6. Transactions are created.
-
-### 11.10 Garmin integration flow
-
-Future Garmin flow:
-
-1. User exports data from Garmin Connect.
-2. User imports CSV into LifeOS.
-3. App previews parsed sleep/workout/recovery records.
-4. User confirms import.
-5. Manual and imported records remain distinguishable.
+M13 reviews and polishes the above operational flows as one product. M14 analytics follows real data accumulation. AI is future work after Analytics, not an immediate UI flow.
 
 ## 12. Mobile behavior
 

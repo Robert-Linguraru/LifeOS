@@ -4,7 +4,7 @@
 
 This document defines how LifeOS should be built. It converts the product direction and prototype lessons into concrete engineering rules.
 
-The architecture must support a small V1 while preserving a clean path toward future modules: sleep, health, fitness, body metrics, nutrition, study, projects, wellbeing, AI, Garmin, and advanced finance.
+The architecture must support the completed M0-M7 baseline and the approved M8-M14 roadmap. M11 Health owns body weight, sleep, and structured daily wellbeing; broader body metrics, journals, AI, integrations, study/projects, and advanced Finance remain future work.
 
 ## 2. Recommended stack
 
@@ -20,13 +20,7 @@ V1 stack:
 - Styling: app-owned CSS with dark JARVIS-inspired design system
 - Tests: .NET test project with unit and integration tests where practical
 
-Future stack elements:
-
-- AI orchestration: Semantic Kernel or equivalent abstraction
-- Local model runtime: Ollama or equivalent local model runner
-- Charts: lightweight Blazor charting or JavaScript interop
-- Imports: dedicated parser services per source
-- Garmin: import adapters, not direct dependency in core domain
+Future stack elements must be selected only when a separately approved milestone requires them. M8–M12 must not introduce AI orchestration, external-import adapters, device provenance, or generic analytics infrastructure.
 
 ## 3. Solution structure
 
@@ -89,9 +83,7 @@ Responsibilities:
 - Identity persistence;
 - background job implementations;
 - notification persistence;
-- future import parsers;
-- future AI connectors;
-- external integration adapters.
+- future infrastructure only when separately approved.
 
 ### 3.4 Service placement
 
@@ -237,7 +229,7 @@ All personal records must have `UserId`, including:
 - XP transactions;
 - user progression;
 - finance transactions;
-- future sleep, health, fitness, body, nutrition, study, project, wellbeing, AI, and import records.
+- planned Health, Fitness, Nutrition, Calendar Event, study, project, wellbeing, and future AI records.
 
 ### 7.3 Soft delete
 
@@ -290,8 +282,8 @@ Use these rules:
 - month grouping: use year/month or first day of month as a date-only value;
 - reminder input: parse as local wall-clock time in the user's IANA time zone, then convert to UTC;
 - finance transaction dates: treat as date-only unless a future import source includes a true timestamp;
-- sleep windows: store bedtime/wake time as instants if time zone is known;
-- Garmin imports: store source metadata and imported time zone/offset where available.
+- sleep windows: design M11 manual bedtime/wake-time capture around the documented user-local date and calculate duration deterministically;
+- external imports, source metadata, and provider time-zone/provenance fields: deferred until an integration milestone.
 
 Avoid global timestamp behavior switches as a permanent solution.
 
@@ -307,17 +299,7 @@ V1 background jobs:
 - optional daily cleanup or status update job;
 - no DailyScore job in V1.
 
-Future jobs:
-
-- daily score calculation;
-- streak bonus XP;
-- weekly review generation;
-- AI insight generation;
-- import processing;
-- Garmin import processing;
-- budget alert generation;
-- training stall detection;
-- neglected subject detection.
+Future jobs require a concrete approved feature. M8 rest timers require no background-job architecture. AI, imports, training stall detection, and generic scoring/analytics are deferred.
 
 Rules:
 
@@ -346,19 +328,17 @@ LifeOS.Web/
   Shared/
 ```
 
-Future pages:
+Planned pages are introduced only by their owning milestone:
 
 ```text
 Pages/
-  SleepHealth/
   Fitness/
-  BodyMetrics/
   Nutrition/
-  Study/
-  Projects/
-  Wellbeing/
-  AI/
+  Health/
+  Calendar/
 ```
+
+Body Metrics, Journal, Study, Projects, AI, and integration pages are future concepts, not planned M8-M14 page contracts.
 
 Reusable UI components should be created for:
 
@@ -405,59 +385,39 @@ Future Finance may add richer personal-finance capabilities through separately
 approved milestones. M7 does not define import, budget, analytics, or
 accounting architecture in advance.
 
-## 13. AI architecture
+## 13. Analytics and AI boundary
 
-AI is future scope but should be architecturally anticipated.
-
-Rules for future AI:
-
-- AI does not query the database directly.
-- AI receives data through approved service functions.
-- AI responses should cite or describe data basis.
-- AI should include confidence when sample size is low.
-- AI should not create, update, or delete data without explicit user confirmation.
-- AI prompts should be scoped to current user and relevant time range.
-
-Future AI modules may include:
-
-- chat service;
-- insight generator;
-- weekly review service;
-- module-specific report generators;
-- prompt templates;
-- model provider abstraction;
-- local model connector;
-- hosted model connector if ever needed.
+M14 is the first Analytics milestone and follows a period of accumulated real data. Its detailed architecture is deliberately undecided. AI is later future work, with no milestone number. When approved, it must consume structured LifeOS data, deterministic domain capabilities, deterministic analytics, and retrieval/query capabilities rather than raw-history prompts or direct database access. No AI services, provider abstractions, fields, or orchestration are introduced in M8–M14 planning.
 
 ## 14. Future module extensibility
 
-### 14.1 Sleep and health
+### 14.1 Health
 
-Design with manual and imported data sources in mind. Use nullable fields where imported devices provide more data than manual logs.
+M11 is manual, lightweight, and non-medical: body weight, sleep, and structured daily wellbeing. Device-derived data, medical metrics, and imported-data schemas are deferred.
 
 ### 14.2 Fitness
 
-Exercise and session logging requires careful relational design. Avoid stuffing set data into JSON until the reporting needs are clear.
+M8/M9 use domain-specific strength-session and activity records plus read projections for unified history. The shared Exercise Library supports strength and calisthenics; no duplicate Fitness timeline or device-import schema is introduced. Avoid JSON set blobs and generic measurement engines.
 
-### 14.3 Body metrics
+### 14.3 Future body metrics and journals
 
-Photos should be stored through a file storage abstraction, not directly tied to UI paths.
+Broader body measurements, physique photos, phase tracking, and journal functionality are future concepts. They require an approved scope and concrete architecture before storage, service, or UI decisions are made.
 
 ### 14.4 Nutrition
 
-Keep practical macro tracking. Avoid committing to a full food database unless the product direction changes.
+M10 separates reusable Food definitions from immutable historical food-log entries. It uses practical macros, hydration, supplements, and reusable meals; external food databases and barcode integration are deferred.
 
 ### 14.5 Study/projects
 
 Study sessions and project work sessions can likely share a generalized focus/work session model later, but avoid premature abstraction in V1.
 
-### 14.6 Wellbeing
+### 14.6 Future journal privacy
 
-Wellbeing data is sensitive. Treat journal content as high privacy and do not send it into AI context unless the user opts in.
+M11 structured wellbeing contains no free text. A future journal is sensitive and must not enter AI context automatically.
 
-### 14.7 Garmin
+### 14.7 Calendar
 
-Use import adapters and source metadata. Imported records should not overwrite manual records silently.
+M12 owns native Calendar Events only and projects dated domain records without duplicating them into Calendar persistence. Calendar observes Fitness; it does not schedule workouts or project ordinary Finance transactions.
 
 ## 15. Service contract baseline
 
@@ -521,7 +481,6 @@ Required capabilities:
 - create manual income/expense transaction;
 - update manual transaction;
 - archive or soft-delete manual transaction;
-- set monthly finance plan;
 - calculate monthly summary and category breakdown.
 
 ## 16. Configuration and secrets

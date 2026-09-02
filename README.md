@@ -2,22 +2,23 @@
 
 LifeOS is a personal life management application built with **Blazor Server**, **.NET**, **Entity Framework Core**, **PostgreSQL**, **ASP.NET Identity**, and **Hangfire** (or an equivalent background job runner).
 
-The goal of LifeOS is to provide a fast, structured, and modular personal operating system for managing tasks, habits, reminders, finances, and personal progression.
+The goal of LifeOS is to provide a fast, structured, and modular personal operating system for managing tasks, habits, reminders, finance, personal progression, and later life domains.
 
 ---
 
 ## Documentation First
 
-The `/docs` directory is the **single source of truth** for the project.
+The `bible/docs` directory is the **single source of truth** for the project.
 
 All implementation decisions must follow the architecture and specifications documented there.
 
 Before beginning work, read the documentation in the following order:
 
-1. `docs/README.md`
-2. `docs/01-v1-scope-prd.md`
-3. `docs/03-technical-architecture.md`
-4. `docs/04-data-model-database-spec.md`
+1. `bible/AGENTS.md`
+2. `bible/docs/product/01-v1-scope-prd.md`
+3. `bible/docs/engineering/03-technical-architecture.md`
+4. `bible/docs/engineering/04-data-model-database-spec.md`
+5. `bible/docs/product/16-post-m7-domain-roadmap.md` for planned M8–M14 work.
 5. Any additional documents relevant to the feature being implemented.
 
 ---
@@ -46,8 +47,8 @@ Before beginning work, read the documentation in the following order:
 
 ## Current Status
 
-**Phase:** V1 Development
+**Implemented through:** M7 — Simple Finance
 
-Milestone 5
+**Planned roadmap:** M8 Strength & Calisthenics Training; M9 Activity & Fitness Progression; M10 Nutrition; M11 Health; M12 Calendar; M13 V1 UI/UX Overhaul & Polish; M14 Analytics.
 
-**✅ READY TO BUILD**
+AI and external integrations are future work after Analytics.

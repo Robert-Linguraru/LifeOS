@@ -44,16 +44,11 @@ Today's Tasks      Quick Actions
 
 --------------------------------------------------------------
 
-Future Widgets (when enabled)
+Planned domain widgets (when their owning milestones are complete)
 
-Sleep
-Workout
+Fitness
 Nutrition
-Body Metrics
-Study
-Projects
-Wellbeing
-AI Insights
+Health
 
 --------------------------------------------------------------
 ```
@@ -323,45 +318,21 @@ Each widget should be independently replaceable.
 
 These widgets are introduced only when their module is implemented.
 
-## Sleep
+## Fitness (M9)
 
-Displays
-
-- Last night's sleep
-- Weekly average
-- Sleep target
+Displays this-week activity count, Start Workout, steps, and the most recent PR. It is an operational shortcut into Fitness, not workout scheduling or Analytics.
 
 ---
 
-## Workout
+## Nutrition (M10)
 
-Displays
-
-- Today's workout
-- Last session
-- Current program
-- Next workout
+Displays daily calories, protein, water, targets, and Log Food.
 
 ---
 
-## Nutrition
+## Health (M11)
 
-Displays
-
-- Calories
-- Protein
-- Water
-- Daily targets
-
----
-
-## Body Metrics
-
-Displays
-
-- Current weight
-- Weekly change
-- Current phase
+Projects Health data such as sleep and structured wellbeing, and may show weight. It has no Dashboard-owned state and shows a useful no-check-in empty state.
 
 ---
 
@@ -396,14 +367,7 @@ Displays
 
 ---
 
-## AI Insights
-
-Displays
-
-- Weekly insight
-- Suggested focus
-- Recent trend
-- Confidence level
+Calendar has no Dashboard widget. Study, projects, advanced gamification, and AI widgets remain future work; AI follows M14 Analytics and has no assigned milestone.
 
 ---
 

@@ -42,7 +42,7 @@ Always consult the relevant documentation before making implementation decisions
 - Reminder execution must be idempotent.
 - Habit completion must prevent duplicate logs.
 - Notification delivery follows the documented retry policy.
-- Finance calculations must not double-count planned income or allowance.
+- M7 Finance calculations use manual Income and Expense transactions only; planned income and allowances are not part of the model.
 - Monetary values use `decimal`.
 
 ---

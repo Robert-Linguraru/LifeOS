@@ -145,7 +145,7 @@ Statistics DTO
 TaskStatisticsDto
 ```
 
-This convention applies consistently across every module.
+This convention applies to implemented and milestone-defined modules only.
 
 Examples
 
@@ -155,11 +155,9 @@ CreateHabitDto
 HabitSummaryDto
 
 FinanceSummaryDto
-
-WorkoutSessionDetailsDto
-
-StudyStatisticsDto
 ```
+
+Future DTO names and APIs are not contracts until their owning milestone defines them.
 
 ---
 
@@ -357,18 +355,7 @@ DashboardService must never
 
 ## Future Expansion
 
-DashboardService may later aggregate
-
-- Sleep
-- Fitness
-- Nutrition
-- Body Metrics
-- Study
-- Projects
-- Wellbeing
-- AI Insights
-
-without changing its architectural role.
+M9, M10, and M11 may add Fitness, Nutrition, and Health widget capabilities through their owning services. Calendar has no Dashboard widget. M14 Analytics and post-Analytics AI require future decisions; Dashboard remains an operational read-only aggregator, not a generic analytics service.
 
 ---
 
@@ -415,8 +402,6 @@ Task UpdateThemeAsync(ThemePreference theme);
 Task UpdateTimeZoneAsync(string timeZoneId);
 
 Task UpdateCurrencyAsync(string currencyCode);
-
-Task UpdateMonthlyAllowanceAsync(decimal allowance);
 
 Task ResetSettingsAsync();
 ```
@@ -547,10 +532,6 @@ TaskService does NOT depend on:
 DashboardService
 
 FinanceService
-
-WorkoutService
-
-AIService
 ```
 
 ---
@@ -967,7 +948,7 @@ Future versions may extend TaskService with:
 - Reschedule
 - Task Templates
 - Task Attachments
-- Calendar Integration
+- Calendar projection/navigation integration
 - Time Blocking
 - AI Prioritisation
 - Task Dependencies
@@ -2413,239 +2394,8 @@ savings goals, recurring expenses, category management, optional imports, or
 AI summaries. These require separately approved contracts and are not M7
 requirements.
 
-# Future Services
+# Future service-contract boundary
 
-The following services are part of the long-term LifeOS architecture.
+No concrete service, DTO, repository, or API contract is approved for M8-M12 until the owning milestone defines it. The high-level ownership boundaries are: Fitness owns Fitness records and derived PR/Goal evaluation; Nutrition owns foods and historical intake; Health owns body weight, sleep, and structured wellbeing; Calendar owns native Events and reads projections from originating domains without duplicating them.
 
-They are intentionally specified at a high level.
-
-Detailed contracts will be created when their implementation begins.
-
----
-
-# SleepService
-
-## Purpose
-
-Owns sleep tracking, sleep analytics, and sleep history.
-
-## Responsibilities
-
-- Create sleep entries
-- Update sleep entries
-- CancelPending
-- Retrieve sleep history
-- Calculate sleep statistics
-
-## Planned Public API
-
-```csharp
-CreateSleepEntryAsync()
-
-UpdateSleepEntryAsync()
-
-DeleteSleepEntryAsync()
-
-GetSleepHistoryAsync()
-
-GetSleepStatisticsAsync()
-```
-
----
-
-# WorkoutService
-
-## Purpose
-
-Owns workout plans, workout sessions and progressive overload.
-
-## Responsibilities
-
-- Workout plans
-- Workout sessions
-- Progressive overload
-- PR detection
-- Workout statistics
-
-## Planned Public API
-
-```csharp
-CreateWorkoutPlanAsync()
-
-StartWorkoutAsync()
-
-CompleteWorkoutAsync()
-
-LogSetAsync()
-
-GetWorkoutHistoryAsync()
-
-GetWorkoutStatisticsAsync()
-```
-
----
-
-# NutritionService
-
-## Planned Public API
-
-```csharp
-CreateMealAsync()
-
-UpdateMealAsync()
-
-DeleteMealAsync()
-
-GetDailyNutritionAsync()
-
-GetNutritionStatisticsAsync()
-```
-
----
-
-# BodyMetricsService
-
-## Planned Public API
-
-```csharp
-LogBodyMetricsAsync()
-
-UpdateBodyMetricsAsync()
-
-GetWeightHistoryAsync()
-
-GetMeasurementHistoryAsync()
-```
-
----
-
-# StudyService
-
-## Planned Public API
-
-```csharp
-CreateSubjectAsync()
-
-LogStudySessionAsync()
-
-GetStudyStatisticsAsync()
-
-GetWeeklyProgressAsync()
-```
-
----
-
-# ProjectService
-
-## Planned Public API
-
-```csharp
-CreateProjectAsync()
-
-UpdateProjectAsync()
-
-LogProjectSessionAsync()
-
-GetProjectStatisticsAsync()
-```
-
----
-
-# FocusSessionService
-
-## Planned Public API
-
-```csharp
-StartFocusSessionAsync()
-
-CompleteFocusSessionAsync()
-
-CancelFocusSessionAsync()
-
-GetFocusStatisticsAsync()
-```
-
----
-
-# WellbeingService
-
-## Planned Public API
-
-```csharp
-CreateDailyCheckInAsync()
-
-UpdateDailyCheckInAsync()
-
-GetWellbeingHistoryAsync()
-```
-
----
-
-# JournalService
-
-## Planned Public API
-
-```csharp
-CreateJournalEntryAsync()
-
-UpdateJournalEntryAsync()
-
-DeleteJournalEntryAsync()
-
-SearchJournalAsync()
-```
-
----
-
-# AIService
-
-## Purpose
-
-Acts as the application entry point for all AI interactions.
-
-AIService never queries the database directly.
-
-It consumes other Application Services.
-
-## Planned Public API
-
-```csharp
-ChatAsync()
-
-GenerateWeeklyReviewAsync()
-
-GenerateInsightAsync()
-
-GenerateFinanceSummaryAsync()
-
-GenerateWorkoutSummaryAsync()
-```
-
----
-
-# ImportService
-
-## Planned Public API
-
-```csharp
-PreviewImportAsync()
-
-ValidateImportAsync()
-
-ConfirmImportAsync()
-
-CancelImportAsync()
-```
-
----
-
-# GarminImportService
-
-## Planned Public API
-
-```csharp
-ImportSleepAsync()
-
-ImportWorkoutAsync()
-
-ImportRecoveryAsync()
+M14 Analytics is deliberately designed after real data exists. AI, Garmin, imports, external providers, Study, Projects, Focus, broader Body Metrics, and Journal are future work; this document defines no APIs for them.

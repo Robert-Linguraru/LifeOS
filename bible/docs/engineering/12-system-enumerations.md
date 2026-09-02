@@ -262,65 +262,17 @@ transactions are manual by definition.
 
 ---
 
-# Future Fitness Enums
+# Planned M8–M12 Enumerations
 
-## WorkoutPhase
+These are requirements concepts, not implemented symbols or a final persistence contract. Their precise names and numeric values are decided only in the owning milestone and then added here before implementation.
 
-```csharp
-public enum WorkoutPhase
-{
-    Bulk = 0,
-    Cut = 1,
-    Maintain = 2
-}
-```
+- M8: Exercise equipment includes Barbell, Dumbbell, Cable, Machine, Smith Machine, Bodyweight, Pull-up Bar, Dip Bars, Kettlebell, Resistance Band, and Other; logging modes are Weight + Reps, Bodyweight + Reps, Added Weight + Reps, Assisted Weight + Reps, Reps Only, Duration, and Weight + Duration; set kind is Warm-up or Working; workout lifecycle includes In Progress, Completed, and Discarded; Session Feeling is Weak, Normal, Good, or Great.
+- M9: activity subtype/category and optional Perceived Intensity (Easy, Moderate, Hard, Max Effort) are defined by the activity requirements; the system must not default missing intensity.
+- M10: meal grouping is Breakfast, Lunch, Dinner, Snack, and optional Other; supplements are Taken/Not Taken.
+- M11: Sleep Quality is Poor, Okay, Good, Great; Energy is Low, Normal, High, Very High; Mood/Overall are Poor, Okay, Good, Great; Stress is Low, Moderate, High, Very High.
+- M12: Calendar views are Month, Week, Day; Month is the default.
 
----
-
-## WorkoutDayType
-
-```csharp
-public enum WorkoutDayType
-{
-    Push = 0,
-    Pull = 1,
-    Legs = 2,
-    Upper = 3,
-    Lower = 4,
-    Rest = 5,
-    Custom = 6
-}
-```
-
----
-
-## ExerciseEquipment
-
-```csharp
-public enum ExerciseEquipment
-{
-    Barbell = 0,
-    Dumbbell = 1,
-    Machine = 2,
-    Cable = 3,
-    Bodyweight = 4,
-    ResistanceBand = 5,
-    Other = 6
-}
-```
-
----
-
-## SetStatus
-
-```csharp
-public enum SetStatus
-{
-    Completed = 0,
-    Failed = 1,
-    Skipped = 2
-}
-```
+See `16-post-m7-domain-roadmap.md` for normative planned behavior. Do not introduce RPE/RIR, generic health metric, import/provenance, or AI enums in M8–M12.
 
 ---
 
