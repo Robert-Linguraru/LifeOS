@@ -320,7 +320,7 @@ Detailed planned requirements are canonical in `16-post-m7-domain-roadmap.md`.
 
 ### 11.1 Fitness
 
-Fitness uses a dedicated active-workout logger rather than generic CRUD: choose a template or Custom Workout, log mode-appropriate sets, see prior performance, use a rest timer, substitute/skip exercises, complete with feeling and summary, then review historical sessions/exercise history. M9 extends the same landing experience with activity entry, PRs, Goals, and unified history. It is not a workout-programming UI.
+Fitness uses the M8 architecture contract and a dedicated active-workout logger rather than generic CRUD: choose a template or Custom Workout, log mode-appropriate sets, see prior performance, use a rest timer, substitute/skip exercises, complete with feeling and summary, then review historical sessions/exercise history. M9 extends the same landing experience with activity entry, PRs, Goals, and unified history. It is not a workout-programming UI.
 
 ### 11.2 Nutrition and Health
 

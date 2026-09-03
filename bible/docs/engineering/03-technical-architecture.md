@@ -397,7 +397,7 @@ M11 is manual, lightweight, and non-medical: body weight, sleep, and structured 
 
 ### 14.2 Fitness
 
-M8/M9 use domain-specific strength-session and activity records plus read projections for unified history. The shared Exercise Library supports strength and calisthenics; no duplicate Fitness timeline or device-import schema is introduced. Avoid JSON set blobs and generic measurement engines.
+M8 follows `16-m8-strength-training-architecture-contract.md`: domain-specific normalized strength-session records, a shared global seeded Exercise Library, persisted active state, aggregate versions, and historical session snapshots. M9 adds activity records and read projections for unified history. No duplicate Fitness timeline or device-import schema is introduced. Avoid JSON set blobs and generic measurement engines.
 
 ### 14.3 Future body metrics and journals
 

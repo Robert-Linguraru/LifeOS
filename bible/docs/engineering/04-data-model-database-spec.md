@@ -429,7 +429,7 @@ Seed behavior must be idempotent.
 
 No post-M7 entity has been implemented or approved as a final schema. `16-post-m7-domain-roadmap.md` is the canonical requirements source; each future milestone must define its concrete entities, relationships, constraints, lifecycle, and indexes before migration work begins.
 
-M8 needs a shared seeded Exercise Library (including calisthenics), reusable Workout Templates, persisted Workout Sessions, ordered session exercises and sets, set kind, supported logging values, session feeling, and a simple Completed/Discarded lifecycle. Template changes must never rewrite completed session snapshots. It must not pre-add custom-exercise, RPE/RIR, program, device-import, or generic metric schemas.
+M8 is defined in `16-m8-strength-training-architecture-contract.md`. It needs a shared seeded Exercise Library (including calisthenics), reusable Workout Templates, persisted Workout Sessions, ordered session exercises and sets, set kind, supported logging values, session feeling, and a simple Completed/Discarded lifecycle. Template changes must never rewrite completed session snapshots. It must not pre-add custom-exercise, RPE/RIR, program, device-import, or generic metric schemas.
 
 M9 adds separate authoritative records appropriate to running/sprints/intervals, walks, daily steps, sports, and other activities. Unified Fitness history is a read projection—not a duplicate timeline table. PRs and Fitness Goals derive from historical evidence and must be recalculable; no mutable authoritative current-PR field is sufficient.
 

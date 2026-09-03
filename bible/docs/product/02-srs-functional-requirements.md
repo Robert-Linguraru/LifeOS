@@ -263,7 +263,7 @@ requirements, and no M7 schema is reserved for them.
 
 ## 9. M8–M12 domain requirements
 
-The canonical planned requirements are in `16-post-m7-domain-roadmap.md`. M8 requires one shared strength/calisthenics exercise library, reusable templates, persisted active/historical sessions, mode-appropriate sets, warm-up/working distinction, substitutions/skips, prior performance, rest timer, feeling, and explicit completed/discarded lifecycle. Workout programming, RPE/RIR, custom exercises, and device data are deferred.
+The canonical planned requirements are in `16-post-m7-domain-roadmap.md`; M8's detailed architecture contract is `../engineering/16-m8-strength-training-architecture-contract.md`. M8 requires one shared strength/calisthenics exercise library, reusable templates, persisted active/historical sessions, mode-appropriate sets, warm-up/working distinction, substitutions/skips, prior performance, rest timer, feeling, and explicit completed/discarded lifecycle. Workout programming, RPE/RIR, custom exercises, and device data are deferred.
 
 M9 requires domain-specific activity records, optional intensity, read-projected unified history, derived recalculable PRs, performance Fitness Goals, summaries, and a Fitness widget. It excludes GPS/device features, a duplicate timeline, cumulative/frequency Fitness Goals, and advanced analytics.
 

@@ -2396,6 +2396,6 @@ requirements.
 
 # Future service-contract boundary
 
-No concrete service, DTO, repository, or API contract is approved for M8-M12 until the owning milestone defines it. The high-level ownership boundaries are: Fitness owns Fitness records and derived PR/Goal evaluation; Nutrition owns foods and historical intake; Health owns body weight, sleep, and structured wellbeing; Calendar owns native Events and reads projections from originating domains without duplicating them.
+M8's service and repository boundaries must follow `16-m8-strength-training-architecture-contract.md`; this ticket does not add concrete API names. No concrete service, DTO, repository, or API contract is approved for later M9-M12 work until its owning milestone defines it. The high-level ownership boundaries are: Fitness owns Fitness records and derived PR/Goal evaluation; Nutrition owns foods and historical intake; Health owns body weight, sleep, and structured wellbeing; Calendar owns native Events and reads projections from originating domains without duplicating them.
 
 M14 Analytics is deliberately designed after real data exists. AI, Garmin, imports, external providers, Study, Projects, Focus, broader Body Metrics, and Journal are future work; this document defines no APIs for them.

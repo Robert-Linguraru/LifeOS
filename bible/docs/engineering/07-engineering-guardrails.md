@@ -118,7 +118,8 @@ If a Codex suggestion, implementation shortcut, or feature idea violates these g
 
 ### 11.1 Fitness
 
-- M8 uses one Exercise Library for strength and calisthenics; do not create a separate calisthenics domain.
+- M8 implementation must follow `16-m8-strength-training-architecture-contract.md`.
+- M8 uses one global seeded Exercise Library for strength and calisthenics; do not create a separate calisthenics domain.
 - Active workouts must persist outside Blazor component memory; completed sessions are immutable historical snapshots.
 - Templates are reusable recipes, not multi-week programs; do not add RPE/RIR, custom exercises, device schemas, or generic metrics.
 - M9 unified Fitness history is a read projection, not a duplicate persistence table. PRs derive from Working-set/activity evidence and Fitness Goals are performance outcomes, not cumulative/frequency challenges.

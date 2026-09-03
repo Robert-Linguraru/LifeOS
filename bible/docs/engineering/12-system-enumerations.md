@@ -264,7 +264,7 @@ transactions are manual by definition.
 
 # Planned M8–M12 Enumerations
 
-These are requirements concepts, not implemented symbols or a final persistence contract. Their precise names and numeric values are decided only in the owning milestone and then added here before implementation.
+These are requirements concepts, not implemented symbols or a final persistence contract. M8's complete terminology, fixed values, and validation semantics are frozen in `16-m8-strength-training-architecture-contract.md`. Their precise names and numeric values are added here before implementation.
 
 - M8: Exercise equipment includes Barbell, Dumbbell, Cable, Machine, Smith Machine, Bodyweight, Pull-up Bar, Dip Bars, Kettlebell, Resistance Band, and Other; logging modes are Weight + Reps, Bodyweight + Reps, Added Weight + Reps, Assisted Weight + Reps, Reps Only, Duration, and Weight + Duration; set kind is Warm-up or Working; workout lifecycle includes In Progress, Completed, and Discarded; Session Feeling is Weak, Normal, Good, or Great.
 - M9: activity subtype/category and optional Perceived Intensity (Easy, Moderate, Hard, Max Effort) are defined by the activity requirements; the system must not default missing intensity.

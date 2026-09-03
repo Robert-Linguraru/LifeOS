@@ -328,6 +328,7 @@ Future AI features need qualitative review plus structured checks for:
 
 ### 13.2 Fitness
 
+- M8 tests must follow `16-m8-strength-training-architecture-contract.md`.
 - Active strength sessions persist across application return.
 - Template edits never rewrite completed session snapshots.
 - Logging modes accept only their appropriate measurements; warm-up sets do not generate PRs.
