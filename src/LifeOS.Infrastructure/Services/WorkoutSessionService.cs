@@ -44,6 +44,104 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
         return session is null ? null : ToDetail(session);
     }
 
+    public async Task<WorkoutSessionDetailDto> AddExerciseAsync(
+        Guid sessionId,
+        AddSessionExerciseDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        if (session.OriginTemplateId is not null)
+        {
+            throw new ValidationException("Exercises cannot be added to a Template workout.");
+        }
+
+        var exercise = await GetAuthoritativeExerciseAsync(
+            dto.ExerciseId,
+            dto.LoggingModeSnapshot,
+            cancellationToken);
+        session.AddExercise(
+            exercise.Id,
+            exercise.Name,
+            exercise.LoggingMode,
+            dto.TargetSetCountSnapshot,
+            dto.TargetRepMinSnapshot,
+            dto.TargetRepMaxSnapshot,
+            dto.DefaultRestSecondsSnapshot);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> RemoveExerciseAsync(
+        Guid sessionId,
+        Guid sessionExerciseId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await GetMutableSessionAsync(sessionId, expectedVersion, cancellationToken);
+        if (session.OriginTemplateId is not null)
+        {
+            throw new ValidationException("Exercises cannot be removed from a Template workout.");
+        }
+
+        if (session.Exercises.Count == 1)
+        {
+            throw new ValidationException("The final exercise cannot be removed from a workout.");
+        }
+
+        session.RemoveExercise(sessionExerciseId);
+        return await PersistMutationAsync(session, expectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> SubstituteExerciseAsync(
+        Guid sessionId,
+        SubstituteSessionExerciseDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        var current = session.Exercises.SingleOrDefault(item => item.Id == dto.SessionExerciseId)
+            ?? throw new ResourceNotFoundException("Session Exercise was not found.");
+        var replacement = await GetAuthoritativeExerciseAsync(
+            dto.ExerciseId,
+            dto.LoggingMode,
+            cancellationToken);
+
+        if ((current.TargetRepMinSnapshot is not null || current.TargetRepMaxSnapshot is not null) &&
+            !IsRepBased(replacement.LoggingMode))
+        {
+            throw new ValidationException("The replacement Exercise is incompatible with the target rep range.");
+        }
+
+        session.SubstituteExercise(
+            current.Id,
+            replacement.Id,
+            replacement.Name,
+            replacement.LoggingMode);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> SkipExerciseAsync(
+        Guid sessionId,
+        Guid sessionExerciseId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await GetMutableSessionAsync(sessionId, expectedVersion, cancellationToken);
+        session.SkipExercise(sessionExerciseId);
+        return await PersistMutationAsync(session, expectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> UnskipExerciseAsync(
+        Guid sessionId,
+        Guid sessionExerciseId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await GetMutableSessionAsync(sessionId, expectedVersion, cancellationToken);
+        session.UnskipExercise(sessionExerciseId);
+        return await PersistMutationAsync(session, expectedVersion, cancellationToken);
+    }
+
     public async Task<WorkoutSessionDetailDto> StartFromTemplateAsync(
         StartTemplateWorkoutDto dto,
         CancellationToken cancellationToken = default)
@@ -146,6 +244,92 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
             cancellationToken);
         return session is null ? null : ToDetail(session);
     }
+
+    private async Task<WorkoutSessionDetailDto> PersistMutationAsync(
+        WorkoutSession session,
+        long expectedVersion,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sessionRepository.UpdateAsync(
+            session.UserId,
+            session,
+            expectedVersion,
+            cancellationToken);
+        EnsureWriteSucceeded(result.Status);
+        var authoritative = await _sessionRepository.GetByIdAsync(
+            session.UserId,
+            session.Id,
+            cancellationToken);
+        return authoritative is null
+            ? throw new ResourceNotFoundException("The workout session could not be loaded.")
+            : ToDetail(authoritative);
+    }
+
+    private async Task<WorkoutSession> GetMutableSessionAsync(
+        Guid sessionId,
+        long expectedVersion,
+        CancellationToken cancellationToken)
+    {
+        var session = await _sessionRepository.GetByIdAsync(
+            GetCurrentUserId(),
+            sessionId,
+            cancellationToken);
+        if (session is null)
+        {
+            throw new ResourceNotFoundException("Workout session was not found.");
+        }
+
+        if (session.Status != WorkoutSessionStatus.InProgress)
+        {
+            throw new ValidationException("Only an active workout can be changed.");
+        }
+
+        if (session.Version != expectedVersion)
+        {
+            throw new WorkoutSessionConcurrencyException();
+        }
+
+        return session;
+    }
+
+    private async Task<Exercise> GetAuthoritativeExerciseAsync(
+        Guid exerciseId,
+        ExerciseLoggingMode requestedLoggingMode,
+        CancellationToken cancellationToken)
+    {
+        var exercise = (await _exerciseRepository.GetActiveByIdsAsync(
+            [exerciseId],
+            cancellationToken)).SingleOrDefault()
+            ?? throw new ResourceNotFoundException("Active Exercise was not found.");
+        if (exercise.LoggingMode != requestedLoggingMode)
+        {
+            throw new ValidationException("The Exercise logging mode does not match the catalog.");
+        }
+
+        return exercise;
+    }
+
+    private static void EnsureWriteSucceeded(WorkoutSessionWriteStatus status)
+    {
+        switch (status)
+        {
+            case WorkoutSessionWriteStatus.Succeeded:
+                return;
+            case WorkoutSessionWriteStatus.NotFound:
+                throw new ResourceNotFoundException("Workout session was not found.");
+            case WorkoutSessionWriteStatus.ConcurrencyConflict:
+                throw new WorkoutSessionConcurrencyException();
+            default:
+                throw new InvalidOperationException("Unknown workout session write status.");
+        }
+    }
+
+    private static bool IsRepBased(ExerciseLoggingMode mode) =>
+        mode is ExerciseLoggingMode.WeightAndReps
+            or ExerciseLoggingMode.BodyweightAndReps
+            or ExerciseLoggingMode.AddedWeightAndReps
+            or ExerciseLoggingMode.AssistedWeightAndReps
+            or ExerciseLoggingMode.RepsOnly;
 
     private async Task<WorkoutSessionDetailDto> PersistStartAsync(
         WorkoutSession session,

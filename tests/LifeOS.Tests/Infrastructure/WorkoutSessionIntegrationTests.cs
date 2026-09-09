@@ -208,6 +208,126 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
         }
     }
 
+    [Fact]
+    public async Task CustomWorkout_AddRemove_ShouldAllowDuplicatesAndNormalizeOrder()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First();
+        var service = CreateSessionService(userId);
+        var start = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+
+        var added = await service.AddExerciseAsync(
+            start.Id,
+            new AddSessionExerciseDto(definition.Id, "ignored", definition.LoggingMode, 2, 6, 8, 60, start.Version));
+        Assert.Equal(2, added.Version);
+        Assert.Equal(2, added.Exercises.Count);
+        Assert.Equal([1, 2], added.Exercises.Select(item => item.SortOrder));
+        Assert.Equal([definition.Id, definition.Id], added.Exercises.Select(item => item.ExerciseId));
+
+        var removed = await service.RemoveExerciseAsync(
+            added.Id,
+            added.Exercises[0].Id,
+            added.Version);
+        Assert.Equal(3, removed.Version);
+        Assert.Single(removed.Exercises);
+        Assert.Equal(1, removed.Exercises[0].SortOrder);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.RemoveExerciseAsync(
+            removed.Id,
+            removed.Exercises[0].Id,
+            removed.Version));
+    }
+
+    [Fact]
+    public async Task SubstituteSkipAndUnskip_ShouldPreserveOriginalAndTemplateState()
+    {
+        var userId = Guid.NewGuid();
+        var original = ExerciseDefaults.Definitions.First();
+        var replacement = ExerciseDefaults.Definitions.First(item => item.Id != original.Id && item.LoggingMode == original.LoggingMode);
+        var template = await CreateTemplateAsync(userId, [original]);
+        var templateRepository = new WorkoutTemplateRepository(_fixture.CreateDbContextFactory());
+        var service = CreateSessionService(userId);
+        var started = await service.StartFromTemplateAsync(new StartTemplateWorkoutDto(template.Id, default, default));
+
+        var substituted = await service.SubstituteExerciseAsync(
+            started.Id,
+            new SubstituteSessionExerciseDto(
+                started.Exercises[0].Id,
+                replacement.Id,
+                "ignored",
+                replacement.LoggingMode,
+                started.Version));
+        Assert.Equal(original.Id, substituted.Exercises[0].OriginalExerciseId);
+        Assert.Equal(original.Name, substituted.Exercises[0].OriginalExerciseNameSnapshot);
+        Assert.Equal(replacement.Id, substituted.Exercises[0].ExerciseId);
+        Assert.Equal(replacement.Name, substituted.Exercises[0].ExerciseNameSnapshot);
+
+        var skipped = await service.SkipExerciseAsync(substituted.Id, substituted.Exercises[0].Id, substituted.Version);
+        Assert.True(skipped.Exercises[0].IsSkipped);
+        var unskipped = await service.UnskipExerciseAsync(skipped.Id, skipped.Exercises[0].Id, skipped.Version);
+        Assert.False(unskipped.Exercises[0].IsSkipped);
+
+        var unchangedTemplate = await templateRepository.GetByIdAsync(userId, template.Id);
+        Assert.Equal(original.Id, unchangedTemplate!.Exercises[0].ExerciseId);
+    }
+
+    [Fact]
+    public async Task IncompatibleSubstitution_ShouldLeaveSessionUnchanged()
+    {
+        var userId = Guid.NewGuid();
+        var original = ExerciseDefaults.Definitions.First();
+        var duration = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.Duration);
+        var template = await CreateTemplateAsync(userId, [original]);
+        var service = CreateSessionService(userId);
+        var started = await service.StartFromTemplateAsync(new StartTemplateWorkoutDto(template.Id, default, default));
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.SubstituteExerciseAsync(
+            started.Id,
+            new SubstituteSessionExerciseDto(
+                started.Exercises[0].Id,
+                duration.Id,
+                duration.Name,
+                duration.LoggingMode,
+                started.Version)));
+
+        var unchanged = (await service.GetActiveSessionAsync())!;
+        Assert.Equal(started.Version, unchanged.Version);
+        Assert.Equal(original.Id, unchanged.Exercises[0].ExerciseId);
+    }
+
+    [Fact]
+    public async Task StaleSessionMutation_ShouldReturnControlledConcurrencyConflict()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First();
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var repository = new WorkoutSessionRepository(_fixture.CreateDbContextFactory());
+        var first = await repository.GetByIdAsync(userId, started.Id);
+        var second = await repository.GetByIdAsync(userId, started.Id);
+        first!.SkipExercise(first.Exercises[0].Id);
+        second!.SkipExercise(second.Exercises[0].Id);
+
+        var firstResult = await repository.UpdateAsync(userId, first, started.Version);
+        var secondResult = await repository.UpdateAsync(userId, second, started.Version);
+
+        Assert.Equal(WorkoutSessionWriteStatus.Succeeded, firstResult.Status);
+        Assert.Equal(WorkoutSessionWriteStatus.ConcurrencyConflict, secondResult.Status);
+        Assert.True((await service.GetActiveSessionAsync())!.Exercises[0].IsSkipped);
+    }
+
+    [Fact]
+    public async Task CrossUserMutation_ShouldBeHiddenAsNotFound()
+    {
+        var owner = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First();
+        var started = await CreateSessionService(owner).StartCustomWorkoutAsync(CreateCustomRequest(definition));
+
+        await Assert.ThrowsAsync<ResourceNotFoundException>(() =>
+            CreateSessionService(other).SkipExerciseAsync(started.Id, started.Exercises[0].Id, started.Version));
+    }
+
     private async Task<WorkoutTemplate> CreateTemplateAsync(
         Guid userId,
         IReadOnlyList<ExerciseDefinition> definitions,
@@ -228,6 +348,20 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
         await new WorkoutTemplateRepository(_fixture.CreateDbContextFactory()).AddAsync(template);
         return template;
     }
+
+    private static StartCustomWorkoutDto CreateCustomRequest(ExerciseDefinition definition) =>
+        new(
+            "Custom Day",
+            default,
+            default,
+            [new StartWorkoutExerciseDto(
+                definition.Id,
+                "ignored",
+                definition.LoggingMode,
+                3,
+                IsRepBased(definition.LoggingMode) ? 6 : null,
+                IsRepBased(definition.LoggingMode) ? 10 : null,
+                90)]);
 
     private WorkoutSessionService CreateSessionService(Guid userId) =>
         new(

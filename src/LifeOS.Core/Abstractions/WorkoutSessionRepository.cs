@@ -33,4 +33,10 @@ public interface IWorkoutSessionRepository
     Task<WorkoutSessionWriteResult> AddAsync(
         WorkoutSession session,
         CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionWriteResult> UpdateAsync(
+        Guid userId,
+        WorkoutSession session,
+        long expectedVersion,
+        CancellationToken cancellationToken = default);
 }
