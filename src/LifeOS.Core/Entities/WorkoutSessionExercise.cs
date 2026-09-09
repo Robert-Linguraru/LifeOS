@@ -169,14 +169,30 @@ public sealed class WorkoutSessionExercise : UserOwnedEntity
         return set;
     }
 
+    internal void UpdateSet(
+        Guid setId,
+        WorkoutSetKind kind,
+        decimal? weightKg,
+        int? repetitions,
+        int? durationSeconds)
+    {
+        var set = FindSet(setId);
+        set.UpdateMeasurements(LoggingModeSnapshot, kind, weightKg, repetitions, durationSeconds);
+    }
+
     internal void UpdateSet(Guid setId, decimal? weightKg, int? repetitions, int? durationSeconds)
     {
         var set = FindSet(setId);
-        set.UpdateMeasurements(LoggingModeSnapshot, weightKg, repetitions, durationSeconds);
+        set.UpdateMeasurements(LoggingModeSnapshot, set.Kind, weightKg, repetitions, durationSeconds);
     }
 
     internal void CompleteSet(Guid setId, DateTimeOffset completedAtUtc, decimal? weightKg, int? repetitions, int? durationSeconds)
     {
+        if (IsSkipped)
+        {
+            throw new InvalidOperationException("An exercise must be unskipped before completing a set.");
+        }
+
         var set = FindSet(setId);
         set.Complete(LoggingModeSnapshot, completedAtUtc, weightKg, repetitions, durationSeconds);
     }

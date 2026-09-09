@@ -142,6 +142,68 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
         return await PersistMutationAsync(session, expectedVersion, cancellationToken);
     }
 
+    public async Task<WorkoutSessionDetailDto> AddSetAsync(
+        Guid sessionId,
+        AddWorkoutSetDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.AddSet(
+            dto.SessionExerciseId,
+            dto.Kind,
+            dto.WeightKg,
+            dto.Repetitions,
+            dto.DurationSeconds);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> UpdateSetAsync(
+        Guid sessionId,
+        UpdateWorkoutSetDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.UpdateSet(
+            dto.SessionExerciseId,
+            dto.SetId,
+            dto.Kind,
+            dto.WeightKg,
+            dto.Repetitions,
+            dto.DurationSeconds);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> RemoveSetAsync(
+        Guid sessionId,
+        Guid sessionExerciseId,
+        Guid setId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await GetMutableSessionAsync(sessionId, expectedVersion, cancellationToken);
+        session.RemoveSet(sessionExerciseId, setId);
+        return await PersistMutationAsync(session, expectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> CompleteSetAsync(
+        Guid sessionId,
+        CompleteWorkoutSetDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.CompleteSet(
+            dto.SessionExerciseId,
+            dto.SetId,
+            _dateTimeProvider.UtcNow,
+            dto.WeightKg,
+            dto.Repetitions,
+            dto.DurationSeconds);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
     public async Task<WorkoutSessionDetailDto> StartFromTemplateAsync(
         StartTemplateWorkoutDto dto,
         CancellationToken cancellationToken = default)

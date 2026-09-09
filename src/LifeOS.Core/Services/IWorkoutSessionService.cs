@@ -47,4 +47,26 @@ public interface IWorkoutSessionService
         Guid sessionExerciseId,
         long expectedVersion,
         CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> AddSetAsync(
+        Guid sessionId,
+        AddWorkoutSetDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> UpdateSetAsync(
+        Guid sessionId,
+        UpdateWorkoutSetDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> RemoveSetAsync(
+        Guid sessionId,
+        Guid sessionExerciseId,
+        Guid setId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> CompleteSetAsync(
+        Guid sessionId,
+        CompleteWorkoutSetDto dto,
+        CancellationToken cancellationToken = default);
 }

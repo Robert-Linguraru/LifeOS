@@ -156,6 +156,18 @@ public sealed class WorkoutSession : UserOwnedEntity
         IncrementVersion();
     }
 
+    public void UpdateSet(
+        Guid sessionExerciseId,
+        Guid setId,
+        decimal? weightKg,
+        int? repetitions,
+        int? durationSeconds)
+    {
+        EnsureInProgress();
+        FindExercise(sessionExerciseId).UpdateSet(setId, weightKg, repetitions, durationSeconds);
+        IncrementVersion();
+    }
+
     public void SubstituteExercise(
         Guid sessionExerciseId,
         Guid exerciseId,
@@ -197,12 +209,13 @@ public sealed class WorkoutSession : UserOwnedEntity
     public void UpdateSet(
         Guid sessionExerciseId,
         Guid setId,
+        WorkoutSetKind kind,
         decimal? weightKg,
         int? repetitions,
         int? durationSeconds)
     {
         EnsureInProgress();
-        FindExercise(sessionExerciseId).UpdateSet(setId, weightKg, repetitions, durationSeconds);
+        FindExercise(sessionExerciseId).UpdateSet(setId, kind, weightKg, repetitions, durationSeconds);
         IncrementVersion();
     }
 

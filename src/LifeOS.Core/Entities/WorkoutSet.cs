@@ -83,16 +83,23 @@ public sealed class WorkoutSet : UserOwnedEntity
 
     internal void UpdateMeasurements(
         ExerciseLoggingMode loggingMode,
+        WorkoutSetKind kind,
         decimal? weightKg,
         int? repetitions,
         int? durationSeconds)
     {
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
         ValidateMeasurements(weightKg, repetitions, durationSeconds);
         if (IsCompleted)
         {
             ValidateCompletedMeasurements(loggingMode, weightKg, repetitions, durationSeconds);
         }
 
+        Kind = kind;
         WeightKg = weightKg;
         Repetitions = repetitions;
         DurationSeconds = durationSeconds;
@@ -121,17 +128,17 @@ public sealed class WorkoutSet : UserOwnedEntity
 
     private static void ValidateMeasurements(decimal? weightKg, int? repetitions, int? durationSeconds)
     {
-        if (weightKg is < 0)
+        if (weightKg is <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(weightKg));
         }
 
-        if (repetitions is < 0)
+        if (repetitions is <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(repetitions));
         }
 
-        if (durationSeconds is < 0)
+        if (durationSeconds is <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(durationSeconds));
         }

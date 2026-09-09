@@ -105,6 +105,7 @@ public sealed record AddWorkoutSetDto(
 public sealed record UpdateWorkoutSetDto(
     Guid SessionExerciseId,
     Guid SetId,
+    WorkoutSetKind Kind,
     decimal? WeightKg,
     int? Repetitions,
     int? DurationSeconds,
@@ -113,11 +114,9 @@ public sealed record UpdateWorkoutSetDto(
 public sealed record CompleteWorkoutSetDto(
     Guid SessionExerciseId,
     Guid SetId,
-    DateTimeOffset CompletedAtUtc,
     decimal? WeightKg,
     int? Repetitions,
     int? DurationSeconds,
-    bool StartRestTimer,
     long ExpectedVersion);
 
 public sealed record StartRestTimerDto(

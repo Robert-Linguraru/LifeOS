@@ -328,6 +328,163 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
             CreateSessionService(other).SkipExerciseAsync(started.Id, started.Exercises[0].Id, started.Version));
     }
 
+    [Fact]
+    public async Task SetWorkflow_ShouldPersistDraftCompletionCorrectionAndResume()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.WeightAndReps);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var exerciseId = started.Exercises[0].Id;
+
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.WarmUp, 80m, null, null, started.Version));
+        Assert.Equal(2, draft.Version);
+        Assert.Null(draft.Exercises[0].Sets[0].CompletedAtUtc);
+
+        var edited = await service.UpdateSetAsync(
+            draft.Id,
+            new UpdateWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, WorkoutSetKind.Working, 80m, 8, null, draft.Version));
+        Assert.Equal(3, edited.Version);
+        Assert.Equal(WorkoutSetKind.Working, edited.Exercises[0].Sets[0].Kind);
+
+        var completed = await service.CompleteSetAsync(
+            edited.Id,
+            new CompleteWorkoutSetDto(exerciseId, edited.Exercises[0].Sets[0].Id, 80m, 8, null, edited.Version));
+        Assert.Equal(4, completed.Version);
+        Assert.Equal(new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero), completed.Exercises[0].Sets[0].CompletedAtUtc);
+
+        var corrected = await service.UpdateSetAsync(
+            completed.Id,
+            new UpdateWorkoutSetDto(exerciseId, completed.Exercises[0].Sets[0].Id, WorkoutSetKind.WarmUp, 82.5m, 7, null, completed.Version));
+        Assert.Equal(5, corrected.Version);
+        Assert.Equal(completed.Exercises[0].Sets[0].CompletedAtUtc, corrected.Exercises[0].Sets[0].CompletedAtUtc);
+
+        var resumed = await CreateSessionService(userId).GetActiveSessionAsync();
+        var set = Assert.Single(Assert.Single(resumed!.Exercises).Sets);
+        Assert.Equal(WorkoutSetKind.WarmUp, set.Kind);
+        Assert.Equal(82.5m, set.WeightKg);
+        Assert.Equal(7, set.Repetitions);
+        Assert.Equal(corrected.Version, resumed.Version);
+    }
+
+    [Theory]
+    [InlineData(ExerciseLoggingMode.WeightAndReps, "80", 8, null)]
+    [InlineData(ExerciseLoggingMode.BodyweightAndReps, null, 8, null)]
+    [InlineData(ExerciseLoggingMode.AddedWeightAndReps, "20", 8, null)]
+    [InlineData(ExerciseLoggingMode.AssistedWeightAndReps, "20", 8, null)]
+    [InlineData(ExerciseLoggingMode.RepsOnly, null, 8, null)]
+    [InlineData(ExerciseLoggingMode.Duration, null, null, 60)]
+    [InlineData(ExerciseLoggingMode.WeightAndDuration, "20", null, 60)]
+    public async Task CompleteSet_ShouldAcceptEveryLoggingMode(
+        ExerciseLoggingMode mode,
+        string? weight,
+        int? repetitions,
+        int? duration)
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == mode);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var exerciseId = started.Exercises[0].Id;
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+
+        var completed = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, weight is null ? null : decimal.Parse(weight), repetitions, duration, draft.Version));
+
+        Assert.True(completed.Exercises[0].Sets[0].CompletedAtUtc.HasValue);
+    }
+
+    [Theory]
+    [InlineData(ExerciseLoggingMode.WeightAndReps, null, 8, null)]
+    [InlineData(ExerciseLoggingMode.BodyweightAndReps, "80", 8, null)]
+    [InlineData(ExerciseLoggingMode.AddedWeightAndReps, null, 8, null)]
+    [InlineData(ExerciseLoggingMode.AssistedWeightAndReps, null, 8, null)]
+    [InlineData(ExerciseLoggingMode.RepsOnly, "1", 8, null)]
+    [InlineData(ExerciseLoggingMode.Duration, null, 1, 60)]
+    [InlineData(ExerciseLoggingMode.WeightAndDuration, "20", 1, 60)]
+    public async Task CompleteSet_ShouldRejectMissingOrExtraMeasurements(
+        ExerciseLoggingMode mode,
+        string? weight,
+        int? repetitions,
+        int? duration)
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == mode);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var exerciseId = started.Exercises[0].Id;
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, weight is null ? null : decimal.Parse(weight), repetitions, duration, draft.Version)));
+
+        var unchanged = await service.GetActiveSessionAsync();
+        Assert.Equal(draft.Version, unchanged!.Version);
+        Assert.Null(unchanged.Exercises[0].Sets[0].CompletedAtUtc);
+    }
+
+    [Fact]
+    public async Task RemoveSet_ShouldNormalizeOrderAndSoftDeleteCompletedSet()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var exerciseId = started.Exercises[0].Id;
+        var first = await service.AddSetAsync(started.Id, new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+        var second = await service.AddSetAsync(first.Id, new AddWorkoutSetDto(exerciseId, WorkoutSetKind.WarmUp, null, null, null, first.Version));
+        var third = await service.AddSetAsync(second.Id, new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, second.Version));
+
+        var removed = await service.RemoveSetAsync(third.Id, exerciseId, third.Exercises[0].Sets[1].Id, third.Version);
+        Assert.Equal(5, removed.Version);
+        Assert.Equal([1, 2], removed.Exercises[0].Sets.Select(item => item.SortOrder));
+
+        var completed = await service.CompleteSetAsync(
+            removed.Id,
+            new CompleteWorkoutSetDto(exerciseId, removed.Exercises[0].Sets[0].Id, null, 5, null, removed.Version));
+        var removedCompleted = await service.RemoveSetAsync(
+            completed.Id,
+            exerciseId,
+            completed.Exercises[0].Sets[0].Id,
+            completed.Version);
+        var remaining = Assert.Single(removedCompleted.Exercises[0].Sets);
+        Assert.Equal(1, remaining.SortOrder);
+
+        await using var context = _fixture.CreateDbContext();
+        Assert.True(await context.WorkoutSets.IgnoreQueryFilters().AnyAsync(item => item.Id == third.Exercises[0].Sets[1].Id && item.IsDeleted));
+        Assert.True(await context.WorkoutSets.IgnoreQueryFilters().AnyAsync(item => item.Id == completed.Exercises[0].Sets[0].Id && item.IsDeleted));
+    }
+
+    [Fact]
+    public async Task StaleSetMutation_ShouldReturnConcurrencyConflictAndPreserveAcceptedState()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var exerciseId = started.Exercises[0].Id;
+        var draft = await service.AddSetAsync(started.Id, new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+        var first = CreateSessionService(userId);
+        var second = CreateSessionService(userId);
+
+        var accepted = await first.UpdateSetAsync(draft.Id, new UpdateWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, WorkoutSetKind.WarmUp, null, 8, null, draft.Version));
+        await Assert.ThrowsAsync<WorkoutSessionConcurrencyException>(() => second.UpdateSetAsync(
+            draft.Id,
+            new UpdateWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, WorkoutSetKind.Working, null, 10, null, draft.Version)));
+
+        var final = await service.GetActiveSessionAsync();
+        Assert.Equal(accepted.Version, final!.Version);
+        Assert.Equal(8, final.Exercises[0].Sets[0].Repetitions);
+    }
+
     private async Task<WorkoutTemplate> CreateTemplateAsync(
         Guid userId,
         IReadOnlyList<ExerciseDefinition> definitions,
