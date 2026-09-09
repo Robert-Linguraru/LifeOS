@@ -1,6 +1,7 @@
 ﻿using LifeOS.Core.Abstractions;
 using LifeOS.Core.Abstractions.Finance;
 using LifeOS.Core.Abstractions.Fitness;
+using LifeOS.Core.Abstractions.WorkoutTemplates;
 using LifeOS.Core.Abstractions.Habits;
 using LifeOS.Core.Abstractions.Notifications;
 using LifeOS.Core.Abstractions.Reminders;
@@ -81,6 +82,8 @@ public static class DependencyInjection
 
         services.AddScoped<IExerciseRepository, ExerciseRepository>();
         services.AddScoped<IExerciseService, ExerciseService>();
+        services.AddScoped<IWorkoutTemplateRepository, WorkoutTemplateRepository>();
+        services.AddScoped<IWorkoutTemplateService, WorkoutTemplateService>();
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();

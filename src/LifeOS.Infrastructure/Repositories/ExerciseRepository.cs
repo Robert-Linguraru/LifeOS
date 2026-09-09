@@ -1,5 +1,6 @@
 using LifeOS.Core.Abstractions.Fitness;
 using LifeOS.Core.DTOs.Fitness;
+using LifeOS.Core.Entities;
 using LifeOS.Core.Enums.Fitness;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,28 @@ public sealed class ExerciseRepository : IExerciseRepository
     public ExerciseRepository(IDbContextFactory<AppDbContext> contextFactory)
     {
         _contextFactory = contextFactory;
+    }
+
+    public async Task<IReadOnlyList<Exercise>> GetActiveByIdsAsync(
+        IReadOnlyCollection<Guid> exerciseIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(exerciseIds);
+
+        if (exerciseIds.Count == 0)
+        {
+            return [];
+        }
+
+        await using var context =
+            await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Exercises
+            .AsNoTracking()
+            .Where(exercise => exerciseIds.Contains(exercise.Id) && exercise.IsActive)
+            .OrderBy(exercise => exercise.SortOrder)
+            .ThenBy(exercise => exercise.Id)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ExerciseSummaryDto>> GetAsync(
