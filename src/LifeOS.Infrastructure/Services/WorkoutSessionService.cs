@@ -194,14 +194,81 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
     {
         ArgumentNullException.ThrowIfNull(dto);
         var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
-        session.CompleteSet(
+        var nowUtc = _dateTimeProvider.UtcNow;
+        session.CompleteSetAndMaybeStartRest(
             dto.SessionExerciseId,
             dto.SetId,
-            _dateTimeProvider.UtcNow,
+            nowUtc,
             dto.WeightKg,
             dto.Repetitions,
-            dto.DurationSeconds);
+            dto.DurationSeconds,
+            dto.StartRestTimer);
         return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> StartRestTimerAsync(
+        Guid sessionId,
+        StartRestTimerDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.StartRestTimer(dto.DurationSeconds, _dateTimeProvider.UtcNow);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> PauseRestTimerAsync(
+        Guid sessionId,
+        TimerTimestampDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.PauseRestTimer(_dateTimeProvider.UtcNow);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> ResumeRestTimerAsync(
+        Guid sessionId,
+        TimerTimestampDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.ResumeRestTimer(_dateTimeProvider.UtcNow);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> ResetRestTimerAsync(
+        Guid sessionId,
+        TimerTimestampDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.ResetRestTimer(_dateTimeProvider.UtcNow);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> AdjustRestTimerAsync(
+        Guid sessionId,
+        AdjustRestTimerDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.AdjustRestTimer(dto.DurationSeconds, _dateTimeProvider.UtcNow);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> ClearRestTimerAsync(
+        Guid sessionId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await GetMutableSessionAsync(sessionId, expectedVersion, cancellationToken);
+        session.ClearRestTimer();
+        return await PersistMutationAsync(session, expectedVersion, cancellationToken);
     }
 
     public async Task<WorkoutSessionDetailDto> StartFromTemplateAsync(

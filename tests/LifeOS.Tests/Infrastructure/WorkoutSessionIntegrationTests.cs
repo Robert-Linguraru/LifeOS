@@ -351,7 +351,7 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
 
         var completed = await service.CompleteSetAsync(
             edited.Id,
-            new CompleteWorkoutSetDto(exerciseId, edited.Exercises[0].Sets[0].Id, 80m, 8, null, edited.Version));
+            new CompleteWorkoutSetDto(exerciseId, edited.Exercises[0].Sets[0].Id, 80m, 8, null, false, edited.Version));
         Assert.Equal(4, completed.Version);
         Assert.Equal(new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero), completed.Exercises[0].Sets[0].CompletedAtUtc);
 
@@ -394,7 +394,7 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
 
         var completed = await service.CompleteSetAsync(
             draft.Id,
-            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, weight is null ? null : decimal.Parse(weight), repetitions, duration, draft.Version));
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, weight is null ? null : decimal.Parse(weight), repetitions, duration, false, draft.Version));
 
         Assert.True(completed.Exercises[0].Sets[0].CompletedAtUtc.HasValue);
     }
@@ -424,7 +424,7 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.CompleteSetAsync(
             draft.Id,
-            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, weight is null ? null : decimal.Parse(weight), repetitions, duration, draft.Version)));
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, weight is null ? null : decimal.Parse(weight), repetitions, duration, false, draft.Version)));
 
         var unchanged = await service.GetActiveSessionAsync();
         Assert.Equal(draft.Version, unchanged!.Version);
@@ -449,7 +449,7 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
 
         var completed = await service.CompleteSetAsync(
             removed.Id,
-            new CompleteWorkoutSetDto(exerciseId, removed.Exercises[0].Sets[0].Id, null, 5, null, removed.Version));
+            new CompleteWorkoutSetDto(exerciseId, removed.Exercises[0].Sets[0].Id, null, 5, null, false, removed.Version));
         var removedCompleted = await service.RemoveSetAsync(
             completed.Id,
             exerciseId,
@@ -485,6 +485,199 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
         Assert.Equal(8, final.Exercises[0].Sets[0].Repetitions);
     }
 
+    [Fact]
+    public async Task TimerWorkflow_ShouldPersistAndReconstructRunningPausedAndAdjustedState()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition, 180));
+        var exerciseId = started.Exercises[0].Id;
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+
+        var completed = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, null, 8, null, true, draft.Version));
+        Assert.Equal(3, completed.Version);
+        Assert.Equal(clock.UtcNow.AddSeconds(180), completed.RestTimerEndsAtUtc);
+
+        var reloadedRunning = await CreateSessionService(userId, clock).GetActiveSessionAsync();
+        Assert.Equal(completed.RestTimerEndsAtUtc, reloadedRunning!.RestTimerEndsAtUtc);
+        Assert.Equal(180, reloadedRunning.RestTimerDurationSeconds);
+
+        clock.UtcNow = clock.UtcNow.AddSeconds(60);
+        var paused = await service.PauseRestTimerAsync(
+            completed.Id,
+            new TimerTimestampDto(completed.Version));
+        Assert.Equal(4, paused.Version);
+        Assert.Null(paused.RestTimerEndsAtUtc);
+        Assert.Equal(120, paused.RestTimerPausedRemainingSeconds);
+
+        var reloadedPaused = await CreateSessionService(userId, clock).GetActiveSessionAsync();
+        Assert.Equal(120, reloadedPaused!.RestTimerPausedRemainingSeconds);
+
+        clock.UtcNow = clock.UtcNow.AddSeconds(30);
+        var resumed = await service.ResumeRestTimerAsync(
+            paused.Id,
+            new TimerTimestampDto(paused.Version));
+        Assert.Equal(5, resumed.Version);
+        Assert.Equal(clock.UtcNow.AddSeconds(120), resumed.RestTimerEndsAtUtc);
+        Assert.Null(resumed.RestTimerPausedRemainingSeconds);
+        var reloadedResumed = await CreateSessionService(userId, clock).GetActiveSessionAsync();
+        Assert.Equal(resumed.RestTimerEndsAtUtc, reloadedResumed!.RestTimerEndsAtUtc);
+        Assert.Null(reloadedResumed.RestTimerPausedRemainingSeconds);
+
+        clock.UtcNow = clock.UtcNow.AddSeconds(10);
+        var adjusted = await service.AdjustRestTimerAsync(
+            resumed.Id,
+            new AdjustRestTimerDto(210, resumed.Version));
+        Assert.Equal(6, adjusted.Version);
+        Assert.Equal(210, adjusted.RestTimerDurationSeconds);
+        Assert.Equal(clock.UtcNow.AddSeconds(210), adjusted.RestTimerEndsAtUtc);
+
+        var reset = await service.ResetRestTimerAsync(
+            adjusted.Id,
+            new TimerTimestampDto(adjusted.Version));
+        Assert.Equal(7, reset.Version);
+        Assert.Equal(210, reset.RestTimerDurationSeconds);
+        Assert.Equal(clock.UtcNow.AddSeconds(210), reset.RestTimerEndsAtUtc);
+
+        var cleared = await service.ClearRestTimerAsync(reset.Id, reset.Version);
+        Assert.Equal(8, cleared.Version);
+        Assert.Null(cleared.RestTimerDurationSeconds);
+        Assert.Null(cleared.RestTimerEndsAtUtc);
+        Assert.Null(cleared.RestTimerPausedRemainingSeconds);
+    }
+
+    [Fact]
+    public async Task PauseExpiredTimer_ShouldClearTimerWithoutNegativeRemaining()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var service = CreateSessionService(userId, clock);
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var running = await service.StartRestTimerAsync(started.Id, new StartRestTimerDto(60, started.Version));
+
+        clock.UtcNow = clock.UtcNow.AddSeconds(65);
+        var cleared = await service.PauseRestTimerAsync(running.Id, new TimerTimestampDto(running.Version));
+
+        Assert.Equal(running.Version + 1, cleared.Version);
+        Assert.Null(cleared.RestTimerDurationSeconds);
+        Assert.Null(cleared.RestTimerEndsAtUtc);
+        Assert.Null(cleared.RestTimerPausedRemainingSeconds);
+    }
+
+    [Fact]
+    public async Task CompleteSetTimer_ShouldUseSessionRestSnapshotAndOneCoherentClock()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var template = await CreateTemplateAsync(userId, [definition]);
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartFromTemplateAsync(new StartTemplateWorkoutDto(template.Id, default, default));
+        var templateRepository = new WorkoutTemplateRepository(_fixture.CreateDbContextFactory());
+        var mutableTemplate = await templateRepository.GetByIdAsync(userId, template.Id);
+        mutableTemplate!.UpdateExercise(mutableTemplate.Exercises[0].Id, definition.LoggingMode, 3, 6, 10, 60);
+        await templateRepository.UpdateAsync(userId, mutableTemplate, template.Version);
+
+        var exerciseId = started.Exercises[0].Id;
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+        var completed = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, null, 8, null, true, draft.Version));
+
+        Assert.Equal(90, completed.RestTimerDurationSeconds);
+        Assert.Equal(clock.UtcNow.AddSeconds(90), completed.RestTimerEndsAtUtc);
+        Assert.Equal(completed.Exercises[0].Sets[0].CompletedAtUtc!.Value.AddSeconds(90), completed.RestTimerEndsAtUtc);
+    }
+
+    [Fact]
+    public async Task CompleteSetWithZeroDefaultRest_ShouldNotStartTimerOrDoubleIncrementVersion()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition, 0));
+        var exerciseId = started.Exercises[0].Id;
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+
+        var completed = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(exerciseId, draft.Exercises[0].Sets[0].Id, null, 8, null, true, draft.Version));
+
+        Assert.Equal(draft.Version + 1, completed.Version);
+        Assert.Null(completed.RestTimerDurationSeconds);
+        Assert.Null(completed.RestTimerEndsAtUtc);
+        Assert.Null(completed.RestTimerPausedRemainingSeconds);
+    }
+
+    [Fact]
+    public async Task ConcurrentTimerMutations_ShouldRejectStaleAggregateWrite()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var started = await CreateSessionService(userId, clock).StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var running = await CreateSessionService(userId, clock).StartRestTimerAsync(
+            started.Id,
+            new StartRestTimerDto(180, started.Version));
+        var repository = new WorkoutSessionRepository(_fixture.CreateDbContextFactory());
+        var first = await repository.GetByIdAsync(userId, running.Id);
+        var second = await repository.GetByIdAsync(userId, running.Id);
+
+        first!.AdjustRestTimer(210, clock.UtcNow);
+        second!.ClearRestTimer();
+        var accepted = await repository.UpdateAsync(userId, first, running.Version);
+        var rejected = await repository.UpdateAsync(userId, second, running.Version);
+
+        Assert.Equal(WorkoutSessionWriteStatus.Succeeded, accepted.Status);
+        Assert.Equal(WorkoutSessionWriteStatus.ConcurrencyConflict, rejected.Status);
+        var final = await CreateSessionService(userId, clock).GetActiveSessionAsync();
+        Assert.Equal(running.Version + 1, final!.Version);
+        Assert.Equal(210, final.RestTimerDurationSeconds);
+        Assert.Equal(clock.UtcNow.AddSeconds(210), final.RestTimerEndsAtUtc);
+    }
+
+    [Fact]
+    public async Task InvalidTimerCommands_ShouldLeaveSessionUnchangedAndHideCrossUserAccess()
+    {
+        var owner = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var started = await CreateSessionService(owner, clock).StartCustomWorkoutAsync(CreateCustomRequest(definition));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateSessionService(owner, clock).PauseRestTimerAsync(
+            started.Id,
+            new TimerTimestampDto(started.Version)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateSessionService(owner, clock).ResumeRestTimerAsync(
+            started.Id,
+            new TimerTimestampDto(started.Version)));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => CreateSessionService(owner, clock).StartRestTimerAsync(
+            started.Id,
+            new StartRestTimerDto(0, started.Version)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateSessionService(owner, clock).AdjustRestTimerAsync(
+            started.Id,
+            new AdjustRestTimerDto(120, started.Version)));
+        await Assert.ThrowsAsync<ResourceNotFoundException>(() => CreateSessionService(other, clock).StartRestTimerAsync(
+            started.Id,
+            new StartRestTimerDto(60, started.Version)));
+
+        var unchanged = await CreateSessionService(owner, clock).GetActiveSessionAsync();
+        Assert.Equal(started.Version, unchanged!.Version);
+        Assert.Null(unchanged.RestTimerDurationSeconds);
+    }
+
     private async Task<WorkoutTemplate> CreateTemplateAsync(
         Guid userId,
         IReadOnlyList<ExerciseDefinition> definitions,
@@ -506,7 +699,7 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
         return template;
     }
 
-    private static StartCustomWorkoutDto CreateCustomRequest(ExerciseDefinition definition) =>
+    private static StartCustomWorkoutDto CreateCustomRequest(ExerciseDefinition definition, int defaultRestSeconds = 90) =>
         new(
             "Custom Day",
             default,
@@ -518,16 +711,16 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
                 3,
                 IsRepBased(definition.LoggingMode) ? 6 : null,
                 IsRepBased(definition.LoggingMode) ? 10 : null,
-                90)]);
+                defaultRestSeconds)]);
 
-    private WorkoutSessionService CreateSessionService(Guid userId) =>
+    private WorkoutSessionService CreateSessionService(Guid userId, IDateTimeProvider? dateTimeProvider = null) =>
         new(
             new WorkoutSessionRepository(_fixture.CreateDbContextFactory()),
             new WorkoutTemplateRepository(_fixture.CreateDbContextFactory()),
             new ExerciseRepository(_fixture.CreateDbContextFactory()),
             new UserSettingsRepository(_fixture.CreateDbContextFactory()),
             new TestCurrentUserService(userId),
-            new TestDateTimeProvider());
+            dateTimeProvider ?? new TestDateTimeProvider());
 
     private static bool IsRepBased(ExerciseLoggingMode mode) =>
         mode is ExerciseLoggingMode.WeightAndReps or ExerciseLoggingMode.BodyweightAndReps or ExerciseLoggingMode.AddedWeightAndReps or ExerciseLoggingMode.AssistedWeightAndReps or ExerciseLoggingMode.RepsOnly;
@@ -540,7 +733,7 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
 
     private sealed class TestDateTimeProvider : IDateTimeProvider
     {
-        public DateTimeOffset UtcNow => new(2026, 8, 9, 12, 0, 0, TimeSpan.Zero);
+        public DateTimeOffset UtcNow { get; set; } = new(2026, 8, 9, 12, 0, 0, TimeSpan.Zero);
         public bool IsValidTimeZone(string timeZoneId) => timeZoneId == "UTC";
         public DateOnly GetCurrentDate(string timeZoneId) => new(2026, 8, 9);
         public LocalTimeConversionResult ConvertLocalToUtc(DateOnly localDate, TimeOnly localTime, string timeZoneId) =>

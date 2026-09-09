@@ -117,20 +117,18 @@ public sealed record CompleteWorkoutSetDto(
     decimal? WeightKg,
     int? Repetitions,
     int? DurationSeconds,
+    bool StartRestTimer,
     long ExpectedVersion);
 
 public sealed record StartRestTimerDto(
     int DurationSeconds,
-    DateTimeOffset NowUtc,
     long ExpectedVersion);
 
 public sealed record TimerTimestampDto(
-    DateTimeOffset NowUtc,
     long ExpectedVersion);
 
 public sealed record AdjustRestTimerDto(
     int DurationSeconds,
-    DateTimeOffset NowUtc,
     long ExpectedVersion);
 
 public sealed record CompleteWorkoutDto(

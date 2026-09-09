@@ -69,4 +69,34 @@ public interface IWorkoutSessionService
         Guid sessionId,
         CompleteWorkoutSetDto dto,
         CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> StartRestTimerAsync(
+        Guid sessionId,
+        StartRestTimerDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> PauseRestTimerAsync(
+        Guid sessionId,
+        TimerTimestampDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> ResumeRestTimerAsync(
+        Guid sessionId,
+        TimerTimestampDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> ResetRestTimerAsync(
+        Guid sessionId,
+        TimerTimestampDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> AdjustRestTimerAsync(
+        Guid sessionId,
+        AdjustRestTimerDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> ClearRestTimerAsync(
+        Guid sessionId,
+        long expectedVersion,
+        CancellationToken cancellationToken = default);
 }

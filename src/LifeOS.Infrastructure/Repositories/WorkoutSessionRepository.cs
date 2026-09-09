@@ -47,6 +47,9 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
 
         context.Entry(existing).Property(item => item.Version).OriginalValue = expectedVersion;
         context.Entry(existing).Property(item => item.Version).CurrentValue = session.Version;
+        context.Entry(existing).Property(item => item.RestTimerDurationSeconds).CurrentValue = session.RestTimerDurationSeconds;
+        context.Entry(existing).Property(item => item.RestTimerEndsAtUtc).CurrentValue = session.RestTimerEndsAtUtc;
+        context.Entry(existing).Property(item => item.RestTimerPausedRemainingSeconds).CurrentValue = session.RestTimerPausedRemainingSeconds;
 
         var existingById = existing.Exercises.ToDictionary(item => item.Id);
         var proposedIds = session.Exercises.Select(item => item.Id).ToHashSet();
