@@ -99,4 +99,14 @@ public interface IWorkoutSessionService
         Guid sessionId,
         long expectedVersion,
         CancellationToken cancellationToken = default);
+
+    Task<WorkoutCompletionSummaryDto> CompleteWorkoutAsync(
+        Guid sessionId,
+        CompleteWorkoutDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto> DiscardWorkoutAsync(
+        Guid sessionId,
+        DiscardWorkoutDto dto,
+        CancellationToken cancellationToken = default);
 }

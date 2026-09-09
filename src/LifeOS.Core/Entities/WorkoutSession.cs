@@ -370,7 +370,13 @@ public sealed class WorkoutSession : UserOwnedEntity
             }
         }
 
-        CompletedAtUtc = RequireTime(completedAtUtc);
+        var completedTime = RequireTime(completedAtUtc);
+        if (completedTime < StartedAtUtc)
+        {
+            throw new ArgumentException("Completion time cannot precede workout start time.", nameof(completedAtUtc));
+        }
+
+        CompletedAtUtc = completedTime;
         DiscardedAtUtc = null;
         SessionFeeling = feeling;
         Status = WorkoutSessionStatus.Completed;

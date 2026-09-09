@@ -47,6 +47,10 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
 
         context.Entry(existing).Property(item => item.Version).OriginalValue = expectedVersion;
         context.Entry(existing).Property(item => item.Version).CurrentValue = session.Version;
+        context.Entry(existing).Property(item => item.Status).CurrentValue = session.Status;
+        context.Entry(existing).Property(item => item.CompletedAtUtc).CurrentValue = session.CompletedAtUtc;
+        context.Entry(existing).Property(item => item.DiscardedAtUtc).CurrentValue = session.DiscardedAtUtc;
+        context.Entry(existing).Property(item => item.SessionFeeling).CurrentValue = session.SessionFeeling;
         context.Entry(existing).Property(item => item.RestTimerDurationSeconds).CurrentValue = session.RestTimerDurationSeconds;
         context.Entry(existing).Property(item => item.RestTimerEndsAtUtc).CurrentValue = session.RestTimerEndsAtUtc;
         context.Entry(existing).Property(item => item.RestTimerPausedRemainingSeconds).CurrentValue = session.RestTimerPausedRemainingSeconds;

@@ -678,6 +678,216 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
         Assert.Null(unchanged.RestTimerDurationSeconds);
     }
 
+    [Fact]
+    public async Task CompleteWorkout_ShouldPersistTerminalStateCleanDraftsSkipUntouchedAndReturnSummary()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definitions = ExerciseDefaults.Definitions
+            .Where(item => item.LoggingMode is ExerciseLoggingMode.RepsOnly or ExerciseLoggingMode.Duration)
+            .Take(2)
+            .ToArray();
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartCustomWorkoutAsync(new StartCustomWorkoutDto(
+            "Completion Day",
+            default,
+            default,
+            definitions.Select(definition => new StartWorkoutExerciseDto(
+                definition.Id,
+                "ignored",
+                definition.LoggingMode,
+                3,
+                IsRepBased(definition.LoggingMode) ? 6 : null,
+                IsRepBased(definition.LoggingMode) ? 10 : null,
+                90)).ToArray()));
+        var performed = started.Exercises[0];
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(performed.Id, WorkoutSetKind.WarmUp, null, null, null, started.Version));
+        var completedSet = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(performed.Id, draft.Exercises[0].Sets[0].Id, null, 8, null, true, draft.Version));
+        var draftSet = await service.AddSetAsync(
+            completedSet.Id,
+            new AddWorkoutSetDto(performed.Id, WorkoutSetKind.Working, null, null, null, completedSet.Version));
+        var draftSetId = draftSet.Exercises[0].Sets.Single(set => !set.CompletedAtUtc.HasValue).Id;
+
+        var summary = await service.CompleteWorkoutAsync(
+            draftSet.Id,
+            new CompleteWorkoutDto(SessionFeeling.Good, draftSet.Version));
+
+        Assert.Equal(started.Id, summary.SessionId);
+        Assert.Equal("Completion Day", summary.NameSnapshot);
+        Assert.Equal(2, summary.ExerciseCount);
+        Assert.Equal(1, summary.CompletedExerciseCount);
+        Assert.Equal(0, summary.WorkingSetCount);
+        Assert.Equal(SessionFeeling.Good, summary.SessionFeeling);
+        Assert.Single(summary.Performance);
+
+        var completed = await service.GetSessionAsync(started.Id);
+        Assert.NotNull(completed);
+        Assert.Equal(WorkoutSessionStatus.Completed, completed!.Status);
+        Assert.True(completed.CompletedAtUtc.HasValue);
+        Assert.Null(completed.RestTimerDurationSeconds);
+        Assert.Null(completed.RestTimerEndsAtUtc);
+        Assert.Null(completed.RestTimerPausedRemainingSeconds);
+        Assert.Single(completed.Exercises[0].Sets);
+        Assert.True(completed.Exercises[1].IsSkipped);
+        Assert.Null(await service.GetActiveSessionAsync());
+
+        await using var context = _fixture.CreateDbContext();
+        Assert.True(await context.WorkoutSets.IgnoreQueryFilters().AnyAsync(item => item.Id == draftSetId && item.IsDeleted));
+        Assert.Equal(1, await context.WorkoutSessions.CountAsync(item => item.UserId == userId && item.Status == WorkoutSessionStatus.Completed));
+        var next = await service.StartCustomWorkoutAsync(CreateCustomRequest(definitions[0]));
+        Assert.NotEqual(started.Id, next.Id);
+    }
+
+    [Fact]
+    public async Task DiscardWorkout_ShouldPersistTerminalStateAndReleaseActiveSession()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var running = await service.StartRestTimerAsync(started.Id, new StartRestTimerDto(120, started.Version));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CompleteWorkoutAsync(
+            running.Id,
+            new CompleteWorkoutDto(null, running.Version)));
+
+        var discarded = await service.DiscardWorkoutAsync(
+            running.Id,
+            new DiscardWorkoutDto(running.Version));
+
+        Assert.Equal(WorkoutSessionStatus.Discarded, discarded.Status);
+        Assert.Equal(clock.UtcNow, discarded.DiscardedAtUtc);
+        Assert.Null(discarded.CompletedAtUtc);
+        Assert.Null(discarded.RestTimerDurationSeconds);
+        Assert.Null(await service.GetActiveSessionAsync());
+        await Assert.ThrowsAsync<ValidationException>(() => service.StartRestTimerAsync(
+            discarded.Id,
+            new StartRestTimerDto(60, discarded.Version)));
+
+        var next = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        Assert.NotEqual(started.Id, next.Id);
+        Assert.Equal(WorkoutSessionStatus.InProgress, next.Status);
+    }
+
+    [Fact]
+    public async Task CompletionSummary_ShouldKeepModeSpecificMeasuresSeparate()
+    {
+        var userId = Guid.NewGuid();
+        var definitions = ExerciseDefaults.Definitions
+            .GroupBy(item => item.LoggingMode)
+            .Select(group => group.First())
+            .ToArray();
+        Assert.Equal(7, definitions.Length);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(new StartCustomWorkoutDto(
+            "Summary Day",
+            default,
+            default,
+            definitions.Select(definition => new StartWorkoutExerciseDto(
+                definition.Id,
+                definition.Name,
+                definition.LoggingMode,
+                1,
+                IsRepBased(definition.LoggingMode) ? 1 : null,
+                IsRepBased(definition.LoggingMode) ? 10 : null,
+                90)).ToArray()));
+        var current = started;
+
+        foreach (var exercise in started.Exercises)
+        {
+            var draft = await service.AddSetAsync(
+                current.Id,
+                new AddWorkoutSetDto(exercise.Id, WorkoutSetKind.Working, null, null, null, current.Version));
+            var definition = definitions.Single(item => item.LoggingMode == exercise.LoggingModeSnapshot);
+            var completed = definition.LoggingMode switch
+            {
+                ExerciseLoggingMode.WeightAndReps => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, 10m, 5, null, false, draft.Version),
+                ExerciseLoggingMode.BodyweightAndReps => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, null, 6, null, false, draft.Version),
+                ExerciseLoggingMode.AddedWeightAndReps => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, 20m, 3, null, false, draft.Version),
+                ExerciseLoggingMode.AssistedWeightAndReps => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, 25m, 4, null, false, draft.Version),
+                ExerciseLoggingMode.RepsOnly => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, null, 7, null, false, draft.Version),
+                ExerciseLoggingMode.Duration => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, null, null, 30, false, draft.Version),
+                ExerciseLoggingMode.WeightAndDuration => new CompleteWorkoutSetDto(exercise.Id, draft.Exercises.Single(item => item.Id == exercise.Id).Sets[0].Id, 15m, null, 20, false, draft.Version),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            current = await service.CompleteSetAsync(draft.Id, completed);
+        }
+
+        var summary = await service.CompleteWorkoutAsync(current.Id, new CompleteWorkoutDto(null, current.Version));
+        Assert.Equal(7, summary.CompletedExerciseCount);
+        Assert.Equal(7, summary.WorkingSetCount);
+        Assert.Equal(10m * 5, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.WeightAndReps).ExternalLoadTimesRepsKg);
+        Assert.Equal(20m * 3, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.AddedWeightAndReps).AddedWeightTimesRepsKg);
+        Assert.Equal(6, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.BodyweightAndReps).CompletedRepetitions);
+        Assert.Equal(7, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly).CompletedRepetitions);
+        Assert.Equal(30, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.Duration).CompletedDurationSeconds);
+        Assert.Equal(20, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.WeightAndDuration).CompletedDurationSeconds);
+        Assert.Equal(15m, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.WeightAndDuration).BestWeightKg);
+        Assert.Equal(25m, summary.Performance.Single(item => item.LoggingMode == ExerciseLoggingMode.AssistedWeightAndReps).AssistanceWeightKg);
+    }
+
+    [Fact]
+    public async Task CompletedWorkout_ShouldRejectFurtherSessionSetExerciseAndTimerMutations()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, started.Version));
+        var completedSet = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, draft.Exercises[0].Sets[0].Id, null, 8, null, false, draft.Version));
+        await service.CompleteWorkoutAsync(completedSet.Id, new CompleteWorkoutDto(null, completedSet.Version));
+        var terminal = await service.GetSessionAsync(started.Id);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(terminal!.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, terminal.Version)));
+        await Assert.ThrowsAsync<ValidationException>(() => service.SkipExerciseAsync(
+            started.Id,
+            terminal!.Exercises[0].Id,
+            terminal.Version));
+        await Assert.ThrowsAsync<ValidationException>(() => service.StartRestTimerAsync(
+            started.Id,
+            new StartRestTimerDto(60, terminal.Version)));
+    }
+
+    [Fact]
+    public async Task CompleteVsDiscard_ShouldAllowExactlyOnePostgreSqlWinner()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, started.Version));
+        var completedSet = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, draft.Exercises[0].Sets[0].Id, null, 8, null, false, draft.Version));
+        var repository = new WorkoutSessionRepository(_fixture.CreateDbContextFactory());
+        var first = await repository.GetByIdAsync(userId, completedSet.Id);
+        var second = await repository.GetByIdAsync(userId, completedSet.Id);
+        first!.Complete(new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero));
+        second!.Discard(new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero));
+
+        var firstResult = await repository.UpdateAsync(userId, first, completedSet.Version);
+        var secondResult = await repository.UpdateAsync(userId, second, completedSet.Version);
+
+        Assert.Equal(WorkoutSessionWriteStatus.Succeeded, firstResult.Status);
+        Assert.Equal(WorkoutSessionWriteStatus.ConcurrencyConflict, secondResult.Status);
+        var persisted = await repository.GetByIdAsync(userId, completedSet.Id);
+        Assert.Equal(WorkoutSessionStatus.Completed, persisted!.Status);
+        Assert.Equal(completedSet.Version + 1, persisted.Version);
+    }
+
     private async Task<WorkoutTemplate> CreateTemplateAsync(
         Guid userId,
         IReadOnlyList<ExerciseDefinition> definitions,

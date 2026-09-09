@@ -271,6 +271,40 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
         return await PersistMutationAsync(session, expectedVersion, cancellationToken);
     }
 
+    public async Task<WorkoutCompletionSummaryDto> CompleteWorkoutAsync(
+        Guid sessionId,
+        CompleteWorkoutDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.Complete(_dateTimeProvider.UtcNow, dto.SessionFeeling);
+        var result = await _sessionRepository.UpdateAsync(
+            session.UserId,
+            session,
+            dto.ExpectedVersion,
+            cancellationToken);
+        EnsureWriteSucceeded(result.Status);
+
+        var authoritative = await _sessionRepository.GetByIdAsync(
+            session.UserId,
+            session.Id,
+            cancellationToken)
+            ?? throw new ResourceNotFoundException("The completed workout could not be loaded.");
+        return ToCompletionSummary(authoritative);
+    }
+
+    public async Task<WorkoutSessionDetailDto> DiscardWorkoutAsync(
+        Guid sessionId,
+        DiscardWorkoutDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var session = await GetMutableSessionAsync(sessionId, dto.ExpectedVersion, cancellationToken);
+        session.Discard(_dateTimeProvider.UtcNow);
+        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+    }
+
     public async Task<WorkoutSessionDetailDto> StartFromTemplateAsync(
         StartTemplateWorkoutDto dto,
         CancellationToken cancellationToken = default)
@@ -575,5 +609,91 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
                             set.CompletedAtUtc))
                         .ToList()))
                 .ToList());
+
+    private static WorkoutCompletionSummaryDto ToCompletionSummary(WorkoutSession session)
+    {
+        var completedExercises = session.Exercises
+            .Where(exercise => exercise.Sets.Any(set => set.IsCompleted))
+            .ToList();
+        var performance = completedExercises
+            .Select(ToPerformanceSummary)
+            .ToList();
+
+        return new WorkoutCompletionSummaryDto(
+            session.Id,
+            session.NameSnapshot,
+            session.CompletedAtUtc!.Value - session.StartedAtUtc,
+            session.Exercises.Count,
+            session.Exercises.Count(exercise => exercise.Sets.Any(set => set.IsCompleted)),
+            completedExercises.Sum(exercise => exercise.Sets.Count(set => set.IsCompleted && set.Kind == WorkoutSetKind.Working)),
+            session.SessionFeeling,
+            performance);
+    }
+
+    private static WorkoutPerformanceSummaryDto ToPerformanceSummary(WorkoutSessionExercise exercise)
+    {
+        var workingSets = exercise.Sets
+            .Where(set => set.IsCompleted && set.Kind == WorkoutSetKind.Working)
+            .ToList();
+
+        if (workingSets.Count == 0)
+        {
+            return new WorkoutPerformanceSummaryDto(
+                exercise.Id,
+                exercise.ExerciseNameSnapshot,
+                exercise.LoggingModeSnapshot,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+        }
+
+        decimal? externalLoadTimesReps = null;
+        decimal? addedWeightTimesReps = null;
+        decimal? assistanceWeight = null;
+        decimal? bestWeight = null;
+        int? repetitions = null;
+        int? durationSeconds = null;
+
+        switch (exercise.LoggingModeSnapshot)
+        {
+            case ExerciseLoggingMode.WeightAndReps:
+                externalLoadTimesReps = workingSets.Sum(set => set.WeightKg!.Value * set.Repetitions!.Value);
+                repetitions = workingSets.Sum(set => set.Repetitions!.Value);
+                break;
+            case ExerciseLoggingMode.AddedWeightAndReps:
+                addedWeightTimesReps = workingSets.Sum(set => set.WeightKg!.Value * set.Repetitions!.Value);
+                repetitions = workingSets.Sum(set => set.Repetitions!.Value);
+                break;
+            case ExerciseLoggingMode.BodyweightAndReps:
+            case ExerciseLoggingMode.RepsOnly:
+                repetitions = workingSets.Sum(set => set.Repetitions!.Value);
+                break;
+            case ExerciseLoggingMode.Duration:
+                durationSeconds = workingSets.Sum(set => set.DurationSeconds!.Value);
+                break;
+            case ExerciseLoggingMode.WeightAndDuration:
+                bestWeight = workingSets.Count == 0 ? null : workingSets.Max(set => set.WeightKg!.Value);
+                durationSeconds = workingSets.Sum(set => set.DurationSeconds!.Value);
+                break;
+            case ExerciseLoggingMode.AssistedWeightAndReps:
+                assistanceWeight = workingSets.Count == 0 ? null : workingSets.Max(set => set.WeightKg!.Value);
+                repetitions = workingSets.Sum(set => set.Repetitions!.Value);
+                break;
+        }
+
+        return new WorkoutPerformanceSummaryDto(
+            exercise.Id,
+            exercise.ExerciseNameSnapshot,
+            exercise.LoggingModeSnapshot,
+            externalLoadTimesReps,
+            addedWeightTimesReps,
+            assistanceWeight,
+            bestWeight,
+            repetitions,
+            durationSeconds);
+    }
 
 }

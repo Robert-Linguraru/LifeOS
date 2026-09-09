@@ -132,18 +132,20 @@ public sealed record AdjustRestTimerDto(
     long ExpectedVersion);
 
 public sealed record CompleteWorkoutDto(
-    DateTimeOffset CompletedAtUtc,
     SessionFeeling? SessionFeeling,
     long ExpectedVersion);
 
 public sealed record DiscardWorkoutDto(
-    DateTimeOffset DiscardedAtUtc,
     long ExpectedVersion);
 
 public sealed record WorkoutPerformanceSummaryDto(
     Guid SessionExerciseId,
     string ExerciseNameSnapshot,
+    ExerciseLoggingMode LoggingMode,
     decimal? ExternalLoadTimesRepsKg,
+    decimal? AddedWeightTimesRepsKg,
+    decimal? AssistanceWeightKg,
+    decimal? BestWeightKg,
     int? CompletedRepetitions,
     int? CompletedDurationSeconds);
 
