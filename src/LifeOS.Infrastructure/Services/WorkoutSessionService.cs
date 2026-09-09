@@ -1,0 +1,266 @@
+using LifeOS.Core.Abstractions;
+using LifeOS.Core.Abstractions.Fitness;
+using LifeOS.Core.Abstractions.WorkoutSessions;
+using LifeOS.Core.Abstractions.WorkoutTemplates;
+using LifeOS.Core.DTOs.WorkoutSessions;
+using LifeOS.Core.Entities;
+using LifeOS.Core.Enums.Fitness;
+using LifeOS.Core.Exceptions;
+using LifeOS.Core.Services;
+
+namespace LifeOS.Infrastructure.Services;
+
+public sealed class WorkoutSessionService : IWorkoutSessionService
+{
+    private readonly IWorkoutSessionRepository _sessionRepository;
+    private readonly IWorkoutTemplateRepository _templateRepository;
+    private readonly IExerciseRepository _exerciseRepository;
+    private readonly IUserSettingsRepository _userSettingsRepository;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IDateTimeProvider _dateTimeProvider;
+
+    public WorkoutSessionService(
+        IWorkoutSessionRepository sessionRepository,
+        IWorkoutTemplateRepository templateRepository,
+        IExerciseRepository exerciseRepository,
+        IUserSettingsRepository userSettingsRepository,
+        ICurrentUserService currentUser,
+        IDateTimeProvider dateTimeProvider)
+    {
+        _sessionRepository = sessionRepository;
+        _templateRepository = templateRepository;
+        _exerciseRepository = exerciseRepository;
+        _userSettingsRepository = userSettingsRepository;
+        _currentUser = currentUser;
+        _dateTimeProvider = dateTimeProvider;
+    }
+
+    public async Task<WorkoutSessionDetailDto?> GetActiveSessionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetActiveByUserIdAsync(
+            GetCurrentUserId(),
+            cancellationToken);
+        return session is null ? null : ToDetail(session);
+    }
+
+    public async Task<WorkoutSessionDetailDto> StartFromTemplateAsync(
+        StartTemplateWorkoutDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var userId = GetCurrentUserId();
+        var existing = await _sessionRepository.GetActiveByUserIdAsync(userId, cancellationToken);
+        if (existing is not null)
+        {
+            return ToDetail(existing);
+        }
+
+        var template = await _templateRepository.GetByIdAsync(userId, dto.TemplateId, cancellationToken)
+            ?? throw new ResourceNotFoundException("Workout template was not found.");
+        if (template.Exercises.Count == 0)
+        {
+            throw new ValidationException("A workout template must contain at least one exercise.");
+        }
+
+        var exerciseIds = template.Exercises.Select(item => item.ExerciseId).Distinct().ToArray();
+        var exercises = await _exerciseRepository.GetActiveByIdsAsync(exerciseIds, cancellationToken);
+        var byId = exercises.ToDictionary(item => item.Id);
+        var session = new WorkoutSession(
+            Guid.NewGuid(),
+            userId,
+            template.Name,
+            await GetWorkoutDateAsync(userId, cancellationToken),
+            _dateTimeProvider.UtcNow,
+            template.Id);
+
+        foreach (var templateExercise in template.Exercises.OrderBy(item => item.SortOrder))
+        {
+            if (!byId.TryGetValue(templateExercise.ExerciseId, out var exercise))
+            {
+                throw new ResourceNotFoundException("A Template Exercise is no longer active.");
+            }
+
+            session.AddInitialExercise(
+                exercise.Id,
+                exercise.Name,
+                exercise.LoggingMode,
+                templateExercise.TargetSetCount,
+                templateExercise.TargetRepMin,
+                templateExercise.TargetRepMax,
+                templateExercise.DefaultRestSeconds);
+        }
+
+        return await PersistStartAsync(session, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto> StartCustomWorkoutAsync(
+        StartCustomWorkoutDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var userId = GetCurrentUserId();
+        var existing = await _sessionRepository.GetActiveByUserIdAsync(userId, cancellationToken);
+        if (existing is not null)
+        {
+            return ToDetail(existing);
+        }
+
+        if (dto.Exercises is null || dto.Exercises.Count == 0)
+        {
+            throw new ValidationException("A Custom Workout must contain at least one Exercise.");
+        }
+
+        var requested = dto.Exercises.Select(item => (item.ExerciseId, item.LoggingModeSnapshot)).ToArray();
+        var exercises = await GetValidatedExercisesAsync(requested, cancellationToken);
+        var session = new WorkoutSession(
+            Guid.NewGuid(),
+            userId,
+            dto.NameSnapshot,
+            await GetWorkoutDateAsync(userId, cancellationToken),
+            _dateTimeProvider.UtcNow);
+
+        foreach (var item in dto.Exercises)
+        {
+            var exercise = exercises[item.ExerciseId];
+            session.AddInitialExercise(
+                exercise.Id,
+                exercise.Name,
+                exercise.LoggingMode,
+                item.TargetSetCountSnapshot,
+                item.TargetRepMinSnapshot,
+                item.TargetRepMaxSnapshot,
+                item.DefaultRestSecondsSnapshot);
+        }
+
+        return await PersistStartAsync(session, cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto?> GetSessionAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetByIdAsync(
+            GetCurrentUserId(),
+            sessionId,
+            cancellationToken);
+        return session is null ? null : ToDetail(session);
+    }
+
+    private async Task<WorkoutSessionDetailDto> PersistStartAsync(
+        WorkoutSession session,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sessionRepository.AddAsync(session, cancellationToken);
+        if (result.Status == WorkoutSessionWriteStatus.ActiveSessionAlreadyExists && result.Session is not null)
+        {
+            return ToDetail(result.Session);
+        }
+
+        if (result.Status != WorkoutSessionWriteStatus.Succeeded)
+        {
+            throw new InvalidOperationException("The workout session could not be started.");
+        }
+
+        var authoritative = await _sessionRepository.GetByIdAsync(
+            session.UserId,
+            session.Id,
+            cancellationToken);
+        return authoritative is null
+            ? throw new ResourceNotFoundException("The started workout session could not be loaded.")
+            : ToDetail(authoritative);
+    }
+
+    private async Task<Dictionary<Guid, Exercise>> GetValidatedExercisesAsync(
+        IReadOnlyCollection<(Guid ExerciseId, ExerciseLoggingMode LoggingMode)> requested,
+        CancellationToken cancellationToken)
+    {
+        if (requested.Any(item => item.ExerciseId == Guid.Empty))
+        {
+            throw new ValidationException("Exercise ID is required.");
+        }
+
+        var exercises = await _exerciseRepository.GetActiveByIdsAsync(
+            requested.Select(item => item.ExerciseId).Distinct().ToArray(),
+            cancellationToken);
+        var byId = exercises.ToDictionary(item => item.Id);
+        foreach (var item in requested)
+        {
+            if (!byId.TryGetValue(item.ExerciseId, out var exercise))
+            {
+                throw new ResourceNotFoundException("Active Exercise was not found.");
+            }
+
+            if (exercise.LoggingMode != item.LoggingMode)
+            {
+                throw new ValidationException("The Exercise logging mode does not match the catalog.");
+            }
+        }
+
+        return byId;
+    }
+
+    private async Task<DateOnly> GetWorkoutDateAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var settings = await _userSettingsRepository.GetByUserIdAsync(userId, cancellationToken);
+        var timeZoneId = settings?.TimeZoneId;
+        return _dateTimeProvider.GetCurrentDate(
+            string.IsNullOrWhiteSpace(timeZoneId) || !_dateTimeProvider.IsValidTimeZone(timeZoneId)
+                ? "UTC"
+                : timeZoneId);
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        if (!_currentUser.IsAuthenticated || _currentUser.UserId == Guid.Empty)
+        {
+            throw new CurrentUserUnavailableException();
+        }
+
+        return _currentUser.UserId;
+    }
+
+    private static WorkoutSessionDetailDto ToDetail(WorkoutSession session) =>
+        new(
+            session.Id,
+            session.OriginTemplateId,
+            session.NameSnapshot,
+            session.WorkoutDate,
+            session.StartedAtUtc,
+            session.Status,
+            session.CompletedAtUtc,
+            session.DiscardedAtUtc,
+            session.SessionFeeling,
+            session.Version,
+            session.RestTimerDurationSeconds,
+            session.RestTimerEndsAtUtc,
+            session.RestTimerPausedRemainingSeconds,
+            session.Exercises
+                .OrderBy(item => item.SortOrder)
+                .Select(exercise => new WorkoutSessionExerciseDto(
+                    exercise.Id,
+                    exercise.SortOrder,
+                    exercise.OriginalExerciseId,
+                    exercise.OriginalExerciseNameSnapshot,
+                    exercise.ExerciseId,
+                    exercise.ExerciseNameSnapshot,
+                    exercise.LoggingModeSnapshot,
+                    exercise.TargetSetCountSnapshot,
+                    exercise.TargetRepMinSnapshot,
+                    exercise.TargetRepMaxSnapshot,
+                    exercise.DefaultRestSecondsSnapshot,
+                    exercise.IsSkipped,
+                    exercise.Sets
+                        .OrderBy(set => set.SortOrder)
+                        .Select(set => new WorkoutSetDto(
+                            set.Id,
+                            set.SortOrder,
+                            set.Kind,
+                            set.WeightKg,
+                            set.Repetitions,
+                            set.DurationSeconds,
+                            set.CompletedAtUtc))
+                        .ToList()))
+                .ToList());
+
+}

@@ -30,28 +30,7 @@ public interface IWorkoutSessionRepository
         Guid sessionId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<WorkoutSessionSummaryDto>> GetHistoryAsync(
-        Guid userId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyDictionary<Guid, IReadOnlyList<StrengthSetEvidence>>> GetPreviousWorkingSetsAsync(
-        Guid userId,
-        IReadOnlyCollection<Guid> exerciseIds,
-        CancellationToken cancellationToken = default);
-
     Task<WorkoutSessionWriteResult> AddAsync(
         WorkoutSession session,
-        CancellationToken cancellationToken = default);
-
-    Task<WorkoutSessionWriteResult> UpdateAsync(
-        Guid userId,
-        WorkoutSession session,
-        long expectedVersion,
-        CancellationToken cancellationToken = default);
-
-    Task<WorkoutSessionWriteResult> DeleteAsync(
-        Guid userId,
-        Guid sessionId,
-        long expectedVersion,
         CancellationToken cancellationToken = default);
 }

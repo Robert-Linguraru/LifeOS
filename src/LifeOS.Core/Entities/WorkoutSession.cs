@@ -91,6 +91,47 @@ public sealed class WorkoutSession : UserOwnedEntity
         int defaultRestSecondsSnapshot)
     {
         EnsureInProgress();
+        var exercise = AddExerciseSnapshot(
+            exerciseId,
+            exerciseNameSnapshot,
+            loggingModeSnapshot,
+            targetSetCountSnapshot,
+            targetRepMinSnapshot,
+            targetRepMaxSnapshot,
+            defaultRestSecondsSnapshot);
+        IncrementVersion();
+        return exercise;
+    }
+
+    public WorkoutSessionExercise AddInitialExercise(
+        Guid exerciseId,
+        string exerciseNameSnapshot,
+        ExerciseLoggingMode loggingModeSnapshot,
+        int targetSetCountSnapshot,
+        int? targetRepMinSnapshot,
+        int? targetRepMaxSnapshot,
+        int defaultRestSecondsSnapshot)
+    {
+        EnsureInProgress();
+        return AddExerciseSnapshot(
+            exerciseId,
+            exerciseNameSnapshot,
+            loggingModeSnapshot,
+            targetSetCountSnapshot,
+            targetRepMinSnapshot,
+            targetRepMaxSnapshot,
+            defaultRestSecondsSnapshot);
+    }
+
+    private WorkoutSessionExercise AddExerciseSnapshot(
+        Guid exerciseId,
+        string exerciseNameSnapshot,
+        ExerciseLoggingMode loggingModeSnapshot,
+        int targetSetCountSnapshot,
+        int? targetRepMinSnapshot,
+        int? targetRepMaxSnapshot,
+        int defaultRestSecondsSnapshot)
+    {
         var exercise = new WorkoutSessionExercise(
             Guid.NewGuid(),
             UserId,
@@ -104,7 +145,6 @@ public sealed class WorkoutSession : UserOwnedEntity
             targetRepMaxSnapshot,
             defaultRestSecondsSnapshot);
         _exercises.Add(exercise);
-        IncrementVersion();
         return exercise;
     }
 
