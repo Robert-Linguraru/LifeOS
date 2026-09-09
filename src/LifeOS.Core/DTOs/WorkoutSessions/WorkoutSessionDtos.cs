@@ -49,8 +49,18 @@ public sealed record WorkoutSessionSummaryDto(
     WorkoutSessionStatus Status,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
+    TimeSpan? Duration,
     int ExerciseCount,
+    int CompletedExerciseCount,
+    int WorkingSetCount,
+    SessionFeeling? SessionFeeling,
     long Version);
+
+public sealed record WorkoutHistoryPageDto(
+    IReadOnlyList<WorkoutSessionSummaryDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
 
 public sealed record StartTemplateWorkoutDto(
     Guid TemplateId,
@@ -161,10 +171,19 @@ public sealed record WorkoutCompletionSummaryDto(
 
 public sealed record PreviousPerformanceDto(
     Guid ExerciseId,
+    string ExerciseNameSnapshot,
+    Guid SessionId,
+    string SessionNameSnapshot,
+    DateOnly WorkoutDate,
     DateTimeOffset CompletedAtUtc,
+    int SessionExerciseSortOrder,
     IReadOnlyList<WorkoutSetDto> WorkingSets);
 
 public sealed record ExerciseHistoryDto(
     Guid ExerciseId,
     string ExerciseNameSnapshot,
-    IReadOnlyList<PreviousPerformanceDto> Sessions);
+    ExerciseLoggingMode LoggingMode,
+    IReadOnlyList<PreviousPerformanceDto> Sessions,
+    int Page,
+    int PageSize,
+    int TotalCount);

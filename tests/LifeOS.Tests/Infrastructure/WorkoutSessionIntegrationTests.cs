@@ -831,6 +831,166 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
     }
 
     [Fact]
+    public async Task PreviousPerformance_ShouldSelectMostRecentEarlierActualExerciseOccurrence()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var first = await CreateCompletedSessionAsync(userId, definition, clock, 5);
+        clock.UtcNow = clock.UtcNow.AddHours(1);
+        var second = await CreateCompletedSessionAsync(userId, definition, clock, 8);
+        clock.UtcNow = clock.UtcNow.AddHours(1);
+        var current = await CreateSessionService(userId, clock).StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var currentDraft = await CreateSessionService(userId, clock).AddSetAsync(
+            current.Id,
+            new AddWorkoutSetDto(current.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, current.Version));
+        await CreateSessionService(userId, clock).CompleteSetAsync(
+            current.Id,
+            new CompleteWorkoutSetDto(current.Exercises[0].Id, currentDraft.Exercises[0].Sets[0].Id, null, 10, null, false, currentDraft.Version));
+
+        var results = await CreateSessionService(userId, clock).GetPreviousPerformancesAsync(
+            current.Id,
+            [definition.Id, definition.Id]);
+
+        var previous = Assert.Single(results);
+        Assert.Equal(second.Id, previous.SessionId);
+        Assert.Equal(definition.Id, previous.ExerciseId);
+        Assert.Equal(8, Assert.Single(previous.WorkingSets).Repetitions);
+        Assert.DoesNotContain(results, item => item.SessionId == current.Id || item.SessionId == first.Id);
+    }
+
+    [Fact]
+    public async Task PreviousPerformance_ShouldExcludeDiscardedAndWarmUpOnlyEvidence()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId, clock);
+        var discarded = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        await service.DiscardWorkoutAsync(discarded.Id, new DiscardWorkoutDto(discarded.Version));
+        clock.UtcNow = clock.UtcNow.AddHours(1);
+        var warmupOnly = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var draft = await service.AddSetAsync(
+            warmupOnly.Id,
+            new AddWorkoutSetDto(warmupOnly.Exercises[0].Id, WorkoutSetKind.WarmUp, null, null, null, warmupOnly.Version));
+        var completed = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(warmupOnly.Exercises[0].Id, draft.Exercises[0].Sets[0].Id, null, 8, null, false, draft.Version));
+        await service.CompleteWorkoutAsync(completed.Id, new CompleteWorkoutDto(null, completed.Version));
+        clock.UtcNow = clock.UtcNow.AddHours(1);
+        var current = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+
+        var results = await service.GetPreviousPerformancesAsync(current.Id, [definition.Id]);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task WorkoutHistory_ShouldBeCompletedOnlyPagedAndCountedServerSide()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var first = await CreateCompletedSessionAsync(userId, definition, clock, 5);
+        clock.UtcNow = clock.UtcNow.AddHours(1);
+        var second = await CreateCompletedSessionAsync(userId, definition, clock, 6);
+        clock.UtcNow = clock.UtcNow.AddHours(1);
+        var inProgress = await CreateSessionService(userId, clock).StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var otherUser = await CreateCompletedSessionAsync(Guid.NewGuid(), definition, clock, 9);
+
+        var pageOne = await CreateSessionService(userId, clock).GetWorkoutHistoryAsync(1, 1);
+        var pageTwo = await CreateSessionService(userId, clock).GetWorkoutHistoryAsync(2, 1);
+
+        Assert.Equal(2, pageOne.TotalCount);
+        Assert.Single(pageOne.Items);
+        Assert.Single(pageTwo.Items);
+        Assert.Equal(second.Id, pageOne.Items[0].Id);
+        Assert.Equal(first.Id, pageTwo.Items[0].Id);
+        Assert.Equal(1, pageOne.Items[0].CompletedExerciseCount);
+        Assert.Equal(1, pageOne.Items[0].WorkingSetCount);
+        Assert.DoesNotContain(pageOne.Items.Concat(pageTwo.Items), item => item.Id == inProgress.Id || item.Id == otherUser.Id);
+    }
+
+    [Fact]
+    public async Task CompletedDetail_ShouldUseHistoricalSnapshotsAfterTemplateChanges()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var template = await CreateTemplateAsync(userId, [definition], "Historical Name");
+        var service = CreateSessionService(userId);
+        var started = await service.StartFromTemplateAsync(new StartTemplateWorkoutDto(template.Id, default, default));
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, started.Version));
+        var completedSet = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, draft.Exercises[0].Sets[0].Id, null, 8, null, false, draft.Version));
+        await service.CompleteWorkoutAsync(completedSet.Id, new CompleteWorkoutDto(null, completedSet.Version));
+
+        var templateRepository = new WorkoutTemplateRepository(_fixture.CreateDbContextFactory());
+        var mutable = await templateRepository.GetByIdAsync(userId, template.Id);
+        mutable!.Rename("Changed Name");
+        await templateRepository.UpdateAsync(userId, mutable, template.Version);
+        await templateRepository.DeleteAsync(userId, template.Id, mutable.Version);
+
+        var detail = await service.GetCompletedWorkoutAsync(started.Id);
+
+        Assert.NotNull(detail);
+        Assert.Equal("Historical Name", detail!.NameSnapshot);
+        Assert.Equal(definition.Name, detail.Exercises[0].ExerciseNameSnapshot);
+        Assert.Single(detail.Exercises[0].Sets);
+        Assert.Equal(WorkoutSetKind.Working, detail.Exercises[0].Sets[0].Kind);
+    }
+
+    [Fact]
+    public async Task ExerciseHistory_ShouldUseActualIdentitySupportInactiveExercisesAndExcludeDiscarded()
+    {
+        var userId = Guid.NewGuid();
+        var clock = new TestDateTimeProvider();
+        var original = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var replacement = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly && item.Id != original.Id);
+        var template = await CreateTemplateAsync(userId, [original]);
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartFromTemplateAsync(new StartTemplateWorkoutDto(template.Id, default, default));
+        var substituted = await service.SubstituteExerciseAsync(
+            started.Id,
+            new SubstituteSessionExerciseDto(
+                started.Exercises[0].Id,
+                replacement.Id,
+                replacement.Name,
+                replacement.LoggingMode,
+                started.Version));
+        var draft = await service.AddSetAsync(
+            substituted.Id,
+            new AddWorkoutSetDto(substituted.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, substituted.Version));
+        var completedSet = await service.CompleteSetAsync(
+            substituted.Id,
+            new CompleteWorkoutSetDto(substituted.Exercises[0].Id, draft.Exercises[0].Sets[0].Id, null, 8, null, false, draft.Version));
+        await service.CompleteWorkoutAsync(completedSet.Id, new CompleteWorkoutDto(null, completedSet.Version));
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Exercises\" SET \"IsActive\" = false WHERE \"Id\" = {replacement.Id};");
+        }
+
+        try
+        {
+            var originalHistory = await service.GetExerciseHistoryAsync(original.Id);
+            var replacementHistory = await service.GetExerciseHistoryAsync(replacement.Id);
+
+            Assert.Empty(originalHistory.Sessions);
+            var occurrence = Assert.Single(replacementHistory.Sessions);
+            Assert.Equal(replacement.Id, occurrence.ExerciseId);
+            Assert.Equal(replacement.Name, occurrence.ExerciseNameSnapshot);
+        }
+        finally
+        {
+            await using var context = _fixture.CreateDbContext();
+            await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Exercises\" SET \"IsActive\" = true WHERE \"Id\" = {replacement.Id};");
+        }
+    }
+
+    [Fact]
     public async Task CompletedWorkout_ShouldRejectFurtherSessionSetExerciseAndTimerMutations()
     {
         var userId = Guid.NewGuid();
@@ -907,6 +1067,24 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
 
         await new WorkoutTemplateRepository(_fixture.CreateDbContextFactory()).AddAsync(template);
         return template;
+    }
+
+    private async Task<WorkoutSessionDetailDto> CreateCompletedSessionAsync(
+        Guid userId,
+        ExerciseDefinition definition,
+        TestDateTimeProvider clock,
+        int repetitions)
+    {
+        var service = CreateSessionService(userId, clock);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var draft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, started.Version));
+        var completedSet = await service.CompleteSetAsync(
+            draft.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, draft.Exercises[0].Sets[0].Id, null, repetitions, null, false, draft.Version));
+        await service.CompleteWorkoutAsync(completedSet.Id, new CompleteWorkoutDto(null, completedSet.Version));
+        return (await service.GetCompletedWorkoutAsync(started.Id))!;
     }
 
     private static StartCustomWorkoutDto CreateCustomRequest(ExerciseDefinition definition, int defaultRestSeconds = 90) =>

@@ -20,6 +20,26 @@ public interface IWorkoutSessionService
         Guid sessionId,
         CancellationToken cancellationToken = default);
 
+    Task<WorkoutHistoryPageDto> GetWorkoutHistoryAsync(
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSessionDetailDto?> GetCompletedWorkoutAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PreviousPerformanceDto>> GetPreviousPerformancesAsync(
+        Guid currentSessionId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        CancellationToken cancellationToken = default);
+
+    Task<ExerciseHistoryDto> GetExerciseHistoryAsync(
+        Guid exerciseId,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default);
+
     Task<WorkoutSessionDetailDto> AddExerciseAsync(
         Guid sessionId,
         AddSessionExerciseDto dto,

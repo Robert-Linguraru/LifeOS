@@ -144,6 +144,195 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
                 cancellationToken);
     }
 
+    public async Task<WorkoutSession?> GetCompletedByIdAsync(
+        Guid userId,
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        return await QueryDetails(context.WorkoutSessions)
+            .Where(session => session.UserId == userId
+                && session.Id == sessionId
+                && session.Status == WorkoutSessionStatus.Completed)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<WorkoutHistoryPageDto> GetCompletedHistoryAsync(
+        Guid userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var sessions = context.WorkoutSessions
+            .AsNoTracking()
+            .Where(session => session.UserId == userId && session.Status == WorkoutSessionStatus.Completed);
+        var totalCount = await sessions.CountAsync(cancellationToken);
+        var items = await sessions
+            .OrderByDescending(session => session.WorkoutDate)
+            .ThenByDescending(session => session.CompletedAtUtc)
+            .ThenByDescending(session => session.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(session => new WorkoutSessionSummaryDto(
+                session.Id,
+                session.NameSnapshot,
+                session.WorkoutDate,
+                session.Status,
+                session.StartedAtUtc,
+                session.CompletedAtUtc,
+                session.CompletedAtUtc - session.StartedAtUtc,
+                session.Exercises.Count,
+                session.Exercises.Count(exercise => exercise.Sets.Any(set => set.CompletedAtUtc != null)),
+                session.Exercises.SelectMany(exercise => exercise.Sets)
+                    .Count(set => set.CompletedAtUtc != null && set.Kind == WorkoutSetKind.Working),
+                session.SessionFeeling,
+                session.Version))
+            .ToListAsync(cancellationToken);
+
+        return new WorkoutHistoryPageDto(items, page, pageSize, totalCount);
+    }
+
+    public async Task<IReadOnlyList<PreviousPerformanceDto>> GetPreviousPerformancesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        Guid currentSessionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (exerciseIds.Count == 0)
+        {
+            return [];
+        }
+
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var occurrences = await context.WorkoutSessions
+            .AsNoTracking()
+            .Where(session => session.UserId == userId
+                && session.Id != currentSessionId
+                && session.Status == WorkoutSessionStatus.Completed
+                && session.CompletedAtUtc != null)
+            .SelectMany(session => session.Exercises
+                .Where(exercise => exerciseIds.Contains(exercise.ExerciseId)
+                    && !exercise.IsSkipped
+                    && exercise.Sets.Any(set => set.CompletedAtUtc != null && set.Kind == WorkoutSetKind.Working))
+                .Select(exercise => new PreviousPerformanceDto(
+                    exercise.ExerciseId,
+                    exercise.ExerciseNameSnapshot,
+                    session.Id,
+                    session.NameSnapshot,
+                    session.WorkoutDate,
+                    session.CompletedAtUtc!.Value,
+                    exercise.SortOrder,
+                    exercise.Sets
+                        .Where(set => set.CompletedAtUtc != null && set.Kind == WorkoutSetKind.Working)
+                        .OrderBy(set => set.SortOrder)
+                        .Select(set => new WorkoutSetDto(
+                            set.Id,
+                            set.SortOrder,
+                            set.Kind,
+                            set.WeightKg,
+                            set.Repetitions,
+                            set.DurationSeconds,
+                            set.CompletedAtUtc))
+                        .ToList())))
+            .ToListAsync(cancellationToken);
+
+        return occurrences
+            .GroupBy(item => item.ExerciseId)
+            .SelectMany(group => group
+                .OrderByDescending(item => item.CompletedAtUtc)
+                .ThenByDescending(item => item.SessionId)
+                .ThenBy(item => item.SessionExerciseSortOrder)
+                .Take(1))
+            .OrderBy(item => item.ExerciseId)
+            .ToList();
+    }
+
+    public async Task<ExerciseHistoryDto> GetExerciseHistoryAsync(
+        Guid userId,
+        Guid exerciseId,
+        string exerciseNameSnapshot,
+        ExerciseLoggingMode loggingMode,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var occurrences = context.WorkoutSessions
+            .AsNoTracking()
+            .Where(session => session.UserId == userId && session.Status == WorkoutSessionStatus.Completed)
+            .SelectMany(session => session.Exercises
+                .Where(exercise => exercise.ExerciseId == exerciseId
+                    && !exercise.IsSkipped
+                    && exercise.Sets.Any(set => set.CompletedAtUtc != null))
+                .Select(exercise => new
+                {
+                    SessionExerciseId = exercise.Id,
+                    exercise.ExerciseId,
+                    exerciseNameSnapshot = exercise.ExerciseNameSnapshot,
+                    SessionId = session.Id,
+                    SessionNameSnapshot = session.NameSnapshot,
+                    session.WorkoutDate,
+                    CompletedAtUtc = session.CompletedAtUtc!.Value,
+                    SessionExerciseSortOrder = exercise.SortOrder
+                }));
+        var totalCount = await occurrences.CountAsync(cancellationToken);
+        var occurrencePage = await occurrences
+            .OrderByDescending(item => item.CompletedAtUtc)
+            .ThenByDescending(item => item.SessionId)
+            .ThenBy(item => item.SessionExerciseSortOrder)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+        var sessionExerciseIds = occurrencePage.Select(item => item.SessionExerciseId).ToArray();
+        var setRows = await context.WorkoutSessionExercises
+            .AsNoTracking()
+            .Where(exercise => sessionExerciseIds.Contains(exercise.Id))
+            .SelectMany(exercise => exercise.Sets
+                .Where(set => set.CompletedAtUtc != null)
+                .Select(set => new
+                {
+                    SessionExerciseId = exercise.Id,
+                    Set = new WorkoutSetDto(
+                        set.Id,
+                        set.SortOrder,
+                        set.Kind,
+                        set.WeightKg,
+                        set.Repetitions,
+                        set.DurationSeconds,
+                        set.CompletedAtUtc)
+                }))
+            .ToListAsync(cancellationToken);
+        var setsByOccurrence = setRows
+            .GroupBy(item => item.SessionExerciseId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<WorkoutSetDto>)group
+                    .Select(item => item.Set)
+                    .OrderBy(set => set.SortOrder)
+                    .ToList());
+        var sessions = occurrencePage
+            .Select(item => new PreviousPerformanceDto(
+                item.ExerciseId,
+                item.exerciseNameSnapshot,
+                item.SessionId,
+                item.SessionNameSnapshot,
+                item.WorkoutDate,
+                item.CompletedAtUtc,
+                item.SessionExerciseSortOrder,
+                setsByOccurrence[item.SessionExerciseId]))
+            .ToList();
+
+        return new ExerciseHistoryDto(
+            exerciseId,
+            exerciseNameSnapshot,
+            loggingMode,
+            sessions,
+            page,
+            pageSize,
+            totalCount);
+    }
+
     public async Task<WorkoutSessionWriteResult> AddAsync(
         WorkoutSession session,
         CancellationToken cancellationToken = default)

@@ -122,6 +122,33 @@ public sealed class ExerciseRepository : IExerciseRepository
             .SingleOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<ExerciseDetailDto?> GetByIdIncludingInactiveAsync(
+        Guid exerciseId,
+        CancellationToken cancellationToken = default)
+    {
+        if (exerciseId == Guid.Empty)
+        {
+            return null;
+        }
+
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Exercises
+            .AsNoTracking()
+            .Where(exercise => exercise.Id == exerciseId)
+            .Select(exercise => new ExerciseDetailDto(
+                exercise.Id,
+                exercise.Name,
+                exercise.PrimaryMuscleGroup,
+                exercise.Equipment,
+                exercise.MovementPattern,
+                exercise.LoggingMode,
+                exercise.SecondaryMuscleGroups
+                    .OrderBy(secondary => secondary.MuscleGroup)
+                    .Select(secondary => secondary.MuscleGroup)
+                    .ToList()))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     private static string EscapeLikePattern(string value) =>
         value.Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("%", "\\%", StringComparison.Ordinal)

@@ -1,5 +1,7 @@
 using LifeOS.Core.DTOs.WorkoutSessions;
 using LifeOS.Core.Entities;
+using LifeOS.Core.DTOs.WorkoutSessions;
+using LifeOS.Core.Enums.Fitness;
 using LifeOS.Core.Services;
 
 namespace LifeOS.Core.Abstractions.WorkoutSessions;
@@ -28,6 +30,32 @@ public interface IWorkoutSessionRepository
     Task<WorkoutSession?> GetByIdAsync(
         Guid userId,
         Guid sessionId,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutSession?> GetCompletedByIdAsync(
+        Guid userId,
+        Guid sessionId,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkoutHistoryPageDto> GetCompletedHistoryAsync(
+        Guid userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PreviousPerformanceDto>> GetPreviousPerformancesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        Guid currentSessionId,
+        CancellationToken cancellationToken = default);
+
+    Task<ExerciseHistoryDto> GetExerciseHistoryAsync(
+        Guid userId,
+        Guid exerciseId,
+        string exerciseNameSnapshot,
+        ExerciseLoggingMode loggingMode,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
 
     Task<WorkoutSessionWriteResult> AddAsync(

@@ -16,4 +16,8 @@ public interface IExerciseRepository
     Task<ExerciseDetailDto?> GetByIdAsync(
         Guid exerciseId,
         CancellationToken cancellationToken = default);
+
+    Task<ExerciseDetailDto?> GetByIdIncludingInactiveAsync(
+        Guid exerciseId,
+        CancellationToken cancellationToken = default);
 }

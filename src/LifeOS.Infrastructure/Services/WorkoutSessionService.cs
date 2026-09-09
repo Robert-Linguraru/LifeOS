@@ -44,6 +44,68 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
         return session is null ? null : ToDetail(session);
     }
 
+    public async Task<WorkoutHistoryPageDto> GetWorkoutHistoryAsync(
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        ValidatePaging(page, pageSize);
+        return await _sessionRepository.GetCompletedHistoryAsync(
+            GetCurrentUserId(),
+            page,
+            pageSize,
+            cancellationToken);
+    }
+
+    public async Task<WorkoutSessionDetailDto?> GetCompletedWorkoutAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetCompletedByIdAsync(
+            GetCurrentUserId(),
+            sessionId,
+            cancellationToken);
+        return session is null ? null : ToDetail(session);
+    }
+
+    public async Task<IReadOnlyList<PreviousPerformanceDto>> GetPreviousPerformancesAsync(
+        Guid currentSessionId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(exerciseIds);
+        var distinctExerciseIds = exerciseIds
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray();
+        return await _sessionRepository.GetPreviousPerformancesAsync(
+            GetCurrentUserId(),
+            distinctExerciseIds,
+            currentSessionId,
+            cancellationToken);
+    }
+
+    public async Task<ExerciseHistoryDto> GetExerciseHistoryAsync(
+        Guid exerciseId,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        ValidatePaging(page, pageSize);
+        var exercise = await _exerciseRepository.GetByIdIncludingInactiveAsync(
+            exerciseId,
+            cancellationToken)
+            ?? throw new ResourceNotFoundException("Exercise was not found.");
+        return await _sessionRepository.GetExerciseHistoryAsync(
+            GetCurrentUserId(),
+            exerciseId,
+            exercise.Name,
+            exercise.LoggingMode,
+            page,
+            pageSize,
+            cancellationToken);
+    }
+
     public async Task<WorkoutSessionDetailDto> AddExerciseAsync(
         Guid sessionId,
         AddSessionExerciseDto dto,
@@ -565,6 +627,19 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
         }
 
         return _currentUser.UserId;
+    }
+
+    private static void ValidatePaging(int page, int pageSize)
+    {
+        if (page < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(page));
+        }
+
+        if (pageSize is < 1 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+        }
     }
 
     private static WorkoutSessionDetailDto ToDetail(WorkoutSession session) =>
