@@ -17,7 +17,7 @@ public sealed class ExerciseSecondaryMuscleGroupConfiguration
         builder.HasKey("ExerciseId", nameof(ExerciseSecondaryMuscleGroup.MuscleGroup));
         builder.Property(group => group.MuscleGroup).IsRequired();
         builder.HasOne<Exercise>()
-            .WithMany()
+            .WithMany(exercise => exercise.SecondaryMuscleGroups)
             .HasForeignKey("ExerciseId")
             .OnDelete(DeleteBehavior.Restrict);
 
