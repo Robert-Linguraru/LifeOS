@@ -50,3 +50,178 @@ h1:focus {
 .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.fitness-page {
+    display: grid;
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+.page-header,
+.page-section-header,
+.template-exercise-heading,
+.template-row,
+.fitness-resume {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    align-items: center;
+}
+
+.primary-button,
+.secondary-button,
+.link-button {
+    display: inline-block;
+    border: 1px solid var(--color-border);
+    border-radius: .4rem;
+    padding: .55rem .8rem;
+    color: var(--color-text);
+    text-decoration: none;
+    cursor: pointer;
+    font: inherit;
+}
+
+.primary-button {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.secondary-button,
+.link-button {
+    background: var(--color-surface);
+}
+
+.link-button {
+    border: 0;
+    padding: 0;
+}
+
+button:disabled {
+    cursor: wait;
+    opacity: .6;
+}
+
+.fitness-resume,
+.fitness-empty,
+.fitness-card,
+.empty-state,
+.template-exercise-editor {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: .6rem;
+    padding: 1rem;
+}
+
+.fitness-template-grid,
+.exercise-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.template-list {
+    display: grid;
+    gap: .8rem;
+}
+
+.fitness-filters,
+.template-editor,
+.custom-workout-form,
+.exercise-picker {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: .6rem;
+}
+
+.fitness-filters {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    align-items: end;
+}
+
+.form-field,
+.template-exercise-fields {
+    display: grid;
+    gap: .35rem;
+}
+
+.template-exercise-fields {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    align-items: end;
+    margin-top: 1rem;
+}
+
+input,
+select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .5rem;
+    color: var(--color-text);
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: .35rem;
+}
+
+.exercise-card dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .35rem .75rem;
+}
+
+.exercise-card dt {
+    color: #bdbdbd;
+}
+
+.error-message,
+.status-message {
+    padding: .8rem;
+    border-radius: .4rem;
+}
+
+.error-message {
+    color: #ffd6d6;
+    background: var(--color-error-background);
+}
+
+.status-message {
+    background: #1f5130;
+}
+
+.empty-state {
+    text-align: center;
+}
+
+@media (max-width: 650px) {
+    .fitness-page {
+        padding: 1rem;
+    }
+
+    .page-header,
+    .template-exercise-heading,
+    .template-row,
+    .fitness-resume {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .page-header .form-actions,
+    .template-row .form-actions {
+        width: 100%;
+    }
+
+    .page-header .form-actions > *,
+    .template-row .form-actions > * {
+        flex: 1 1 auto;
+        text-align: center;
+    }
+}

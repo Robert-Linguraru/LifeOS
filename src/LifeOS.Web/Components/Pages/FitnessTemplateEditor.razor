@@ -1,0 +1,396 @@
+@page "/fitness/templates/new"
+@page "/fitness/templates/{TemplateId:guid}"
+
+@inject IWorkoutTemplateService WorkoutTemplateService
+@inject IExerciseService ExerciseService
+@inject NavigationManager Navigation
+
+<PageTitle>@(_isNew ? "New Workout Template" : "Edit Workout Template")</PageTitle>
+
+<div class="fitness-page">
+    <header class="page-header">
+        <div>
+            <h1>@(_isNew ? "New workout template" : "Edit workout template")</h1>
+            <p>Choose Exercises, configure targets, and keep the order that works for you.</p>
+        </div>
+        <a class="secondary-button" href="/fitness/templates">Back to templates</a>
+    </header>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading template editor...</p>
+    }
+    else if (_error is not null)
+    {
+        <div class="error-message" role="alert">@_error</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">Try again</button>
+    }
+    else
+    {
+        @if (_actionError is not null)
+        {
+            <div class="error-message" role="alert">@_actionError</div>
+        }
+        @if (_status is not null)
+        {
+            <div class="status-message" role="status">@_status</div>
+        }
+
+        <EditForm Model="_form" OnValidSubmit="SaveNameOrNewAsync" class="template-editor">
+            <div class="form-field">
+                <label for="template-name">Template name</label>
+                <InputText id="template-name" @bind-Value="_form.Name" />
+            </div>
+            @if (_isNew)
+            {
+                <button type="submit" class="primary-button" disabled="@_isBusy">Save template</button>
+            }
+            else
+            {
+                <button type="submit" class="secondary-button" disabled="@_isBusy">Save name</button>
+                <p class="form-hint">Version @_version</p>
+            }
+        </EditForm>
+
+        <section aria-labelledby="selected-exercises-heading">
+            <h2 id="selected-exercises-heading">Template Exercises</h2>
+            @if (_rows.Count == 0)
+            {
+                <p class="empty-state">Add at least one Exercise to save this template.</p>
+            }
+            else
+            {
+                @foreach (var row in _rows)
+                {
+                    <article class="template-exercise-editor">
+                        <div class="template-exercise-heading">
+                            <div>
+                                <h3>@row.Name</h3>
+                                <p>@FormatLoggingMode(row.LoggingMode)</p>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="secondary-button" disabled="@(_isBusy || row == _rows.First())" @onclick="() => MoveUpAsync(row)">Move up</button>
+                                <button type="button" class="secondary-button" disabled="@(_isBusy || row == _rows.Last())" @onclick="() => MoveDownAsync(row)">Move down</button>
+                                <button type="button" class="secondary-button" disabled="@(_isBusy || _rows.Count == 1)" title="A template must keep at least one Exercise" @onclick="() => RemoveAsync(row)">Remove</button>
+                            </div>
+                        </div>
+                        <div class="template-exercise-fields">
+                            <label>Target sets <InputNumber @bind-Value="row.TargetSetCount" /></label>
+                            @if (IsRepBased(row.LoggingMode))
+                            {
+                                <label>Minimum reps <InputNumber @bind-Value="row.TargetRepMin" /></label>
+                                <label>Maximum reps <InputNumber @bind-Value="row.TargetRepMax" /></label>
+                            }
+                            <label>Rest seconds <InputNumber @bind-Value="row.DefaultRestSeconds" /></label>
+                            @if (!_isNew)
+                            {
+                                <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => UpdateAsync(row)">Save Exercise settings</button>
+                            }
+                        </div>
+                    </article>
+                }
+            }
+        </section>
+
+        <section class="exercise-picker" aria-labelledby="picker-heading">
+            <h2 id="picker-heading">Add an Exercise</h2>
+            <div class="form-actions">
+                <label for="exercise-picker">Exercise</label>
+                <select id="exercise-picker" @bind="_selectedExerciseId">
+                    <option value="@Guid.Empty">Choose an Exercise</option>
+                    @foreach (var exercise in _exercises)
+                    {
+                        <option value="@exercise.Id">@exercise.Name — @FormatLoggingMode(exercise.LoggingMode)</option>
+                    }
+                </select>
+                <button type="button" class="primary-button" disabled="@(_isBusy || _selectedExerciseId == Guid.Empty)" @onclick="AddSelectedAsync">Add Exercise</button>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? TemplateId { get; set; }
+
+    private readonly TemplateForm _form = new();
+    private readonly List<EditorExercise> _rows = [];
+    private IReadOnlyList<ExerciseSummaryDto> _exercises = [];
+    private WorkoutTemplateDetailDto? _detail;
+    private Guid _selectedExerciseId;
+    private long _version;
+    private bool _isNew;
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _error;
+    private string? _actionError;
+    private string? _status;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isNew = TemplateId is null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _exercises = await ExerciseService.GetExercisesAsync(new ExerciseQuery());
+            _rows.Clear();
+            if (_isNew)
+            {
+                _form.Name = string.Empty;
+                _version = 0;
+                _detail = null;
+            }
+            else
+            {
+                _detail = await WorkoutTemplateService.GetTemplateAsync(TemplateId!.Value)
+                    ?? throw new ResourceNotFoundException("Workout template was not found.");
+                _form.Name = _detail.Name;
+                _version = _detail.Version;
+                _rows.AddRange(_detail.Exercises.Select(EditorExercise.FromDto));
+            }
+        }
+        catch (ResourceNotFoundException)
+        {
+            _error = "The workout template could not be found.";
+        }
+        catch (Exception)
+        {
+            _error = "The template editor could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveNameOrNewAsync()
+    {
+        if (_isBusy) return;
+        _actionError = null;
+        _status = null;
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            _actionError = "Enter a template name.";
+            return;
+        }
+        if (_isNew)
+        {
+            if (_rows.Count == 0)
+            {
+                _actionError = "Add at least one Exercise before saving.";
+                return;
+            }
+
+            _isBusy = true;
+            try
+            {
+                var created = await WorkoutTemplateService.CreateTemplateAsync(new CreateWorkoutTemplateDto(
+                    _form.Name.Trim(),
+                    _rows.Select(row => row.ToCreateDto()).ToList()));
+                Navigation.NavigateTo($"/fitness/templates/{created.Id}");
+            }
+            catch (ValidationException exception)
+            {
+                _actionError = exception.Message;
+            }
+            catch (Exception)
+            {
+                _actionError = "The template could not be saved. Please try again.";
+            }
+            finally
+            {
+                _isBusy = false;
+            }
+        }
+        else
+        {
+            await RunMutationAsync(
+                () => WorkoutTemplateService.RenameTemplateAsync(TemplateId!.Value, new RenameWorkoutTemplateDto(_form.Name.Trim(), _version)),
+                "Template name saved.");
+        }
+    }
+
+    private async Task AddSelectedAsync()
+    {
+        var exercise = _exercises.Single(item => item.Id == _selectedExerciseId);
+        var row = EditorExercise.FromSummary(exercise);
+        if (_isNew)
+        {
+            _rows.Add(row);
+            _selectedExerciseId = Guid.Empty;
+            return;
+        }
+
+        var updated = await RunMutationAsync(
+            () => WorkoutTemplateService.AddExerciseAsync(TemplateId!.Value, row.ToAddDto(_version)),
+            "Exercise added.");
+        if (updated is not null)
+        {
+            _rows.Clear();
+            _rows.AddRange(updated.Exercises.Select(EditorExercise.FromDto));
+            _selectedExerciseId = Guid.Empty;
+        }
+    }
+
+    private async Task UpdateAsync(EditorExercise row)
+    {
+        if (_isNew) return;
+        var updated = await RunMutationAsync(
+            () => WorkoutTemplateService.UpdateExerciseAsync(TemplateId!.Value, row.ToUpdateDto(_version)),
+            "Exercise settings saved.");
+        if (updated is not null) ReplaceRows(updated);
+    }
+
+    private async Task RemoveAsync(EditorExercise row)
+    {
+        if (_isNew)
+        {
+            _rows.Remove(row);
+            return;
+        }
+        if (_rows.Count == 1) return;
+        var updated = await RunMutationAsync(
+            () => WorkoutTemplateService.RemoveExerciseAsync(TemplateId!.Value, row.TemplateExerciseId, _version),
+            "Exercise removed.");
+        if (updated is not null) ReplaceRows(updated);
+    }
+
+    private async Task MoveUpAsync(EditorExercise row) => await ReorderAsync(row, -1);
+    private async Task MoveDownAsync(EditorExercise row) => await ReorderAsync(row, 1);
+
+    private async Task ReorderAsync(EditorExercise row, int direction)
+    {
+        var index = _rows.IndexOf(row);
+        var newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= _rows.Count) return;
+        (_rows[index], _rows[newIndex]) = (_rows[newIndex], _rows[index]);
+        if (_isNew) return;
+        var updated = await RunMutationAsync(
+            () => WorkoutTemplateService.ReorderExercisesAsync(TemplateId!.Value, new ReorderWorkoutTemplateExercisesDto(_rows.Select(item => item.TemplateExerciseId).ToList(), _version)),
+            "Exercise order saved.");
+        if (updated is not null) ReplaceRows(updated);
+    }
+
+    private async Task<WorkoutTemplateDetailDto?> RunMutationAsync(
+        Func<Task<WorkoutTemplateDetailDto>> mutation,
+        string successMessage)
+    {
+        if (_isBusy) return null;
+        _isBusy = true;
+        _actionError = null;
+        _status = null;
+        try
+        {
+            var updated = await mutation();
+            _version = updated.Version;
+            _status = successMessage;
+            return updated;
+        }
+        catch (WorkoutTemplateConcurrencyException)
+        {
+            _actionError = "This template changed in another tab. The latest version has been loaded.";
+            await ReloadAuthoritativeAsync();
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError = "This template is no longer available.";
+            Navigation.NavigateTo("/fitness/templates");
+        }
+        catch (Exception)
+        {
+            _actionError = "The template change could not be saved. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+        return null;
+    }
+
+    private async Task ReloadAuthoritativeAsync()
+    {
+        if (TemplateId is null) return;
+        var latest = await WorkoutTemplateService.GetTemplateAsync(TemplateId.Value);
+        if (latest is null) return;
+        _detail = latest;
+        _form.Name = latest.Name;
+        _version = latest.Version;
+        ReplaceRows(latest);
+    }
+
+    private void ReplaceRows(WorkoutTemplateDetailDto detail)
+    {
+        _detail = detail;
+        _version = detail.Version;
+        _rows.Clear();
+        _rows.AddRange(detail.Exercises.Select(EditorExercise.FromDto));
+    }
+
+    private static bool IsRepBased(ExerciseLoggingMode mode) => mode is
+        ExerciseLoggingMode.WeightAndReps or ExerciseLoggingMode.BodyweightAndReps or
+        ExerciseLoggingMode.AddedWeightAndReps or ExerciseLoggingMode.AssistedWeightAndReps or
+        ExerciseLoggingMode.RepsOnly;
+
+    private static string FormatLoggingMode(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => "Weight + Reps",
+        ExerciseLoggingMode.BodyweightAndReps => "Bodyweight + Reps",
+        ExerciseLoggingMode.AddedWeightAndReps => "Added Weight + Reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assisted Weight + Reps",
+        ExerciseLoggingMode.RepsOnly => "Reps Only",
+        ExerciseLoggingMode.Duration => "Duration",
+        ExerciseLoggingMode.WeightAndDuration => "Weight + Duration",
+        _ => mode.ToString()
+    };
+
+    private sealed class TemplateForm
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class EditorExercise
+    {
+        public Guid TemplateExerciseId { get; set; }
+        public Guid ExerciseId { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public ExerciseLoggingMode LoggingMode { get; init; }
+        public int TargetSetCount { get; set; } = 3;
+        public int? TargetRepMin { get; set; }
+        public int? TargetRepMax { get; set; }
+        public int DefaultRestSeconds { get; set; } = 90;
+
+        public static EditorExercise FromSummary(ExerciseSummaryDto exercise) => new()
+        {
+            ExerciseId = exercise.Id,
+            Name = exercise.Name,
+            LoggingMode = exercise.LoggingMode,
+            TargetRepMin = IsRepBased(exercise.LoggingMode) ? 8 : null,
+            TargetRepMax = IsRepBased(exercise.LoggingMode) ? 12 : null
+        };
+
+        public static EditorExercise FromDto(WorkoutTemplateExerciseDto exercise) => new()
+        {
+            TemplateExerciseId = exercise.TemplateExerciseId,
+            ExerciseId = exercise.ExerciseId,
+            Name = exercise.ExerciseName,
+            LoggingMode = exercise.LoggingMode,
+            TargetSetCount = exercise.TargetSetCount,
+            TargetRepMin = exercise.TargetRepMin,
+            TargetRepMax = exercise.TargetRepMax,
+            DefaultRestSeconds = exercise.DefaultRestSeconds
+        };
+
+        public CreateWorkoutTemplateExerciseDto ToCreateDto() => new(ExerciseId, LoggingMode, TargetSetCount, TargetRepMin, TargetRepMax, DefaultRestSeconds);
+        public AddWorkoutTemplateExerciseDto ToAddDto(long version) => new(ExerciseId, LoggingMode, TargetSetCount, TargetRepMin, TargetRepMax, DefaultRestSeconds, version);
+        public UpdateWorkoutTemplateExerciseDto ToUpdateDto(long version) => new(TemplateExerciseId, LoggingMode, TargetSetCount, TargetRepMin, TargetRepMax, DefaultRestSeconds, version);
+    }
+}

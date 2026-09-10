@@ -1,0 +1,153 @@
+@page "/fitness"
+
+@inject IWorkoutSessionService WorkoutSessionService
+@inject IWorkoutTemplateService WorkoutTemplateService
+@inject NavigationManager Navigation
+
+<PageTitle>Fitness</PageTitle>
+
+<div class="fitness-page">
+    <header class="page-header">
+        <div>
+            <h1>Fitness</h1>
+            <p>Build consistent strength and calisthenics workouts.</p>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="primary-button" @onclick="StartCustomWorkout">Start custom workout</button>
+            <button type="button" class="secondary-button" @onclick="OpenExerciseLibrary">Exercise library</button>
+        </div>
+    </header>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading Fitness...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">Try again</button>
+    }
+    else
+    {
+        @if (_activeSession is not null)
+        {
+            <section class="fitness-resume" aria-labelledby="resume-heading">
+                <div>
+                    <h2 id="resume-heading">Workout in progress</h2>
+                    <p><strong>@_activeSession.NameSnapshot</strong></p>
+                    <p>Started @_activeSession.StartedAtUtc.ToLocalTime().ToString("g") · @_activeSession.Exercises.Count exercises</p>
+                </div>
+                <button type="button" class="primary-button" @onclick="ResumeWorkout">Resume workout</button>
+            </section>
+        }
+        else
+        {
+            <section class="fitness-empty" aria-labelledby="start-heading">
+                <h2 id="start-heading">Ready to train?</h2>
+                <p>Choose a saved template or build a focused workout.</p>
+                <div class="form-actions">
+                    <button type="button" class="primary-button" @onclick="OpenTemplates">Browse templates</button>
+                    <button type="button" class="secondary-button" @onclick="StartCustomWorkout">Start custom workout</button>
+                </div>
+            </section>
+        }
+
+        <section aria-labelledby="templates-heading">
+            <div class="page-section-header">
+                <h2 id="templates-heading">Workout templates</h2>
+                <button type="button" class="secondary-button" @onclick="OpenTemplates">Manage templates</button>
+            </div>
+            @if (_templates.Count == 0)
+            {
+                <p>No workout templates yet. <button type="button" class="link-button" @onclick="CreateTemplate">Create one</button></p>
+            }
+            else
+            {
+                <div class="fitness-template-grid">
+                    @foreach (var template in _templates.Take(3))
+                    {
+                        <article class="fitness-card">
+                            <h3>@template.Name</h3>
+                            <p>@template.ExerciseCount exercises</p>
+                            <button type="button" class="primary-button" disabled="@_isBusy" @onclick="() => StartTemplateAsync(template.Id)">Start workout</button>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+        @if (_actionError is not null)
+        {
+            <div class="error-message" role="alert">@_actionError</div>
+        }
+    }
+</div>
+
+@code {
+    private WorkoutSessionDetailDto? _activeSession;
+    private IReadOnlyList<WorkoutTemplateSummaryDto> _templates = [];
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private string? _actionError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            _activeSession = await WorkoutSessionService.GetActiveSessionAsync();
+            _templates = await WorkoutTemplateService.GetTemplatesAsync();
+        }
+        catch (CurrentUserUnavailableException)
+        {
+            _loadError = "The current user is unavailable.";
+        }
+        catch (Exception)
+        {
+            _loadError = "Fitness could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task StartTemplateAsync(Guid templateId)
+    {
+        if (_isBusy) return;
+        _isBusy = true;
+        _actionError = null;
+        try
+        {
+            var session = await WorkoutSessionService.StartFromTemplateAsync(new StartTemplateWorkoutDto(templateId, default, default));
+            Navigation.NavigateTo($"/fitness/workout/{session.Id}");
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError = "That template is no longer available.";
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = "The workout could not be started. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void ResumeWorkout() => Navigation.NavigateTo($"/fitness/workout/{_activeSession!.Id}");
+    private void StartCustomWorkout() => Navigation.NavigateTo("/fitness/workout/custom");
+    private void OpenExerciseLibrary() => Navigation.NavigateTo("/fitness/exercises");
+    private void OpenTemplates() => Navigation.NavigateTo("/fitness/templates");
+    private void CreateTemplate() => Navigation.NavigateTo("/fitness/templates/new");
+}

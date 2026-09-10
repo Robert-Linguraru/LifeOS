@@ -1,0 +1,170 @@
+@page "/fitness/workout/custom"
+
+@inject IExerciseService ExerciseService
+@inject IWorkoutSessionService WorkoutSessionService
+@inject NavigationManager Navigation
+
+<PageTitle>Start Custom Workout</PageTitle>
+
+<div class="fitness-page">
+    <header class="page-header">
+        <div>
+            <h1>Start custom workout</h1>
+            <p>Choose at least one Exercise to begin a focused session.</p>
+        </div>
+        <a class="secondary-button" href="/fitness">Back to Fitness</a>
+    </header>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading Exercises...</p>
+    }
+    else if (_error is not null)
+    {
+        <div class="error-message" role="alert">@_error</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">Try again</button>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="StartAsync" class="custom-workout-form">
+            <div class="form-field">
+                <label for="custom-name">Workout name</label>
+                <InputText id="custom-name" @bind-Value="_form.Name" />
+            </div>
+            <div class="form-field">
+                <label for="custom-exercise">Exercise</label>
+                <select id="custom-exercise" @bind="_form.ExerciseId">
+                    <option value="@Guid.Empty">Choose an Exercise</option>
+                    @foreach (var exercise in _exercises)
+                    {
+                        <option value="@exercise.Id">@exercise.Name (@FormatLoggingMode(exercise.LoggingMode))</option>
+                    }
+                </select>
+            </div>
+            <div class="template-exercise-fields">
+                <label>Target sets <InputNumber @bind-Value="_form.TargetSetCount" /></label>
+                @if (_selectedExercise is not null && IsRepBased(_selectedExercise.LoggingMode))
+                {
+                    <label>Minimum reps <InputNumber @bind-Value="_form.TargetRepMin" /></label>
+                    <label>Maximum reps <InputNumber @bind-Value="_form.TargetRepMax" /></label>
+                }
+                <label>Default rest seconds <InputNumber @bind-Value="_form.DefaultRestSeconds" /></label>
+            </div>
+            @if (_actionError is not null)
+            {
+                <div class="error-message" role="alert">@_actionError</div>
+            }
+            <button type="submit" class="primary-button" disabled="@_isBusy">@(_isBusy ? "Starting..." : "Start workout")</button>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<ExerciseSummaryDto> _exercises = [];
+    private readonly CustomForm _form = new()
+    {
+        Name = "Custom Workout",
+        TargetSetCount = 3,
+        TargetRepMin = 8,
+        TargetRepMax = 12,
+        DefaultRestSeconds = 90
+    };
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _error;
+    private string? _actionError;
+
+    private ExerciseSummaryDto? _selectedExercise => _exercises.SingleOrDefault(item => item.Id == _form.ExerciseId);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _exercises = await ExerciseService.GetExercisesAsync(new ExerciseQuery());
+        }
+        catch (Exception)
+        {
+            _error = "Exercises could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task StartAsync()
+    {
+        _actionError = null;
+        if (_form.ExerciseId == Guid.Empty)
+        {
+            _actionError = "Choose at least one Exercise.";
+            return;
+        }
+
+        var exercise = _selectedExercise!;
+        _isBusy = true;
+        try
+        {
+            var session = await WorkoutSessionService.StartCustomWorkoutAsync(new StartCustomWorkoutDto(
+                string.IsNullOrWhiteSpace(_form.Name) ? "Custom Workout" : _form.Name.Trim(),
+                default,
+                default,
+                [new StartWorkoutExerciseDto(
+                    exercise.Id,
+                    exercise.Name,
+                    exercise.LoggingMode,
+                    _form.TargetSetCount,
+                    IsRepBased(exercise.LoggingMode) ? _form.TargetRepMin : null,
+                    IsRepBased(exercise.LoggingMode) ? _form.TargetRepMax : null,
+                    _form.DefaultRestSeconds)]));
+            Navigation.NavigateTo($"/fitness/workout/{session.Id}");
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError = "The selected Exercise is no longer available.";
+        }
+        catch (Exception)
+        {
+            _actionError = "The custom workout could not be started. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private static bool IsRepBased(ExerciseLoggingMode mode) => mode is
+        ExerciseLoggingMode.WeightAndReps or ExerciseLoggingMode.BodyweightAndReps or
+        ExerciseLoggingMode.AddedWeightAndReps or ExerciseLoggingMode.AssistedWeightAndReps or
+        ExerciseLoggingMode.RepsOnly;
+
+    private static string FormatLoggingMode(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => "Weight + Reps",
+        ExerciseLoggingMode.BodyweightAndReps => "Bodyweight + Reps",
+        ExerciseLoggingMode.AddedWeightAndReps => "Added Weight + Reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assisted Weight + Reps",
+        ExerciseLoggingMode.RepsOnly => "Reps Only",
+        ExerciseLoggingMode.Duration => "Duration",
+        ExerciseLoggingMode.WeightAndDuration => "Weight + Duration",
+        _ => mode.ToString()
+    };
+
+    private sealed class CustomForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public Guid ExerciseId { get; set; }
+        public int TargetSetCount { get; set; }
+        public int? TargetRepMin { get; set; }
+        public int? TargetRepMax { get; set; }
+        public int DefaultRestSeconds { get; set; }
+    }
+}

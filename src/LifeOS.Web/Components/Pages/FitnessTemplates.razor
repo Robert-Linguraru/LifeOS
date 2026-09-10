@@ -1,0 +1,159 @@
+@page "/fitness/templates"
+
+@inject IWorkoutTemplateService WorkoutTemplateService
+@inject IWorkoutSessionService WorkoutSessionService
+@inject NavigationManager Navigation
+
+<PageTitle>Workout Templates</PageTitle>
+
+<div class="fitness-page">
+    <header class="page-header">
+        <div>
+            <h1>Workout Templates</h1>
+            <p>Save the workouts you return to most often.</p>
+        </div>
+        <div class="form-actions">
+            <a class="secondary-button" href="/fitness">Back to Fitness</a>
+            <button type="button" class="primary-button" @onclick="CreateTemplate">Create template</button>
+        </div>
+    </header>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading templates...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="error-message" role="alert">@_loadError</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">Try again</button>
+    }
+    else if (_templates.Count == 0)
+    {
+        <section class="empty-state">
+            <h2>No workout templates yet.</h2>
+            <p>Create one to start a repeatable workout quickly.</p>
+            <button type="button" class="primary-button" @onclick="CreateTemplate">Create template</button>
+        </section>
+    }
+    else
+    {
+        @if (_actionError is not null)
+        {
+            <div class="error-message" role="alert">@_actionError</div>
+        }
+        <div class="template-list">
+            @foreach (var template in _templates)
+            {
+                <article class="fitness-card template-row">
+                    <div>
+                        <h2>@template.Name</h2>
+                        <p>@template.ExerciseCount exercises · Updated @template.UpdatedAtUtc.ToLocalTime().ToString("g")</p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="primary-button" disabled="@_isBusy" @onclick="() => StartAsync(template.Id)">Start</button>
+                        <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => Edit(template.Id)">Edit</button>
+                        @if (_deleteId == template.Id)
+                        {
+                            <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => DeleteAsync(template)">Confirm delete</button>
+                            <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="CancelDelete">Cancel</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => RequestDelete(template.Id)">Delete</button>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<WorkoutTemplateSummaryDto> _templates = [];
+    private Guid? _deleteId;
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private string? _actionError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            _templates = await WorkoutTemplateService.GetTemplatesAsync();
+        }
+        catch (Exception)
+        {
+            _loadError = "Templates could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task StartAsync(Guid templateId)
+    {
+        if (_isBusy) return;
+        _isBusy = true;
+        _actionError = null;
+        try
+        {
+            var session = await WorkoutSessionService.StartFromTemplateAsync(new StartTemplateWorkoutDto(templateId, default, default));
+            Navigation.NavigateTo($"/fitness/workout/{session.Id}");
+        }
+        catch (ValidationException exception)
+        {
+            _actionError = exception.Message;
+        }
+        catch (ResourceNotFoundException)
+        {
+            _actionError = "That template is no longer available.";
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = "The workout could not be started. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task DeleteAsync(WorkoutTemplateSummaryDto template)
+    {
+        if (_isBusy) return;
+        _isBusy = true;
+        _actionError = null;
+        try
+        {
+            await WorkoutTemplateService.DeleteTemplateAsync(template.Id, template.Version);
+            _deleteId = null;
+            await LoadAsync();
+        }
+        catch (WorkoutTemplateConcurrencyException)
+        {
+            _actionError = "This template changed in another tab. The latest templates have been loaded.";
+            _deleteId = null;
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _actionError = "The template could not be deleted. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void RequestDelete(Guid id) => _deleteId = id;
+    private void CancelDelete() => _deleteId = null;
+    private void CreateTemplate() => Navigation.NavigateTo("/fitness/templates/new");
+    private void Edit(Guid id) => Navigation.NavigateTo($"/fitness/templates/{id}");
+}

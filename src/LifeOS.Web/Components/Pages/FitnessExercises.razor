@@ -1,0 +1,179 @@
+@page "/fitness/exercises"
+
+@inject IExerciseService ExerciseService
+
+<PageTitle>Exercise Library</PageTitle>
+
+<div class="fitness-page">
+    <header class="page-header">
+        <div>
+            <h1>Exercise Library</h1>
+            <p>Find active Exercises by name, muscle group, equipment, movement, or logging mode.</p>
+        </div>
+        <a class="secondary-button" href="/fitness">Back to Fitness</a>
+    </header>
+
+    <EditForm Model="_filter" OnValidSubmit="SearchAsync" class="fitness-filters">
+        <div class="form-field">
+            <label for="exercise-search">Search</label>
+            <InputText id="exercise-search" @bind-Value="_filter.Search" placeholder="Search exercises" />
+        </div>
+        <div class="form-field">
+            <label for="muscle-filter">Primary muscle group</label>
+            <select id="muscle-filter" @bind="_filter.Muscle">
+                <option value="">All muscle groups</option>
+                @foreach (var value in Enum.GetValues<MuscleGroup>())
+                {
+                    <option value="@value">@FormatEnum(value.ToString())</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label for="equipment-filter">Equipment</label>
+            <select id="equipment-filter" @bind="_filter.Equipment">
+                <option value="">All equipment</option>
+                @foreach (var value in Enum.GetValues<ExerciseEquipment>())
+                {
+                    <option value="@value">@FormatEnum(value.ToString())</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label for="movement-filter">Movement pattern</label>
+            <select id="movement-filter" @bind="_filter.Movement">
+                <option value="">All movement patterns</option>
+                @foreach (var value in Enum.GetValues<MovementPattern>())
+                {
+                    <option value="@value">@FormatEnum(value.ToString())</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label for="logging-filter">Logging mode</label>
+            <select id="logging-filter" @bind="_filter.LoggingMode">
+                <option value="">All logging modes</option>
+                @foreach (var value in Enum.GetValues<ExerciseLoggingMode>())
+                {
+                    <option value="@value">@FormatLoggingMode(value)</option>
+                }
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="primary-button" disabled="@_isLoading">@(_isLoading ? "Searching..." : "Search")</button>
+            <button type="button" class="secondary-button" disabled="@_isLoading" @onclick="ClearAsync">Clear filters</button>
+        </div>
+    </EditForm>
+
+    @if (_isLoading)
+    {
+        <p role="status">Loading exercises...</p>
+    }
+    else if (_error is not null)
+    {
+        <div class="error-message" role="alert">@_error</div>
+        <button type="button" class="secondary-button" @onclick="SearchAsync">Try again</button>
+    }
+    else if (_exercises.Count == 0)
+    {
+        <p class="empty-state">No matching Exercises found.</p>
+    }
+    else
+    {
+        <div class="exercise-grid" aria-live="polite">
+            @foreach (var exercise in _exercises)
+            {
+                <article class="fitness-card exercise-card">
+                    <h2>@exercise.Name</h2>
+                    <dl>
+                        <dt>Muscle</dt><dd>@FormatEnum(exercise.PrimaryMuscleGroup.ToString())</dd>
+                        <dt>Equipment</dt><dd>@FormatEnum(exercise.Equipment.ToString())</dd>
+                        <dt>Movement</dt><dd>@FormatEnum(exercise.MovementPattern.ToString())</dd>
+                        <dt>Logging</dt><dd>@FormatLoggingMode(exercise.LoggingMode)</dd>
+                    </dl>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<ExerciseSummaryDto> _exercises = [];
+    private readonly FilterForm _filter = new();
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await SearchAsync();
+
+    private async Task SearchAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _exercises = await ExerciseService.GetExercisesAsync(new ExerciseQuery(
+                string.IsNullOrWhiteSpace(_filter.Search) ? null : _filter.Search.Trim(),
+                ParseEnum<MuscleGroup>(_filter.Muscle),
+                ParseEnum<ExerciseEquipment>(_filter.Equipment),
+                ParseEnum<MovementPattern>(_filter.Movement),
+                ParseEnum<ExerciseLoggingMode>(_filter.LoggingMode)));
+        }
+        catch (Exception)
+        {
+            _error = "The Exercise Library could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        _filter.Search = null;
+        _filter.Muscle = string.Empty;
+        _filter.Equipment = string.Empty;
+        _filter.Movement = string.Empty;
+        _filter.LoggingMode = string.Empty;
+        await SearchAsync();
+    }
+
+    private static T? ParseEnum<T>(string value) where T : struct, Enum =>
+        Enum.TryParse<T>(value, out var parsed) ? parsed : null;
+
+    private static string FormatEnum(string value)
+    {
+        var result = new System.Text.StringBuilder();
+        foreach (var character in value)
+        {
+            if (result.Length > 0 && char.IsUpper(character))
+            {
+                result.Append(' ');
+            }
+
+            result.Append(character);
+        }
+
+        return result.ToString();
+    }
+
+    private static string FormatLoggingMode(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => "Weight + Reps",
+        ExerciseLoggingMode.BodyweightAndReps => "Bodyweight + Reps",
+        ExerciseLoggingMode.AddedWeightAndReps => "Added Weight + Reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assisted Weight + Reps",
+        ExerciseLoggingMode.RepsOnly => "Reps Only",
+        ExerciseLoggingMode.Duration => "Duration",
+        ExerciseLoggingMode.WeightAndDuration => "Weight + Duration",
+        _ => mode.ToString()
+    };
+
+    private sealed class FilterForm
+    {
+        public string? Search { get; set; }
+        public string Muscle { get; set; } = string.Empty;
+        public string Equipment { get; set; } = string.Empty;
+        public string Movement { get; set; } = string.Empty;
+        public string LoggingMode { get; set; } = string.Empty;
+    }
+}

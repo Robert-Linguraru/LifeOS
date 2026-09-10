@@ -1,0 +1,47 @@
+@page "/fitness/workout"
+@page "/fitness/workout/{SessionId:guid}"
+
+@inject IWorkoutSessionService WorkoutSessionService
+@inject NavigationManager Navigation
+
+<PageTitle>Workout in Progress</PageTitle>
+
+<div class="fitness-page">
+    @if (_isLoading)
+    {
+        <p role="status">Loading workout...</p>
+    }
+    else if (_session is null)
+    {
+        <section class="empty-state">
+            <h1>No workout in progress</h1>
+            <p>Start a template or custom workout from Fitness.</p>
+            <a class="primary-button" href="/fitness">Back to Fitness</a>
+        </section>
+    }
+    else
+    {
+        <section class="fitness-resume" aria-labelledby="workout-placeholder-heading">
+            <div>
+                <h1 id="workout-placeholder-heading">Workout in progress</h1>
+                <h2>@_session.NameSnapshot</h2>
+                <p>This workout is ready for the active workout experience.</p>
+                <p>Ticket 17 will add Set logging, rest timers, and completion controls here.</p>
+            </div>
+            <a class="secondary-button" href="/fitness">Return to Fitness</a>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? SessionId { get; set; }
+    private WorkoutSessionDetailDto? _session;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _session = await WorkoutSessionService.GetActiveSessionAsync();
+        _isLoading = false;
+    }
+}
