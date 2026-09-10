@@ -1,7 +1,5 @@
 @page "/fitness/workout/completed/{SessionId:guid}"
 
-@page "/fitness/workout/completed/{SessionId:guid}"
-
 @inject IWorkoutSessionService WorkoutSessionService
 
 <PageTitle>Workout Complete</PageTitle>
@@ -11,48 +9,171 @@
     {
         <p role="status">Loading completed workout...</p>
     }
-    else if (_summary is null)
+    else if (_error is not null)
+    {
+        <div class="error-message" role="alert">@_error</div>
+        <a class="secondary-button" href="/fitness">Back to Fitness</a>
+    }
+    else if (_session is null)
     {
         <section class="empty-state">
             <h1>Workout complete</h1>
-            <p>The workout was saved. Its detailed summary will be available in the History experience.</p>
-            <a class="primary-button" href="/fitness">Back to Fitness</a>
+            <p>The workout was saved, but its summary is not available.</p>
+            <a class="primary-button" href="/fitness/history">View Workout History</a>
         </section>
     }
     else
     {
-        <section class="fitness-resume" aria-labelledby="completed-heading">
+        <header class="page-header">
             <div>
-                <h1 id="completed-heading">Workout complete</h1>
-                <h2>@_summary.NameSnapshot</h2>
-                <p>@_summary.WorkingSetCount Working Sets · @_summary.Duration.ToString("m' minutes' ss' seconds'")</p>
+                <h1>Workout complete</h1>
+                <h2>@_session.NameSnapshot</h2>
+                <p>@_session.WorkoutDate · Completed @_session.CompletedAtUtc?.ToLocalTime().ToString("g")</p>
+                <p>Duration: @FormatDuration(_session.CompletedAtUtc - _session.StartedAtUtc)</p>
+                <p>Feeling: @(_session.SessionFeeling?.ToString() ?? "Not recorded")</p>
             </div>
-            <a class="primary-button" href="/fitness">Back to Fitness</a>
+            <div class="form-actions">
+                <a class="primary-button" href="/fitness">Back to Fitness</a>
+                <a class="secondary-button" href="/fitness/history">View Workout History</a>
+            </div>
+        </header>
+
+        <section class="fitness-card completion-counts" aria-labelledby="counts-heading">
+            <h2 id="counts-heading">Workout totals</h2>
+            <p>@PerformedExerciseCount performed Exercises · @WorkingSetCount Working Sets</p>
+        </section>
+
+        @if (_session.StrengthRecordAchievements.Count > 0)
+        {
+            <section class="fitness-card" aria-labelledby="achievements-heading">
+                <h2 id="achievements-heading">Strength records</h2>
+                <div class="history-list">
+                    @foreach (var achievement in _session.StrengthRecordAchievements)
+                    {
+                        <div class="history-best-row">
+                            <strong>@(achievement.IsFirstRecord ? "First record" : "New PR")</strong>
+                            <span>@FormatAchievement(achievement)</span>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <section aria-labelledby="breakdown-heading">
+            <h2 id="breakdown-heading">Workout breakdown</h2>
+            @foreach (var exercise in _session.Exercises.OrderBy(item => item.SortOrder))
+            {
+                <article class="workout-exercise @(exercise.IsSkipped ? "workout-exercise--skipped" : string.Empty)">
+                    <div class="workout-exercise__header">
+                        <div>
+                            <h3>@exercise.ExerciseNameSnapshot</h3>
+                            @if (exercise.IsSkipped)
+                            {
+                                <p class="form-hint"><strong>Skipped</strong> — no Sets were performed.</p>
+                            }
+                            @if (exercise.ExerciseId != exercise.OriginalExerciseId)
+                            {
+                                <p class="form-hint">Substituted for @exercise.OriginalExerciseNameSnapshot</p>
+                            }
+                            <p>@FormatLoggingMode(exercise.LoggingModeSnapshot)</p>
+                        </div>
+                        <a class="secondary-button" href="/fitness/exercises/@exercise.ExerciseId/history">Exercise history</a>
+                    </div>
+                    @if (!exercise.IsSkipped)
+                    {
+                        <p>@FormatPerformance(exercise)</p>
+                        <div class="history-set-list">
+                            @foreach (var set in exercise.Sets.Where(item => item.CompletedAtUtc is not null).OrderBy(item => item.SortOrder))
+                            {
+                                <div class="history-set-row">
+                                    <strong>Set @set.SortOrder</strong>
+                                    <span>@(set.Kind == WorkoutSetKind.WarmUp ? "Warm-up" : "Working")</span>
+                                    <span>@FormatSet(set, exercise.LoggingModeSnapshot)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </article>
+            }
         </section>
     }
 </div>
 
 @code {
     [Parameter] public Guid SessionId { get; set; }
-    private WorkoutCompletionSummaryDto? _summary;
+    private WorkoutSessionDetailDto? _session;
     private bool _isLoading = true;
+    private string? _error;
+    private int PerformedExerciseCount => _session?.Exercises.Count(item => !item.IsSkipped && item.Sets.Any(set => set.CompletedAtUtc is not null)) ?? 0;
+    private int WorkingSetCount => _session?.Exercises.SelectMany(item => item.Sets).Count(set => set.Kind == WorkoutSetKind.Working && set.CompletedAtUtc is not null) ?? 0;
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
-        var detail = await WorkoutSessionService.GetCompletedWorkoutAsync(SessionId);
-        if (detail is not null)
+        _error = null;
+        try
         {
-            _summary = new WorkoutCompletionSummaryDto(
-                detail.Id,
-                detail.NameSnapshot,
-                detail.CompletedAtUtc!.Value - detail.StartedAtUtc,
-                detail.Exercises.Count,
-                detail.Exercises.Count(item => item.Sets.Any(set => set.CompletedAtUtc is not null)),
-                detail.Exercises.SelectMany(item => item.Sets).Count(set => set.CompletedAtUtc is not null && set.Kind == WorkoutSetKind.Working),
-                detail.SessionFeeling,
-                []);
+            _session = await WorkoutSessionService.GetCompletedWorkoutAsync(SessionId);
         }
-        _isLoading = false;
+        catch (ResourceNotFoundException)
+        {
+            _session = null;
+        }
+        catch (Exception)
+        {
+            _error = "The completed workout could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
+
+    private static string FormatDuration(TimeSpan? duration) => duration is null ? "Unavailable" : duration.Value.TotalHours >= 1
+        ? $"{(int)duration.Value.TotalHours} hr {duration.Value.Minutes} min"
+        : duration.Value.TotalMinutes >= 1 ? $"{duration.Value.Minutes} min {duration.Value.Seconds} sec" : $"{duration.Value.Seconds} sec";
+    private static string FormatLoggingMode(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => "Weight + Reps",
+        ExerciseLoggingMode.BodyweightAndReps => "Bodyweight + Reps",
+        ExerciseLoggingMode.AddedWeightAndReps => "Added Weight + Reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assistance Weight + Reps",
+        ExerciseLoggingMode.RepsOnly => "Reps Only",
+        ExerciseLoggingMode.Duration => "Duration",
+        ExerciseLoggingMode.WeightAndDuration => "Weight + Duration",
+        _ => mode.ToString()
+    };
+    private static string FormatPerformance(WorkoutSessionExerciseDto exercise)
+    {
+        var working = exercise.Sets.Where(set => set.Kind == WorkoutSetKind.Working && set.CompletedAtUtc is not null).ToArray();
+        return exercise.LoggingModeSnapshot switch
+        {
+            ExerciseLoggingMode.WeightAndReps => $"Working reps: {working.Sum(set => set.Repetitions ?? 0)} · Working weight: {working.Select(set => set.WeightKg).Where(weight => weight is not null).DefaultIfEmpty().Max():0.##} kg",
+            ExerciseLoggingMode.AddedWeightAndReps => $"Working reps: {working.Sum(set => set.Repetitions ?? 0)} · Added-load best: {working.Select(set => set.WeightKg).Where(weight => weight is not null).DefaultIfEmpty().Max():0.##} kg",
+            ExerciseLoggingMode.BodyweightAndReps or ExerciseLoggingMode.RepsOnly => $"Working reps: {working.Sum(set => set.Repetitions ?? 0)}",
+            ExerciseLoggingMode.Duration => $"Working duration: {working.Sum(set => set.DurationSeconds ?? 0)} sec",
+            ExerciseLoggingMode.WeightAndDuration => $"Working duration: {working.Sum(set => set.DurationSeconds ?? 0)} sec · Best weight: {working.Select(set => set.WeightKg).Where(weight => weight is not null).DefaultIfEmpty().Max():0.##} kg",
+            ExerciseLoggingMode.AssistedWeightAndReps => $"Working reps: {working.Sum(set => set.Repetitions ?? 0)} · Assistance: {working.Select(set => set.WeightKg).Where(weight => weight is not null).DefaultIfEmpty().Max():0.##} kg",
+            _ => "Working performance"
+        };
+    }
+    private static string FormatSet(WorkoutSetDto set, ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => $"{set.WeightKg:0.##} kg × {set.Repetitions} reps",
+        ExerciseLoggingMode.AddedWeightAndReps => $"+{set.WeightKg:0.##} kg × {set.Repetitions} reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => $"{set.WeightKg:0.##} kg assistance × {set.Repetitions} reps",
+        ExerciseLoggingMode.BodyweightAndReps or ExerciseLoggingMode.RepsOnly => $"{set.Repetitions} reps",
+        ExerciseLoggingMode.Duration => $"{set.DurationSeconds} sec",
+        ExerciseLoggingMode.WeightAndDuration => $"{set.WeightKg:0.##} kg · {set.DurationSeconds} sec",
+        _ => "Completed Set"
+    };
+    private static string FormatAchievement(StrengthRecordAchievement achievement) => achievement.Type switch
+    {
+        StrengthRecordType.HeaviestWeight => $"Heaviest weight — {achievement.WeightKg:0.##} kg",
+        StrengthRecordType.BestRepsAtWeight => $"{achievement.Repetitions} reps at {achievement.WeightKg:0.##} kg",
+        StrengthRecordType.MostReps => $"Most reps — {achievement.Repetitions}",
+        StrengthRecordType.LongestDuration => $"Longest duration — {achievement.DurationSeconds} sec",
+        StrengthRecordType.LongestDurationAtWeight => $"{achievement.DurationSeconds} sec at {achievement.WeightKg:0.##} kg",
+        _ => "Strength record"
+    };
 }

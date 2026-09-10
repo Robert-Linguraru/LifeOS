@@ -15,6 +15,7 @@
         <div class="form-actions">
             <button type="button" class="primary-button" @onclick="StartCustomWorkout">Start custom workout</button>
             <button type="button" class="secondary-button" @onclick="OpenExerciseLibrary">Exercise library</button>
+            <button type="button" class="secondary-button" @onclick="OpenHistory">Workout history</button>
         </div>
     </header>
 
@@ -148,6 +149,7 @@
     private void ResumeWorkout() => Navigation.NavigateTo($"/fitness/workout/{_activeSession!.Id}");
     private void StartCustomWorkout() => Navigation.NavigateTo("/fitness/workout/custom");
     private void OpenExerciseLibrary() => Navigation.NavigateTo("/fitness/exercises");
+    private void OpenHistory() => Navigation.NavigateTo("/fitness/history");
     private void OpenTemplates() => Navigation.NavigateTo("/fitness/templates");
     private void CreateTemplate() => Navigation.NavigateTo("/fitness/templates/new");
 }

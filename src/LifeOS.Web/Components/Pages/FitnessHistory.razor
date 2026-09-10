@@ -1,0 +1,97 @@
+@page "/fitness/history"
+
+@inject IWorkoutSessionService WorkoutSessionService
+@inject NavigationManager Navigation
+
+<PageTitle>Workout History</PageTitle>
+
+<div class="fitness-page">
+    <header class="page-header">
+        <div>
+            <a class="secondary-button" href="/fitness">Back to Fitness</a>
+            <h1>Workout History</h1>
+            <p>Completed strength and calisthenics workouts.</p>
+        </div>
+    </header>
+
+    @if (_loading)
+    {
+        <p role="status">Loading workout history...</p>
+    }
+    else if (_error is not null)
+    {
+        <div class="error-message" role="alert">@_error</div>
+        <button type="button" class="secondary-button" @onclick="LoadAsync">Try again</button>
+    }
+    else if (_history?.Items.Count == 0)
+    {
+        <section class="empty-state">
+            <h2>No completed workouts yet.</h2>
+            <p>Complete a workout to see it here.</p>
+            <a class="primary-button" href="/fitness">Back to Fitness</a>
+        </section>
+    }
+    else if (_history is not null)
+    {
+        <div class="history-list">
+            @foreach (var workout in _history.Items)
+            {
+                <article class="fitness-card history-card">
+                    <div>
+                        <h2>@workout.NameSnapshot</h2>
+                        <p>@workout.WorkoutDate · @FormatDuration(workout.Duration)</p>
+                        <p>@workout.CompletedExerciseCount Exercises · @workout.WorkingSetCount Working Sets</p>
+                        @if (workout.SessionFeeling is not null)
+                        {
+                            <p>Feeling: @workout.SessionFeeling</p>
+                        }
+                    </div>
+                    <a class="primary-button" href="/fitness/history/@workout.Id">View workout</a>
+                </article>
+            }
+        </div>
+        <nav class="history-pagination" aria-label="Workout history pages">
+            <button type="button" class="secondary-button" disabled="@(_history.Page <= 1 || _loading)" @onclick="PreviousAsync">Previous</button>
+            <span>Page @_history.Page of @TotalPages</span>
+            <button type="button" class="secondary-button" disabled="@(_history.Page >= TotalPages || _loading)" @onclick="NextAsync">Next</button>
+        </nav>
+    }
+</div>
+
+@code {
+    private const int PageSize = 20;
+    private WorkoutHistoryPageDto? _history;
+    private bool _loading = true;
+    private string? _error;
+    private int TotalPages => _history is null ? 1 : Math.Max(1, (int)Math.Ceiling((double)_history.TotalCount / _history.PageSize));
+
+    protected override async Task OnInitializedAsync() => await LoadAsync(1);
+
+    private async Task LoadAsync() => await LoadAsync(_history?.Page ?? 1);
+
+    private async Task LoadAsync(int page)
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _history = await WorkoutSessionService.GetWorkoutHistoryAsync(page, PageSize);
+        }
+        catch (Exception)
+        {
+            _error = "Workout history could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task PreviousAsync() => LoadAsync(Math.Max(1, _history!.Page - 1));
+    private Task NextAsync() => LoadAsync(Math.Min(TotalPages, _history!.Page + 1));
+
+    private static string FormatDuration(TimeSpan? duration) => duration is null ? "Duration unavailable" : FormatDuration(duration.Value);
+    private static string FormatDuration(TimeSpan duration) => duration.TotalHours >= 1
+        ? $"{(int)duration.TotalHours} hr {duration.Minutes} min"
+        : duration.TotalMinutes >= 1 ? $"{duration.Minutes} min {duration.Seconds} sec" : $"{duration.Seconds} sec";
+}

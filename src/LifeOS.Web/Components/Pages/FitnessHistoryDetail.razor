@@ -1,0 +1,127 @@
+@page "/fitness/history/{SessionId:guid}"
+
+@inject IWorkoutSessionService WorkoutSessionService
+
+<PageTitle>Completed Workout</PageTitle>
+
+<div class="fitness-page">
+    @if (_loading)
+    {
+        <p role="status">Loading completed workout...</p>
+    }
+    else if (_error is not null)
+    {
+        <div class="error-message" role="alert">@_error</div>
+        <a class="secondary-button" href="/fitness/history">Back to Workout History</a>
+    }
+    else if (_session is null)
+    {
+        <section class="empty-state">
+            <h1>Workout not found</h1>
+            <p>This completed workout is no longer available.</p>
+            <a class="primary-button" href="/fitness/history">Back to Workout History</a>
+        </section>
+    }
+    else
+    {
+        <header class="page-header">
+            <div>
+                <a class="secondary-button" href="/fitness/history">Back to Workout History</a>
+                <h1>@_session.NameSnapshot</h1>
+                <p>@_session.WorkoutDate · @FormatDate(_session.StartedAtUtc) – @FormatDate(_session.CompletedAtUtc)</p>
+                <p>Duration: @FormatDuration(_session.CompletedAtUtc - _session.StartedAtUtc) · Feeling: @(_session.SessionFeeling?.ToString() ?? "Not recorded")</p>
+            </div>
+        </header>
+
+        @foreach (var exercise in _session.Exercises.OrderBy(item => item.SortOrder))
+        {
+            <section class="workout-exercise @(exercise.IsSkipped ? "workout-exercise--skipped" : string.Empty)" aria-labelledby="history-exercise-@exercise.Id">
+                <div class="workout-exercise__header">
+                    <div>
+                        <h2 id="history-exercise-@exercise.Id">@exercise.ExerciseNameSnapshot</h2>
+                        @if (exercise.IsSkipped)
+                        {
+                            <p class="form-hint"><strong>Skipped</strong> — no Sets were performed.</p>
+                        }
+                        @if (exercise.ExerciseId != exercise.OriginalExerciseId)
+                        {
+                            <p class="form-hint">Substituted for @exercise.OriginalExerciseNameSnapshot</p>
+                        }
+                        <p>@FormatLoggingMode(exercise.LoggingModeSnapshot) · Target @exercise.TargetSetCountSnapshot sets @FormatRepRange(exercise) · Rest @exercise.DefaultRestSecondsSnapshot sec</p>
+                    </div>
+                    <a class="secondary-button" href="/fitness/exercises/@exercise.ExerciseId/history">Exercise history</a>
+                </div>
+                @if (!exercise.IsSkipped)
+                {
+                    <div class="history-set-list">
+                        @foreach (var set in exercise.Sets.Where(item => item.CompletedAtUtc is not null).OrderBy(item => item.SortOrder))
+                        {
+                            <div class="history-set-row">
+                                <strong>Set @set.SortOrder</strong>
+                                <span>@(set.Kind == WorkoutSetKind.WarmUp ? "Warm-up" : "Working")</span>
+                                <span>@FormatSet(set, exercise.LoggingModeSnapshot)</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    private WorkoutSessionDetailDto? _session;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _session = await WorkoutSessionService.GetCompletedWorkoutAsync(SessionId);
+        }
+        catch (ResourceNotFoundException)
+        {
+            _session = null;
+        }
+        catch (Exception)
+        {
+            _error = "The completed workout could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string FormatDate(DateTimeOffset? date) => date?.ToLocalTime().ToString("g") ?? "Unavailable";
+    private static string FormatDuration(TimeSpan? duration) => duration is null ? "Unavailable" : duration.Value.TotalHours >= 1
+        ? $"{(int)duration.Value.TotalHours} hr {duration.Value.Minutes} min"
+        : duration.Value.TotalMinutes >= 1 ? $"{duration.Value.Minutes} min {duration.Value.Seconds} sec" : $"{duration.Value.Seconds} sec";
+    private static string FormatRepRange(WorkoutSessionExerciseDto exercise) => exercise.TargetRepMinSnapshot is null && exercise.TargetRepMaxSnapshot is null ? string.Empty : $"({exercise.TargetRepMinSnapshot}-{exercise.TargetRepMaxSnapshot} reps)";
+    private static string FormatLoggingMode(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => "Weight + Reps",
+        ExerciseLoggingMode.BodyweightAndReps => "Bodyweight + Reps",
+        ExerciseLoggingMode.AddedWeightAndReps => "Added Weight + Reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assistance Weight + Reps",
+        ExerciseLoggingMode.RepsOnly => "Reps Only",
+        ExerciseLoggingMode.Duration => "Duration",
+        ExerciseLoggingMode.WeightAndDuration => "Weight + Duration",
+        _ => mode.ToString()
+    };
+    private static string FormatSet(WorkoutSetDto set, ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => $"{set.WeightKg:0.##} kg × {set.Repetitions} reps",
+        ExerciseLoggingMode.AddedWeightAndReps => $"+{set.WeightKg:0.##} kg × {set.Repetitions} reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => $"{set.WeightKg:0.##} kg assistance × {set.Repetitions} reps",
+        ExerciseLoggingMode.BodyweightAndReps or ExerciseLoggingMode.RepsOnly => $"{set.Repetitions} reps",
+        ExerciseLoggingMode.Duration => FormatSeconds(set.DurationSeconds),
+        ExerciseLoggingMode.WeightAndDuration => $"{set.WeightKg:0.##} kg · {FormatSeconds(set.DurationSeconds)}",
+        _ => "Completed Set"
+    };
+    private static string FormatSeconds(int? seconds) => seconds is null ? "Duration unavailable" : $"{seconds} sec";
+}

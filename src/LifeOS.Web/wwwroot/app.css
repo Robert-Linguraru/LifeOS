@@ -255,6 +255,36 @@ select {
     color: #bdbdbd;
 }
 
+.history-list,
+.history-set-list,
+.history-best-list {
+    display: grid;
+    gap: .8rem;
+}
+
+.history-card,
+.history-best-row,
+.history-set-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.history-best-row,
+.history-set-row {
+    padding: .7rem;
+    background: var(--color-background);
+    border-radius: .35rem;
+}
+
+.history-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+}
+
 @media (max-width: 650px) {
     .fitness-page {
         padding: 1rem;
@@ -285,5 +315,12 @@ select {
 
     .workout-set-row {
         grid-template-columns: 1fr;
+    }
+
+    .history-card,
+    .history-best-row,
+    .history-set-row {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
