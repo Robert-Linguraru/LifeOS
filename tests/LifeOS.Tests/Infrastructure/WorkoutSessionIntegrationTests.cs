@@ -8,6 +8,7 @@ using LifeOS.Core.DTOs.WorkoutTemplates;
 using LifeOS.Core.Entities;
 using LifeOS.Core.Enums.Fitness;
 using LifeOS.Core.Exceptions;
+using LifeOS.Core.Services;
 using LifeOS.Core.Time;
 using LifeOS.Infrastructure.Repositories;
 using LifeOS.Infrastructure.Services;
@@ -22,6 +23,80 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
     public WorkoutSessionIntegrationTests(PostgreSqlContainerFixture fixture)
     {
         _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task CompleteSet_ShouldReturnDerivedStrictImprovementAndUseEarlierCurrentSessionEvidence()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+
+        var firstDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, started.Version));
+        var first = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, firstDraft.Exercises[0].Sets.Single(item => item.CompletedAtUtc is null).Id, null, 5, null, false, firstDraft.Version));
+
+        var tieDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, first.Version));
+        var tie = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, tieDraft.Exercises[0].Sets.Single(item => item.CompletedAtUtc is null).Id, null, 5, null, false, tieDraft.Version));
+
+        var improvementDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, tie.Version));
+        var improvement = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, improvementDraft.Exercises[0].Sets.Single(item => item.CompletedAtUtc is null).Id, null, 6, null, false, improvementDraft.Version));
+
+        var firstAchievement = Assert.Single(first.StrengthRecordAchievements);
+        Assert.Equal(StrengthRecordType.MostReps, firstAchievement.Type);
+        Assert.True(firstAchievement.IsFirstRecord);
+        Assert.Empty(tie.StrengthRecordAchievements);
+        Assert.Equal(6, Assert.Single(improvement.StrengthRecordAchievements).Repetitions);
+    }
+
+    [Fact]
+    public async Task CompleteWorkout_ShouldIncludeDeduplicatedDerivedAchievementsAndExcludeWarmUp()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+
+        var warmUpDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.WarmUp, null, null, null, started.Version));
+        var afterWarmUp = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, warmUpDraft.Exercises[0].Sets[0].Id, null, 20, null, false, warmUpDraft.Version));
+        Assert.Empty(afterWarmUp.StrengthRecordAchievements);
+
+        var firstDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, afterWarmUp.Version));
+        var first = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, firstDraft.Exercises[0].Sets.Single(item => item.CompletedAtUtc is null).Id, null, 5, null, false, firstDraft.Version));
+        var secondDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(started.Exercises[0].Id, WorkoutSetKind.Working, null, null, null, first.Version));
+        var second = await service.CompleteSetAsync(
+            started.Id,
+            new CompleteWorkoutSetDto(started.Exercises[0].Id, secondDraft.Exercises[0].Sets.Single(item => item.CompletedAtUtc is null).Id, null, 6, null, false, secondDraft.Version));
+
+        var summary = await service.CompleteWorkoutAsync(
+            started.Id,
+            new CompleteWorkoutDto(null, second.Version));
+
+        var achievement = Assert.Single(summary.StrengthRecordAchievements);
+        Assert.Equal(StrengthRecordType.MostReps, achievement.Type);
+        Assert.Equal(6, achievement.Repetitions);
     }
 
     [Fact]

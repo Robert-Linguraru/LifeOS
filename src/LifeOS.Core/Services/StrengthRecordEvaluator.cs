@@ -30,7 +30,10 @@ public sealed record StrengthRecordAchievement(
     int? DurationSeconds,
     decimal? PreviousWeightKg,
     int? PreviousRepetitions,
-    int? PreviousDurationSeconds);
+    int? PreviousDurationSeconds)
+{
+    public Guid? ExerciseId { get; init; }
+}
 
 public static class StrengthRecordEvaluator
 {

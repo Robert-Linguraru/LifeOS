@@ -333,6 +333,48 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
             totalCount);
     }
 
+    public async Task<IReadOnlyList<StrengthSetEvidence>> GetStrengthRecordEvidenceAsync(
+        Guid userId,
+        Guid exerciseId,
+        Guid currentSessionId,
+        Guid candidateSetId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await context.WorkoutSessions
+            .AsNoTracking()
+            .Where(session => session.UserId == userId
+                && ((session.Status == WorkoutSessionStatus.Completed && session.Id != currentSessionId)
+                    || (session.Id == currentSessionId && session.Status == WorkoutSessionStatus.InProgress)))
+            .SelectMany(session => session.Exercises
+                .Where(exercise => exercise.ExerciseId == exerciseId && !exercise.IsSkipped)
+                .SelectMany(exercise => exercise.Sets
+                    .Where(set => set.Id != candidateSetId
+                        && set.CompletedAtUtc != null
+                        && set.Kind == WorkoutSetKind.Working)
+                    .Select(set => new
+                    {
+                        exercise.LoggingModeSnapshot,
+                        set.Kind,
+                        set.WeightKg,
+                        set.Repetitions,
+                        set.DurationSeconds,
+                        set.CompletedAtUtc
+                    })))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .OrderBy(item => item.CompletedAtUtc)
+            .Select(item => new StrengthSetEvidence(
+                item.LoggingModeSnapshot,
+                item.Kind,
+                item.WeightKg,
+                item.Repetitions,
+                item.DurationSeconds,
+                item.CompletedAtUtc))
+            .ToList();
+    }
+
     public async Task<WorkoutSessionWriteResult> AddAsync(
         WorkoutSession session,
         CancellationToken cancellationToken = default)

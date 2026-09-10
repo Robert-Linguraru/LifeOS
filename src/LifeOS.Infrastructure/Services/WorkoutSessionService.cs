@@ -96,7 +96,7 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
             exerciseId,
             cancellationToken)
             ?? throw new ResourceNotFoundException("Exercise was not found.");
-        return await _sessionRepository.GetExerciseHistoryAsync(
+        var history = await _sessionRepository.GetExerciseHistoryAsync(
             GetCurrentUserId(),
             exerciseId,
             exercise.Name,
@@ -104,6 +104,27 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
             page,
             pageSize,
             cancellationToken);
+        try
+        {
+            var evidence = await _sessionRepository.GetStrengthRecordEvidenceAsync(
+                GetCurrentUserId(),
+                exerciseId,
+                Guid.Empty,
+                Guid.Empty,
+                cancellationToken);
+            return history with
+            {
+                CurrentBests = BuildCurrentBests(evidence)
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return history;
+        }
     }
 
     public async Task<WorkoutSessionDetailDto> AddExerciseAsync(
@@ -265,7 +286,40 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
             dto.Repetitions,
             dto.DurationSeconds,
             dto.StartRestTimer);
-        return await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+        var authoritative = await PersistMutationAsync(session, dto.ExpectedVersion, cancellationToken);
+        var sessionExercise = authoritative.Exercises.Single(exercise => exercise.Id == dto.SessionExerciseId);
+        var completedSet = sessionExercise.Sets.Single(set => set.Id == dto.SetId);
+        if (completedSet.Kind != WorkoutSetKind.Working
+            || completedSet.CompletedAtUtc is null
+            || sessionExercise.LoggingModeSnapshot == ExerciseLoggingMode.AssistedWeightAndReps)
+        {
+            return authoritative;
+        }
+
+        try
+        {
+            var evidence = await _sessionRepository.GetStrengthRecordEvidenceAsync(
+                GetCurrentUserId(),
+                sessionExercise.ExerciseId,
+                authoritative.Id,
+                completedSet.Id,
+                cancellationToken);
+            var candidate = ToEvidence(sessionExercise.LoggingModeSnapshot, completedSet);
+            return authoritative with
+            {
+                StrengthRecordAchievements = StrengthRecordEvaluator.Evaluate(candidate, evidence)
+                    .Select(achievement => achievement with { ExerciseId = sessionExercise.ExerciseId })
+                    .ToList()
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return authoritative;
+        }
     }
 
     public async Task<WorkoutSessionDetailDto> StartRestTimerAsync(
@@ -353,7 +407,22 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
             session.Id,
             cancellationToken)
             ?? throw new ResourceNotFoundException("The completed workout could not be loaded.");
-        return ToCompletionSummary(authoritative);
+        var summary = ToCompletionSummary(authoritative);
+        try
+        {
+            return summary with
+            {
+                StrengthRecordAchievements = await EvaluateSessionAchievementsAsync(authoritative, cancellationToken)
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return summary;
+        }
     }
 
     public async Task<WorkoutSessionDetailDto> DiscardWorkoutAsync(
@@ -684,6 +753,113 @@ public sealed class WorkoutSessionService : IWorkoutSessionService
                             set.CompletedAtUtc))
                         .ToList()))
                 .ToList());
+
+    private async Task<IReadOnlyList<StrengthRecordAchievement>> EvaluateSessionAchievementsAsync(
+        WorkoutSession session,
+        CancellationToken cancellationToken)
+    {
+        var achievements = new List<StrengthRecordAchievement>();
+        foreach (var exercise in session.Exercises.Where(item => !item.IsSkipped))
+        {
+            var evidence = await _sessionRepository.GetStrengthRecordEvidenceAsync(
+                session.UserId,
+                exercise.ExerciseId,
+                session.Id,
+                Guid.Empty,
+                cancellationToken);
+            var prior = evidence.ToList();
+            foreach (var set in exercise.Sets
+                         .Where(item => item.IsCompleted && item.Kind == WorkoutSetKind.Working)
+                         .OrderBy(item => item.CompletedAtUtc)
+                         .ThenBy(item => item.SortOrder))
+            {
+                var candidate = ToEvidence(exercise.LoggingModeSnapshot, set);
+                var current = StrengthRecordEvaluator.Evaluate(candidate, prior);
+                achievements.AddRange(current.Select(achievement => achievement with { ExerciseId = exercise.ExerciseId }));
+                prior.Add(candidate);
+            }
+        }
+
+        return DeduplicateAchievements(achievements);
+    }
+
+    private static IReadOnlyList<StrengthRecordAchievement> BuildCurrentBests(
+        IReadOnlyList<StrengthSetEvidence> evidence)
+    {
+        if (evidence.Count == 0)
+        {
+            return [];
+        }
+
+        var loggingMode = evidence[0].LoggingMode;
+        var prior = new List<StrengthSetEvidence>();
+        var achievements = new List<StrengthRecordAchievement>();
+        foreach (var candidate in evidence.Where(item => item.LoggingMode == loggingMode))
+        {
+            achievements.AddRange(StrengthRecordEvaluator.Evaluate(candidate, prior));
+            prior.Add(candidate);
+        }
+
+        return DeduplicateAchievements(achievements)
+            .Where(achievement => achievement.Type switch
+            {
+                StrengthRecordType.BestRepsAtWeight or StrengthRecordType.LongestDurationAtWeight => achievement.WeightKg is not null,
+                StrengthRecordType.HeaviestWeight => achievement.WeightKg is not null,
+                StrengthRecordType.MostReps => achievement.Repetitions is not null,
+                StrengthRecordType.LongestDuration => achievement.DurationSeconds is not null,
+                _ => false
+            })
+            .OrderBy(achievement => achievement.Type)
+            .ThenBy(achievement => achievement.WeightKg)
+            .Take(25)
+            .ToList();
+    }
+
+    private static IReadOnlyList<StrengthRecordAchievement> DeduplicateAchievements(
+        IEnumerable<StrengthRecordAchievement> achievements)
+    {
+        var result = new List<StrengthRecordAchievement>();
+        foreach (var achievement in achievements)
+        {
+            var index = result.FindIndex(existing => existing.Type == achievement.Type
+                && existing.ExerciseId == achievement.ExerciseId
+                && (achievement.Type is StrengthRecordType.BestRepsAtWeight or StrengthRecordType.LongestDurationAtWeight
+                    ? existing.WeightKg == achievement.WeightKg
+                    : true));
+            if (index >= 0)
+            {
+                result[index] = achievement;
+            }
+            else
+            {
+                result.Add(achievement);
+            }
+        }
+
+        return result;
+    }
+
+    private static StrengthSetEvidence ToEvidence(
+        ExerciseLoggingMode loggingMode,
+        WorkoutSetDto set) =>
+        new(
+            loggingMode,
+            set.Kind,
+            set.WeightKg,
+            set.Repetitions,
+            set.DurationSeconds,
+            set.CompletedAtUtc);
+
+    private static StrengthSetEvidence ToEvidence(
+        ExerciseLoggingMode loggingMode,
+        WorkoutSet set) =>
+        new(
+            loggingMode,
+            set.Kind,
+            set.WeightKg,
+            set.Repetitions,
+            set.DurationSeconds,
+            set.CompletedAtUtc);
 
     private static WorkoutCompletionSummaryDto ToCompletionSummary(WorkoutSession session)
     {

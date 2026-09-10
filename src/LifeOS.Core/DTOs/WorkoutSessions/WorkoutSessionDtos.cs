@@ -1,5 +1,7 @@
 using LifeOS.Core.Enums.Fitness;
 
+using LifeOS.Core.Services;
+
 namespace LifeOS.Core.DTOs.WorkoutSessions;
 
 public sealed record WorkoutSetDto(
@@ -40,7 +42,10 @@ public sealed record WorkoutSessionDetailDto(
     int? RestTimerDurationSeconds,
     DateTimeOffset? RestTimerEndsAtUtc,
     int? RestTimerPausedRemainingSeconds,
-    IReadOnlyList<WorkoutSessionExerciseDto> Exercises);
+    IReadOnlyList<WorkoutSessionExerciseDto> Exercises)
+{
+    public IReadOnlyList<StrengthRecordAchievement> StrengthRecordAchievements { get; init; } = [];
+}
 
 public sealed record WorkoutSessionSummaryDto(
     Guid Id,
@@ -167,7 +172,10 @@ public sealed record WorkoutCompletionSummaryDto(
     int CompletedExerciseCount,
     int WorkingSetCount,
     SessionFeeling? SessionFeeling,
-    IReadOnlyList<WorkoutPerformanceSummaryDto> Performance);
+    IReadOnlyList<WorkoutPerformanceSummaryDto> Performance)
+{
+    public IReadOnlyList<StrengthRecordAchievement> StrengthRecordAchievements { get; init; } = [];
+}
 
 public sealed record PreviousPerformanceDto(
     Guid ExerciseId,
@@ -186,4 +194,7 @@ public sealed record ExerciseHistoryDto(
     IReadOnlyList<PreviousPerformanceDto> Sessions,
     int Page,
     int PageSize,
-    int TotalCount);
+    int TotalCount)
+{
+    public IReadOnlyList<StrengthRecordAchievement> CurrentBests { get; init; } = [];
+}

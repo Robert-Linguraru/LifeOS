@@ -27,6 +27,13 @@ public interface IWorkoutSessionRepository
         Guid userId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<StrengthSetEvidence>> GetStrengthRecordEvidenceAsync(
+        Guid userId,
+        Guid exerciseId,
+        Guid currentSessionId,
+        Guid candidateSetId,
+        CancellationToken cancellationToken = default);
+
     Task<WorkoutSession?> GetByIdAsync(
         Guid userId,
         Guid sessionId,
