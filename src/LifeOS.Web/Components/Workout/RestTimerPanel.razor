@@ -1,0 +1,43 @@
+@using LifeOS.Core.DTOs.WorkoutSessions
+
+@if (Session.RestTimerEndsAtUtc is not null || Session.RestTimerPausedRemainingSeconds is not null)
+{
+    <section class="rest-timer-panel" aria-labelledby="rest-timer-heading">
+        <h2 id="rest-timer-heading">Rest timer</h2>
+        @if (Session.RestTimerEndsAtUtc is not null)
+        {
+            <p role="status">Running · <strong>@FormatSeconds(RemainingSeconds ?? 0)</strong> remaining</p>
+            <div class="form-actions">
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="OnPause">Pause</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="OnReset">Reset</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="() => OnAdjust.InvokeAsync(-15)">-15 sec</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="() => OnAdjust.InvokeAsync(15)">+15 sec</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="OnSkip">Skip rest</button>
+            </div>
+        }
+        else
+        {
+            <p role="status">Paused · <strong>@FormatSeconds(RemainingSeconds ?? 0)</strong> remaining</p>
+            <div class="form-actions">
+                <button type="button" class="primary-button" disabled="@IsBusy" @onclick="OnResume">Resume</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="OnReset">Reset</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="() => OnAdjust.InvokeAsync(-15)">-15 sec</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="() => OnAdjust.InvokeAsync(15)">+15 sec</button>
+                <button type="button" class="secondary-button" disabled="@IsBusy" @onclick="OnSkip">Skip rest</button>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public WorkoutSessionDetailDto Session { get; set; } = default!;
+    [Parameter] public int? RemainingSeconds { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback OnPause { get; set; }
+    [Parameter] public EventCallback OnResume { get; set; }
+    [Parameter] public EventCallback OnReset { get; set; }
+    [Parameter] public EventCallback<int> OnAdjust { get; set; }
+    [Parameter] public EventCallback OnSkip { get; set; }
+
+    private static string FormatSeconds(int seconds) => $"{Math.Max(0, seconds) / 60}:{Math.Max(0, seconds) % 60:00}";
+}

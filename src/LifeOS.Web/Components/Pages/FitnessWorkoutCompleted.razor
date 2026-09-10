@@ -1,0 +1,58 @@
+@page "/fitness/workout/completed/{SessionId:guid}"
+
+@page "/fitness/workout/completed/{SessionId:guid}"
+
+@inject IWorkoutSessionService WorkoutSessionService
+
+<PageTitle>Workout Complete</PageTitle>
+
+<div class="fitness-page">
+    @if (_isLoading)
+    {
+        <p role="status">Loading completed workout...</p>
+    }
+    else if (_summary is null)
+    {
+        <section class="empty-state">
+            <h1>Workout complete</h1>
+            <p>The workout was saved. Its detailed summary will be available in the History experience.</p>
+            <a class="primary-button" href="/fitness">Back to Fitness</a>
+        </section>
+    }
+    else
+    {
+        <section class="fitness-resume" aria-labelledby="completed-heading">
+            <div>
+                <h1 id="completed-heading">Workout complete</h1>
+                <h2>@_summary.NameSnapshot</h2>
+                <p>@_summary.WorkingSetCount Working Sets · @_summary.Duration.ToString("m' minutes' ss' seconds'")</p>
+            </div>
+            <a class="primary-button" href="/fitness">Back to Fitness</a>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    private WorkoutCompletionSummaryDto? _summary;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        var detail = await WorkoutSessionService.GetCompletedWorkoutAsync(SessionId);
+        if (detail is not null)
+        {
+            _summary = new WorkoutCompletionSummaryDto(
+                detail.Id,
+                detail.NameSnapshot,
+                detail.CompletedAtUtc!.Value - detail.StartedAtUtc,
+                detail.Exercises.Count,
+                detail.Exercises.Count(item => item.Sets.Any(set => set.CompletedAtUtc is not null)),
+                detail.Exercises.SelectMany(item => item.Sets).Count(set => set.CompletedAtUtc is not null && set.Kind == WorkoutSetKind.Working),
+                detail.SessionFeeling,
+                []);
+        }
+        _isLoading = false;
+    }
+}

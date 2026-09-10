@@ -201,12 +201,68 @@ select {
     text-align: center;
 }
 
+.workout-header,
+.workout-exercise__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.workout-exercise,
+.rest-timer-panel,
+.previous-performance,
+.workout-inline-editor {
+    display: grid;
+    gap: .8rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: .6rem;
+    background: var(--color-surface);
+}
+
+.workout-exercise--skipped {
+    opacity: .75;
+}
+
+.workout-sets {
+    display: grid;
+    gap: .7rem;
+}
+
+.workout-set-row {
+    display: grid;
+    grid-template-columns: auto repeat(auto-fit, minmax(120px, 1fr));
+    gap: .7rem;
+    align-items: end;
+    padding: .8rem;
+    border-left: .3rem solid var(--color-border);
+    background: var(--color-background);
+}
+
+.workout-set-row__heading,
+.workout-set-row label {
+    display: grid;
+    gap: .3rem;
+}
+
+.previous-performance ul {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+.form-hint {
+    color: #bdbdbd;
+}
+
 @media (max-width: 650px) {
     .fitness-page {
         padding: 1rem;
     }
 
     .page-header,
+    .workout-header,
+    .workout-exercise__header,
     .template-exercise-heading,
     .template-row,
     .fitness-resume {
@@ -220,8 +276,14 @@ select {
     }
 
     .page-header .form-actions > *,
+    .workout-header .form-actions > *,
+    .workout-exercise__header .form-actions > *,
     .template-row .form-actions > * {
         flex: 1 1 auto;
         text-align: center;
+    }
+
+    .workout-set-row {
+        grid-template-columns: 1fr;
     }
 }

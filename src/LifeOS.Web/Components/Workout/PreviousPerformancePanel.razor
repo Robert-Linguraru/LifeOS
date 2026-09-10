@@ -1,0 +1,36 @@
+@using LifeOS.Core.DTOs.WorkoutSessions
+@using LifeOS.Core.Enums.Fitness
+
+<section class="previous-performance" aria-label="Previous performance">
+    <h3>Previous</h3>
+    @if (Performance is null)
+    {
+        <p>No previous performance</p>
+    }
+    else
+    {
+        <p>@Performance.SessionNameSnapshot · @Performance.WorkoutDate</p>
+        <ul>
+            @foreach (var set in Performance.WorkingSets)
+            {
+                <li>@FormatSet(set)</li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    [Parameter] public PreviousPerformanceDto? Performance { get; set; }
+    [Parameter] public ExerciseLoggingMode LoggingMode { get; set; }
+
+    private string FormatSet(WorkoutSetDto set) => LoggingMode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => $"{set.WeightKg:0.##} kg × {set.Repetitions} reps",
+        ExerciseLoggingMode.AddedWeightAndReps => $"+{set.WeightKg:0.##} kg × {set.Repetitions} reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => $"{set.WeightKg:0.##} kg assistance × {set.Repetitions} reps",
+        ExerciseLoggingMode.BodyweightAndReps or ExerciseLoggingMode.RepsOnly => $"{set.Repetitions} reps",
+        ExerciseLoggingMode.Duration => $"{set.DurationSeconds} seconds",
+        ExerciseLoggingMode.WeightAndDuration => $"{set.WeightKg:0.##} kg × {set.DurationSeconds} seconds",
+        _ => "Completed Set"
+    };
+}

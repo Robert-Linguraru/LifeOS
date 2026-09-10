@@ -1,12 +1,15 @@
 @page "/fitness/workout"
+@page "/fitness/workout"
 @page "/fitness/workout/{SessionId:guid}"
+@implements IAsyncDisposable
 
 @inject IWorkoutSessionService WorkoutSessionService
+@inject IExerciseService ExerciseService
 @inject NavigationManager Navigation
 
-<PageTitle>Workout in Progress</PageTitle>
+<PageTitle>Active Workout</PageTitle>
 
-<div class="fitness-page">
+<div class="fitness-page workout-page">
     @if (_isLoading)
     {
         <p role="status">Loading workout...</p>
@@ -14,34 +17,572 @@
     else if (_session is null)
     {
         <section class="empty-state">
-            <h1>No workout in progress</h1>
-            <p>Start a template or custom workout from Fitness.</p>
+            <h1>@(_routeMismatch ? "Workout is no longer active" : "No workout in progress")</h1>
+            <p>@(_routeMismatch ? "The requested workout has been completed or discarded." : "Start a template or custom workout from Fitness.")</p>
             <a class="primary-button" href="/fitness">Back to Fitness</a>
         </section>
     }
     else
     {
-        <section class="fitness-resume" aria-labelledby="workout-placeholder-heading">
+        <header class="workout-header">
             <div>
-                <h1 id="workout-placeholder-heading">Workout in progress</h1>
-                <h2>@_session.NameSnapshot</h2>
-                <p>This workout is ready for the active workout experience.</p>
-                <p>Ticket 17 will add Set logging, rest timers, and completion controls here.</p>
+                <a class="secondary-button" href="/fitness">Back to Fitness</a>
+                <h1>@_session.NameSnapshot</h1>
+                <p>Started @_session.StartedAtUtc.ToLocalTime().ToString("g") · @_session.WorkoutDate</p>
+                <p>@CompletedExerciseCount of @_session.Exercises.Count Exercises completed · @_session.Exercises.Sum(item => item.Sets.Count(set => set.CompletedAtUtc is not null && set.Kind == WorkoutSetKind.Working)) Working Sets</p>
             </div>
-            <a class="secondary-button" href="/fitness">Return to Fitness</a>
-        </section>
+            <div class="workout-header__actions">
+                @if (_confirmComplete)
+                {
+                    <label for="session-feeling">How did it feel?</label>
+                    <select id="session-feeling" @bind="_sessionFeeling">
+                        <option value="">No feeling</option>
+                        @foreach (var feeling in Enum.GetValues<SessionFeeling>())
+                        {
+                            <option value="@feeling">@feeling</option>
+                        }
+                    </select>
+                    <button type="button" class="primary-button" disabled="@_isBusy" @onclick="CompleteAsync">Confirm complete</button>
+                    <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => _confirmComplete = false">Cancel</button>
+                }
+                else
+                {
+                    <button type="button" class="primary-button" disabled="@(_isBusy || !HasCompletedSet)" title="Complete at least one Set first" @onclick="() => _confirmComplete = true">Complete Workout</button>
+                }
+                @if (_confirmDiscard)
+                {
+                    <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="DiscardAsync">Confirm discard</button>
+                    <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => _confirmDiscard = false">Cancel</button>
+                }
+                else
+                {
+                    <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => _confirmDiscard = true">Discard Workout</button>
+                }
+            </div>
+        </header>
+
+        @if (_error is not null)
+        {
+            <div class="error-message" role="alert">@_error</div>
+        }
+        @if (_status is not null)
+        {
+            <div class="status-message" role="status">@_status</div>
+        }
+
+        <RestTimerPanel Session="@_session"
+                        RemainingSeconds="@RemainingTimerSeconds"
+                        IsBusy="@_isBusy"
+                        OnPause="PauseTimerAsync"
+                        OnResume="ResumeTimerAsync"
+                        OnReset="ResetTimerAsync"
+                        OnAdjust="AdjustTimerAsync"
+                        OnSkip="SkipTimerAsync" />
+
+        @foreach (var exercise in _session.Exercises.OrderBy(item => item.SortOrder))
+        {
+            <section class="workout-exercise @(exercise.IsSkipped ? "workout-exercise--skipped" : string.Empty)" aria-labelledby="exercise-@exercise.Id">
+                <div class="workout-exercise__header">
+                    <div>
+                        <h2 id="exercise-@exercise.Id">@exercise.ExerciseNameSnapshot</h2>
+                        @if (exercise.IsSkipped)
+                        {
+                            <p class="form-hint"><strong>Skipped</strong> — no Sets were logged for this Exercise.</p>
+                        }
+                        @if (exercise.ExerciseId != exercise.OriginalExerciseId)
+                        {
+                            <p class="form-hint">Substituted for @exercise.OriginalExerciseNameSnapshot</p>
+                        }
+                        <p>@FormatLoggingMode(exercise.LoggingModeSnapshot) · Target @exercise.TargetSetCountSnapshot sets @FormatRepRange(exercise)</p>
+                    </div>
+                    <div class="form-actions">
+                        @if (exercise.IsSkipped)
+                        {
+                            <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => UnskipExerciseAsync(exercise)">Unskip Exercise</button>
+                        }
+                        else
+                        {
+                            @if (exercise.Sets.Count == 0 && _session.OriginTemplateId is null)
+                            {
+                                <button type="button" class="secondary-button" disabled="@(_isBusy || _session.Exercises.Count <= 1)" title="A workout must keep at least one Exercise" @onclick="() => RemoveExerciseAsync(exercise)">Remove Exercise</button>
+                            }
+                            <button type="button" class="secondary-button" disabled="@(_isBusy || exercise.Sets.Count > 0)" title="Remove Sets before skipping" @onclick="() => SkipExerciseAsync(exercise)">Skip Exercise</button>
+                            @if (exercise.Sets.Count == 0)
+                            {
+                                <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => BeginSubstitution(exercise)">Substitute</button>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @if (_substitutionExerciseId == exercise.Id)
+                {
+                    <div class="workout-inline-editor">
+                        <label for="substitute-@exercise.Id">Replacement Exercise</label>
+                        <select id="substitute-@exercise.Id" @bind="_selectedExerciseId">
+                            <option value="@Guid.Empty">Choose an Exercise</option>
+                            @foreach (var replacement in _exercises)
+                            {
+                                <option value="@replacement.Id">@replacement.Name — @FormatLoggingMode(replacement.LoggingMode)</option>
+                            }
+                        </select>
+                        <button type="button" class="primary-button" disabled="@(_isBusy || _selectedExerciseId == Guid.Empty)" @onclick="() => SubstituteAsync(exercise)">Save substitution</button>
+                        <button type="button" class="secondary-button" @onclick="CancelSubstitution">Cancel</button>
+                    </div>
+                }
+
+                <PreviousPerformancePanel Performance="@GetPreviousPerformance(exercise.ExerciseId)" LoggingMode="@exercise.LoggingModeSnapshot" />
+
+                @if (!exercise.IsSkipped)
+                {
+                    <div class="workout-sets" aria-label="Sets">
+                        @foreach (var set in exercise.Sets.OrderBy(item => item.SortOrder))
+                        {
+                            var draft = GetDraft(set);
+                            <div class="workout-set-row">
+                                <div class="workout-set-row__heading">
+                                    <strong>Set @set.SortOrder</strong>
+                                    <span>@(draft.CompletedAtUtc is null ? "Draft" : "Completed")</span>
+                                </div>
+                                <label>Kind
+                                    <select @bind="draft.Kind">
+                                        <option value="@WorkoutSetKind.Working">Working</option>
+                                        <option value="@WorkoutSetKind.WarmUp">Warm-up</option>
+                                    </select>
+                                </label>
+                                @if (RequiresWeight(exercise.LoggingModeSnapshot))
+                                {
+                                    <label>@WeightLabel(exercise.LoggingModeSnapshot)
+                                        <InputNumber @bind-Value="draft.WeightKg" step="0.1" />
+                                    </label>
+                                }
+                                @if (RequiresRepetitions(exercise.LoggingModeSnapshot))
+                                {
+                                    <label>Reps
+                                        <InputNumber @bind-Value="draft.Repetitions" />
+                                    </label>
+                                }
+                                @if (RequiresDuration(exercise.LoggingModeSnapshot))
+                                {
+                                    <label>Duration (seconds)
+                                        <InputNumber @bind-Value="draft.DurationSeconds" />
+                                    </label>
+                                }
+                                <div class="form-actions">
+                                    <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => SaveSetAsync(exercise, draft)">Save</button>
+                                    @if (draft.CompletedAtUtc is null)
+                                    {
+                                        <button type="button" class="primary-button" disabled="@_isBusy" @onclick="() => CompleteSetAsync(exercise, draft)">Complete</button>
+                                    }
+                                    <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => RemoveSetAsync(exercise, draft)">Remove</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="form-actions workout-add-set">
+                        <button type="button" class="primary-button" disabled="@_isBusy" @onclick="() => AddSetAsync(exercise, WorkoutSetKind.Working)">Add Working Set</button>
+                        <button type="button" class="secondary-button" disabled="@_isBusy" @onclick="() => AddSetAsync(exercise, WorkoutSetKind.WarmUp)">Add Warm-up Set</button>
+                    </div>
+                }
+            </section>
+        }
+
+        @if (_session.OriginTemplateId is null)
+        {
+            <section class="exercise-picker" aria-labelledby="add-exercise-heading">
+                <h2 id="add-exercise-heading">Add Exercise</h2>
+                <div class="form-actions">
+                    <select aria-label="Exercise to add" @bind="_selectedExerciseId">
+                        <option value="@Guid.Empty">Choose an Exercise</option>
+                        @foreach (var exercise in _exercises)
+                        {
+                            <option value="@exercise.Id">@exercise.Name — @FormatLoggingMode(exercise.LoggingMode)</option>
+                        }
+                    </select>
+                    <button type="button" class="primary-button" disabled="@(_isBusy || _selectedExerciseId == Guid.Empty)" @onclick="AddExerciseAsync">Add Exercise</button>
+                </div>
+            </section>
+        }
     }
 </div>
 
 @code {
     [Parameter] public Guid? SessionId { get; set; }
-    private WorkoutSessionDetailDto? _session;
-    private bool _isLoading = true;
 
-    protected override async Task OnParametersSetAsync()
+    private WorkoutSessionDetailDto? _session;
+    private IReadOnlyList<PreviousPerformanceDto> _previous = [];
+    private IReadOnlyList<ExerciseSummaryDto> _exercises = [];
+    private readonly Dictionary<Guid, SetDraft> _drafts = [];
+    private CancellationTokenSource? _timerCts;
+    private DateTimeOffset _timerNow;
+    private Guid _selectedExerciseId;
+    private Guid? _substitutionExerciseId;
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private bool _routeMismatch;
+    private bool _confirmComplete;
+    private bool _confirmDiscard;
+    private string _sessionFeeling = string.Empty;
+    private string? _error;
+    private string? _status;
+
+    private bool HasCompletedSet => _session?.Exercises.SelectMany(item => item.Sets).Any(item => item.CompletedAtUtc is not null) == true;
+    private int CompletedExerciseCount => _session?.Exercises.Count(item => item.Sets.Any(set => set.CompletedAtUtc is not null)) ?? 0;
+    private int? RemainingTimerSeconds => _session?.RestTimerEndsAtUtc is not null
+        ? Math.Max(0, (int)Math.Ceiling((_session.RestTimerEndsAtUtc.Value - _timerNow).TotalSeconds))
+        : _session?.RestTimerPausedRemainingSeconds;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
     {
         _isLoading = true;
-        _session = await WorkoutSessionService.GetActiveSessionAsync();
-        _isLoading = false;
+        _error = null;
+        _routeMismatch = false;
+        try
+        {
+            var active = await WorkoutSessionService.GetActiveSessionAsync();
+            if (active is null || (SessionId is not null && active.Id != SessionId.Value))
+            {
+                _session = null;
+                _routeMismatch = SessionId is not null;
+                return;
+            }
+
+            _exercises = await ExerciseService.GetExercisesAsync(new ExerciseQuery());
+            await ApplySessionAsync(active, refreshPrevious: true);
+        }
+        catch (Exception)
+        {
+            _error = "The active workout could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplySessionAsync(WorkoutSessionDetailDto session, bool refreshPrevious = false)
+    {
+        _session = session;
+        _drafts.Clear();
+        foreach (var set in session.Exercises.SelectMany(item => item.Sets))
+        {
+            _drafts[set.Id] = SetDraft.FromDto(set);
+        }
+
+        if (refreshPrevious)
+        {
+            var ids = session.Exercises.Select(item => item.ExerciseId).Distinct().ToArray();
+            _previous = ids.Length == 0
+                ? []
+                : await WorkoutSessionService.GetPreviousPerformancesAsync(session.Id, ids);
+        }
+
+        _timerNow = DateTimeOffset.UtcNow;
+        EnsureTimerLoop();
+    }
+
+    private SetDraft GetDraft(WorkoutSetDto set) => _drafts[set.Id];
+
+    private PreviousPerformanceDto? GetPreviousPerformance(Guid exerciseId) =>
+        _previous.FirstOrDefault(item => item.ExerciseId == exerciseId);
+
+    private async Task AddSetAsync(WorkoutSessionExerciseDto exercise, WorkoutSetKind kind)
+    {
+        await MutateAsync(() => WorkoutSessionService.AddSetAsync(
+            _session!.Id,
+            new AddWorkoutSetDto(exercise.Id, kind, null, null, null, _session.Version)));
+    }
+
+    private async Task SaveSetAsync(WorkoutSessionExerciseDto exercise, SetDraft draft)
+    {
+        await MutateAsync(() => WorkoutSessionService.UpdateSetAsync(
+            _session!.Id,
+            new UpdateWorkoutSetDto(exercise.Id, draft.Id, draft.Kind, draft.WeightKg, draft.Repetitions, draft.DurationSeconds, _session.Version)));
+    }
+
+    private async Task CompleteSetAsync(WorkoutSessionExerciseDto exercise, SetDraft draft)
+    {
+        try
+        {
+            _isBusy = true;
+            _error = null;
+            var result = await WorkoutSessionService.CompleteSetAsync(
+                _session!.Id,
+                new CompleteWorkoutSetDto(
+                    exercise.Id,
+                    draft.Id,
+                    draft.WeightKg,
+                    draft.Repetitions,
+                    draft.DurationSeconds,
+                    exercise.DefaultRestSecondsSnapshot > 0,
+                    _session.Version));
+            await ApplySessionAsync(result, refreshPrevious: false);
+            _status = result.StrengthRecordAchievements.Count == 0
+                ? "Set completed."
+                : string.Join(" ", result.StrengthRecordAchievements.Select(FormatAchievement));
+        }
+        catch (Exception exception)
+        {
+            await HandleMutationErrorAsync(exception);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task RemoveSetAsync(WorkoutSessionExerciseDto exercise, SetDraft draft)
+    {
+        await MutateAsync(() => WorkoutSessionService.RemoveSetAsync(_session!.Id, exercise.Id, draft.Id, _session.Version));
+    }
+
+    private async Task AddExerciseAsync()
+    {
+        var selected = _exercises.SingleOrDefault(item => item.Id == _selectedExerciseId);
+        if (selected is null) return;
+        await MutateAsync(() => WorkoutSessionService.AddExerciseAsync(
+            _session!.Id,
+            new AddSessionExerciseDto(selected.Id, selected.Name, selected.LoggingMode, 3, IsRepBased(selected.LoggingMode) ? 8 : null, IsRepBased(selected.LoggingMode) ? 12 : null, 90, _session.Version)),
+            refreshPrevious: true);
+        _selectedExerciseId = Guid.Empty;
+    }
+
+    private async Task RemoveExerciseAsync(WorkoutSessionExerciseDto exercise) =>
+        await MutateAsync(() => WorkoutSessionService.RemoveExerciseAsync(_session!.Id, exercise.Id, _session.Version), refreshPrevious: true);
+
+    private async Task SkipExerciseAsync(WorkoutSessionExerciseDto exercise) =>
+        await MutateAsync(() => WorkoutSessionService.SkipExerciseAsync(_session!.Id, exercise.Id, _session.Version));
+
+    private async Task UnskipExerciseAsync(WorkoutSessionExerciseDto exercise) =>
+        await MutateAsync(() => WorkoutSessionService.UnskipExerciseAsync(_session!.Id, exercise.Id, _session.Version));
+
+    private void BeginSubstitution(WorkoutSessionExerciseDto exercise)
+    {
+        _substitutionExerciseId = exercise.Id;
+        _selectedExerciseId = Guid.Empty;
+    }
+
+    private void CancelSubstitution() => _substitutionExerciseId = null;
+
+    private async Task SubstituteAsync(WorkoutSessionExerciseDto exercise)
+    {
+        var replacement = _exercises.SingleOrDefault(item => item.Id == _selectedExerciseId);
+        if (replacement is null) return;
+        await MutateAsync(() => WorkoutSessionService.SubstituteExerciseAsync(
+            _session!.Id,
+            new SubstituteSessionExerciseDto(exercise.Id, replacement.Id, replacement.Name, replacement.LoggingMode, _session.Version)),
+            refreshPrevious: true);
+        _substitutionExerciseId = null;
+        _selectedExerciseId = Guid.Empty;
+    }
+
+    private async Task MutateAsync(Func<Task<WorkoutSessionDetailDto>> mutation, bool refreshPrevious = false)
+    {
+        if (_isBusy) return;
+        _isBusy = true;
+        _error = null;
+        try
+        {
+            await ApplySessionAsync(await mutation(), refreshPrevious);
+            _status = "Workout updated.";
+        }
+        catch (Exception exception)
+        {
+            await HandleMutationErrorAsync(exception);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task HandleMutationErrorAsync(Exception exception)
+    {
+        if (exception is WorkoutSessionConcurrencyException)
+        {
+            _error = "This workout changed in another tab. The latest version has been loaded.";
+            await ReloadActiveAsync();
+        }
+        else if (exception is ResourceNotFoundException or ValidationException)
+        {
+            _error = exception.Message;
+        }
+        else
+        {
+            _error = "The workout change could not be saved. Please try again.";
+        }
+    }
+
+    private async Task ReloadActiveAsync()
+    {
+        var active = await WorkoutSessionService.GetActiveSessionAsync();
+        if (active is null)
+        {
+            _session = null;
+            _error = "This workout is no longer active.";
+            return;
+        }
+
+        await ApplySessionAsync(active, refreshPrevious: true);
+    }
+
+    private async Task PauseTimerAsync() => await TimerMutationAsync(() => WorkoutSessionService.PauseRestTimerAsync(_session!.Id, new TimerTimestampDto(_session.Version)));
+    private async Task ResumeTimerAsync() => await TimerMutationAsync(() => WorkoutSessionService.ResumeRestTimerAsync(_session!.Id, new TimerTimestampDto(_session.Version)));
+    private async Task ResetTimerAsync() => await TimerMutationAsync(() => WorkoutSessionService.ResetRestTimerAsync(_session!.Id, new TimerTimestampDto(_session.Version)));
+    private async Task SkipTimerAsync() => await TimerMutationAsync(() => WorkoutSessionService.ClearRestTimerAsync(_session!.Id, _session.Version));
+
+    private async Task AdjustTimerAsync(int seconds)
+    {
+        var remaining = RemainingTimerSeconds ?? _session!.RestTimerDurationSeconds ?? 0;
+        await TimerMutationAsync(() => WorkoutSessionService.AdjustRestTimerAsync(_session!.Id, new AdjustRestTimerDto(Math.Max(1, remaining + seconds), _session.Version)));
+    }
+
+    private async Task TimerMutationAsync(Func<Task<WorkoutSessionDetailDto>> mutation) => await MutateAsync(mutation);
+
+    private async Task CompleteAsync()
+    {
+        if (_isBusy) return;
+        _isBusy = true;
+        try
+        {
+            var feeling = Enum.TryParse<SessionFeeling>(_sessionFeeling, out var parsed) ? parsed : (SessionFeeling?)null;
+            await WorkoutSessionService.CompleteWorkoutAsync(_session!.Id, new CompleteWorkoutDto(feeling, _session.Version));
+            Navigation.NavigateTo($"/fitness/workout/completed/{_session.Id}");
+        }
+        catch (Exception exception)
+        {
+            await HandleMutationErrorAsync(exception);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task DiscardAsync()
+    {
+        if (_isBusy) return;
+        _isBusy = true;
+        try
+        {
+            await WorkoutSessionService.DiscardWorkoutAsync(_session!.Id, new DiscardWorkoutDto(_session.Version));
+            Navigation.NavigateTo("/fitness");
+        }
+        catch (Exception exception)
+        {
+            await HandleMutationErrorAsync(exception);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void EnsureTimerLoop()
+    {
+        if (_session?.RestTimerEndsAtUtc is null || _timerCts is not null) return;
+        _timerCts = new CancellationTokenSource();
+        _ = TimerLoopAsync(_timerCts.Token);
+    }
+
+    private async Task TimerLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                _timerNow = DateTimeOffset.UtcNow;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private static string FormatAchievement(StrengthRecordAchievement achievement) => achievement.IsFirstRecord
+        ? $"First record — {FormatAchievementValue(achievement)}"
+        : $"New PR — {FormatAchievementValue(achievement)}";
+
+    private static string FormatAchievementValue(StrengthRecordAchievement achievement) => achievement.Type switch
+    {
+        StrengthRecordType.HeaviestWeight => $"{achievement.WeightKg:0.##} kg",
+        StrengthRecordType.BestRepsAtWeight => $"{achievement.Repetitions} reps at {achievement.WeightKg:0.##} kg",
+        StrengthRecordType.MostReps => $"{achievement.Repetitions} reps",
+        StrengthRecordType.LongestDuration => $"{achievement.DurationSeconds} seconds",
+        StrengthRecordType.LongestDurationAtWeight => $"{achievement.DurationSeconds} seconds at {achievement.WeightKg:0.##} kg",
+        _ => "record"
+    };
+
+    private static string FormatRepRange(WorkoutSessionExerciseDto exercise) =>
+        exercise.TargetRepMinSnapshot is null && exercise.TargetRepMaxSnapshot is null
+            ? string.Empty
+            : $"({exercise.TargetRepMinSnapshot?.ToString() ?? ""}-{exercise.TargetRepMaxSnapshot?.ToString() ?? ""} reps)";
+
+    private static bool RequiresWeight(ExerciseLoggingMode mode) => mode is
+        ExerciseLoggingMode.WeightAndReps or ExerciseLoggingMode.AddedWeightAndReps or
+        ExerciseLoggingMode.AssistedWeightAndReps or ExerciseLoggingMode.WeightAndDuration;
+
+    private static bool RequiresRepetitions(ExerciseLoggingMode mode) => mode is
+        ExerciseLoggingMode.WeightAndReps or ExerciseLoggingMode.BodyweightAndReps or
+        ExerciseLoggingMode.AddedWeightAndReps or ExerciseLoggingMode.AssistedWeightAndReps or
+        ExerciseLoggingMode.RepsOnly;
+
+    private static bool RequiresDuration(ExerciseLoggingMode mode) => mode is
+        ExerciseLoggingMode.Duration or ExerciseLoggingMode.WeightAndDuration;
+
+    private static string WeightLabel(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.AddedWeightAndReps => "Added weight (kg)",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assistance weight (kg)",
+        _ => "Weight (kg)"
+    };
+
+    private static bool IsRepBased(ExerciseLoggingMode mode) => mode is
+        ExerciseLoggingMode.WeightAndReps or ExerciseLoggingMode.BodyweightAndReps or
+        ExerciseLoggingMode.AddedWeightAndReps or ExerciseLoggingMode.AssistedWeightAndReps or
+        ExerciseLoggingMode.RepsOnly;
+
+    private static string FormatLoggingMode(ExerciseLoggingMode mode) => mode switch
+    {
+        ExerciseLoggingMode.WeightAndReps => "Weight + Reps",
+        ExerciseLoggingMode.BodyweightAndReps => "Bodyweight + Reps",
+        ExerciseLoggingMode.AddedWeightAndReps => "Added Weight + Reps",
+        ExerciseLoggingMode.AssistedWeightAndReps => "Assistance Weight + Reps",
+        ExerciseLoggingMode.RepsOnly => "Reps Only",
+        ExerciseLoggingMode.Duration => "Duration",
+        ExerciseLoggingMode.WeightAndDuration => "Weight + Duration",
+        _ => mode.ToString()
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_timerCts is not null)
+        {
+            await _timerCts.CancelAsync();
+            _timerCts.Dispose();
+        }
+    }
+
+    private sealed class SetDraft
+    {
+        public Guid Id { get; init; }
+        public WorkoutSetKind Kind { get; set; }
+        public decimal? WeightKg { get; set; }
+        public int? Repetitions { get; set; }
+        public int? DurationSeconds { get; set; }
+        public DateTimeOffset? CompletedAtUtc { get; init; }
+        public static SetDraft FromDto(WorkoutSetDto set) => new()
+        {
+            Id = set.Id,
+            Kind = set.Kind,
+            WeightKg = set.WeightKg,
+            Repetitions = set.Repetitions,
+            DurationSeconds = set.DurationSeconds,
+            CompletedAtUtc = set.CompletedAtUtc
+        };
     }
 }
