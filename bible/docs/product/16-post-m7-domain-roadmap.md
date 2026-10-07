@@ -4,7 +4,7 @@
 
 This is the canonical active requirements document for planned Milestones 8–14. It supplements the implemented V1 documentation; it does not change the completed M0–M7 contract.
 
-**Implemented through M7:** foundation, Tasks, Habits, XP/progression, one-time in-app Reminders/Notifications, Dashboard, Settings, and Simple Finance.
+**Implemented through M8:** foundation, Tasks, Habits, XP/progression, one-time in-app Reminders/Notifications, Dashboard, Settings, Simple Finance, and Strength & Calisthenics Training.
 
 **M7 Simple Finance:** manual Income and Expense transactions, stable default categories, transaction CRUD, monthly income/expenses/net and expense-category breakdown, monthly history, small yearly income/expenses/net summary, user-level currency preference, and Dashboard widget. It deliberately excludes budgets, spending plans, allowances, transaction currencies, FX, imports, accounting/ledger infrastructure, and advanced finance analytics.
 
@@ -18,7 +18,7 @@ Do not introduce generic analytics or cross-domain metric engines, AI orchestrat
 
 | Milestone | Status | Scope |
 |---|---|---|
-| M8 | Planned | Strength & Calisthenics Training |
+| M8 | Completed | Strength & Calisthenics Training |
 | M9 | Planned | Activity & Fitness Progression |
 | M10 | Planned | Nutrition |
 | M11 | Planned | Health |

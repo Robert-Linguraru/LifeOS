@@ -1,5 +1,7 @@
 # M8 — Strength & Calisthenics Training Architecture Contract
 
+> **Status: Completed.** The M8 contract was implemented through Tickets 1–19. Runtime PostgreSQL verification remains subject to the documented Rancher Desktop/Testcontainers readiness limitation; focused Core/Web verification and prior integration baselines are retained below.
+
 ## 1. Authority and scope
 
 This document freezes the M8 implementation contract before production models, persistence, mappings, seed data, or migrations are created. The canonical product requirements remain `bible/docs/product/16-post-m7-domain-roadmap.md`; this document defines the M8 architectural detail.

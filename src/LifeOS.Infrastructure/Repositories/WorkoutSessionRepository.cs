@@ -96,14 +96,17 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
                             : context.Entry(active[index]);
                         tracked.Property(item => item.SortOrder).CurrentValue = TemporarySortOrderBase + index;
                     }
+                }
 
-                    await context.SaveChangesAsync(cancellationToken);
-                    await ApplyFinalOrderingAsync(context, active, existingById, cancellationToken);
+                await context.SaveChangesAsync(cancellationToken);
+
+                if (requiresOrderPhase)
+                {
+                    await ApplyFinalOrderingAsync(context, session.Exercises.ToList(), existingById, cancellationToken);
                 }
 
                 if (requiresSetOrderPhase)
                 {
-                    await context.SaveChangesAsync(cancellationToken);
                     await ApplyFinalSetOrderingAsync(context, session, cancellationToken);
                 }
             }
@@ -467,9 +470,15 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
             }
 
             var proposedIds = proposedExercise.Sets.Select(item => item.Id).ToHashSet();
-            requiresOrderPhase |= existingExercise.Sets.Any(item => !proposedIds.Contains(item.Id));
-            requiresOrderPhase |= proposedExercise.Sets.Any(item =>
+            var exerciseRequiresOrderPhase = existingExercise.Sets.Any(item => !proposedIds.Contains(item.Id))
+                || proposedExercise.Sets.Any(item =>
                 !existingExercise.Sets.Any(existingSet => existingSet.Id == item.Id && existingSet.SortOrder == item.SortOrder));
+            requiresOrderPhase |= exerciseRequiresOrderPhase;
+            if (!exerciseRequiresOrderPhase)
+            {
+                continue;
+            }
+
             foreach (var set in proposedExercise.Sets)
             {
                 var entry = context.Entry(set.Id == Guid.Empty
@@ -535,6 +544,7 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
         var parameters = new List<NpgsqlParameter>();
         var cases = new List<string>();
         var ids = new List<string>();
+        var finalOrders = new Dictionary<Guid, int>();
         var index = 0;
         foreach (var set in session.Exercises.SelectMany(item => item.Sets))
         {
@@ -542,6 +552,7 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
             parameters.Add(new NpgsqlParameter($"p_set_order_{index}", set.SortOrder));
             cases.Add($"WHEN @p_set_id_{index} THEN @p_set_order_{index}");
             ids.Add($"@p_set_id_{index}");
+            finalOrders[set.Id] = set.SortOrder;
             index++;
         }
 
@@ -552,6 +563,17 @@ public sealed class WorkoutSessionRepository : IWorkoutSessionRepository
 
         var sql = $"UPDATE \"WorkoutSets\" SET \"SortOrder\" = CASE \"Id\" {string.Join(' ', cases)} END WHERE \"Id\" IN ({string.Join(", ", ids)});";
         await context.Database.ExecuteSqlRawAsync(sql, parameters, cancellationToken);
+
+        foreach (var entry in context.ChangeTracker.Entries<WorkoutSet>()
+                     .Where(entry => finalOrders.ContainsKey(entry.Entity.Id))
+                     .ToList())
+        {
+            var sortOrder = entry.Property(item => item.SortOrder);
+            sortOrder.CurrentValue = finalOrders[entry.Entity.Id];
+            sortOrder.OriginalValue = finalOrders[entry.Entity.Id];
+            sortOrder.IsModified = false;
+            entry.State = EntityState.Detached;
+        }
     }
 
     private static bool IsActiveSessionViolation(DbUpdateException exception) =>

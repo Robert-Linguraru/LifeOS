@@ -13,6 +13,7 @@ using LifeOS.Core.Time;
 using LifeOS.Infrastructure.Repositories;
 using LifeOS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace LifeOS.Tests.Infrastructure;
 
@@ -442,6 +443,135 @@ public sealed class WorkoutSessionIntegrationTests : IClassFixture<PostgreSqlCon
         Assert.Equal(82.5m, set.WeightKg);
         Assert.Equal(7, set.Repetitions);
         Assert.Equal(corrected.Version, resumed.Version);
+    }
+
+    [Fact]
+    public async Task SetOrdering_ShouldRemainContiguousAcrossUpdateRemoveAndCompletion()
+    {
+        var userId = Guid.NewGuid();
+        var definition = ExerciseDefaults.Definitions.First(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly);
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(CreateCustomRequest(definition));
+        var exerciseId = started.Exercises[0].Id;
+
+        var first = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+        var updated = await service.UpdateSetAsync(
+            first.Id,
+            new UpdateWorkoutSetDto(exerciseId, first.Exercises[0].Sets[0].Id, WorkoutSetKind.Working, null, 5, null, first.Version));
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var persisted = await context.WorkoutSets
+                .Where(item => item.WorkoutSessionExerciseId == exerciseId && !item.IsDeleted)
+                .OrderBy(item => item.SortOrder)
+                .Select(item => item.SortOrder)
+                .ToListAsync();
+            Assert.Equal([1], persisted);
+            Assert.DoesNotContain(persisted, order => order >= 1_000_000);
+        }
+
+        var second = await service.AddSetAsync(
+            updated.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.WarmUp, null, null, null, updated.Version));
+        var third = await service.AddSetAsync(
+            second.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, second.Version));
+        var removed = await service.RemoveSetAsync(
+            third.Id,
+            exerciseId,
+            third.Exercises[0].Sets[1].Id,
+            third.Version);
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var persisted = await context.WorkoutSets
+                .Where(item => item.WorkoutSessionExerciseId == exerciseId && !item.IsDeleted)
+                .OrderBy(item => item.SortOrder)
+                .Select(item => item.SortOrder)
+                .ToListAsync();
+            Assert.Equal([1, 2], persisted);
+            Assert.DoesNotContain(persisted, order => order >= 1_000_000);
+        }
+
+        var completedSet = await service.CompleteSetAsync(
+            removed.Id,
+            new CompleteWorkoutSetDto(exerciseId, removed.Exercises[0].Sets[0].Id, null, 5, null, false, removed.Version));
+        await service.CompleteWorkoutAsync(
+            completedSet.Id,
+            new CompleteWorkoutDto(null, completedSet.Version));
+
+        var completed = await CreateSessionService(userId).GetCompletedWorkoutAsync(completedSet.Id);
+        var historicalOrders = completed!.Exercises[0].Sets.Select(item => item.SortOrder).ToArray();
+        Assert.Equal([1], historicalOrders);
+        Assert.DoesNotContain(historicalOrders, order => order >= 1_000_000);
+    }
+
+    [Fact]
+    public async Task CompleteWorkoutWithFeeling_ShouldNormalizeDraftCleanupWithoutUniqueIndexConflict()
+    {
+        var userId = Guid.NewGuid();
+        var definitions = ExerciseDefaults.Definitions
+            .Where(item => item.LoggingMode == ExerciseLoggingMode.RepsOnly)
+            .Take(1)
+            .ToArray();
+        var service = CreateSessionService(userId);
+        var started = await service.StartCustomWorkoutAsync(new StartCustomWorkoutDto(
+            "Completion ordering",
+            default,
+            default,
+            definitions.Select(item => new StartWorkoutExerciseDto(item.Id, "ignored", item.LoggingMode, 2, null, null, 0)).ToArray()));
+        var exerciseId = started.Exercises[0].Id;
+
+        var firstDraft = await service.AddSetAsync(
+            started.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.Working, null, null, null, started.Version));
+        var afterCompletedSet = await service.CompleteSetAsync(
+            firstDraft.Id,
+            new CompleteWorkoutSetDto(exerciseId, firstDraft.Exercises[0].Sets[0].Id, null, 10, null, false, firstDraft.Version));
+        var withDraft = await service.AddSetAsync(
+            afterCompletedSet.Id,
+            new AddWorkoutSetDto(exerciseId, WorkoutSetKind.WarmUp, null, null, null, afterCompletedSet.Version));
+
+        await using (var beforeCompletionContext = _fixture.CreateDbContext())
+        {
+            var beforeCompletion = await beforeCompletionContext.WorkoutSessionExercises
+                .Where(item => item.Id == exerciseId)
+                .SelectMany(item => item.Sets)
+                .OrderBy(item => item.SortOrder)
+                .Select(item => item.SortOrder)
+                .ToListAsync();
+            Assert.Equal([1, 2], beforeCompletion);
+        }
+
+        var summary = await service.CompleteWorkoutAsync(
+            withDraft.Id,
+            new CompleteWorkoutDto(SessionFeeling.Good, withDraft.Version));
+
+        Assert.Equal(SessionFeeling.Good, summary.SessionFeeling);
+
+        await using var context = _fixture.CreateDbContext();
+        var persisted = await context.WorkoutSessions
+            .Include(item => item.Exercises)
+            .ThenInclude(item => item.Sets)
+            .SingleAsync(item => item.Id == started.Id);
+        Assert.Equal(WorkoutSessionStatus.Completed, persisted.Status);
+        Assert.Equal(SessionFeeling.Good, persisted.SessionFeeling);
+        Assert.Equal([1], persisted.Exercises
+            .SelectMany(exercise => exercise.Sets)
+            .Where(set => !set.IsDeleted)
+            .OrderBy(set => set.SortOrder)
+            .Select(set => set.SortOrder));
+
+        var setIndex = context.Model.FindEntityType(typeof(WorkoutSet))!.GetIndexes()
+            .Single(index => index.Properties.Select(property => property.Name).SequenceEqual([
+                nameof(WorkoutSet.WorkoutSessionExerciseId), nameof(WorkoutSet.SortOrder)]));
+        Assert.True(setIndex.IsUnique);
+        Assert.Equal("\"IsDeleted\" = false", setIndex.GetFilter());
+
+        var history = await CreateSessionService(userId).GetCompletedWorkoutAsync(started.Id);
+        Assert.Equal([1], history!.Exercises[0].Sets.Select(set => set.SortOrder));
     }
 
     [Theory]

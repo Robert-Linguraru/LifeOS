@@ -387,6 +387,8 @@ Done when:
 
 ## Milestone 8 - Strength & Calisthenics Training
 
+Status: **Completed** (Tickets 1–19).
+
 Goal: establish the shared, deep strength/calisthenics Fitness foundation defined by `16-m8-strength-training-architecture-contract.md`: seeded Exercise Library, reusable Workout Templates, persisted active sessions, mode-appropriate set logging, warm-up/working set distinction, substitutions/skips, history/previous performance, rest timer, session feeling, and completed/discarded lifecycle.
 
 Done when the M8 architecture contract is implemented and validated: historical completed sessions are immutable application-level snapshots, active progress survives application closure, templates remain reusable recipes, one active session is enforced, and Fitness V1 does not introduce programming, RPE/RIR, custom exercises, device integrations, or generic metric infrastructure.

@@ -8,7 +8,7 @@ Items in this backlog are not deleted. They are deferred until their prerequisit
 
 ## 2. Status labels
 
-- `Completed` - implemented and verified through M7.
+- `Completed` - implemented and verified through the current milestone.
 - `Planned M8` through `Planned M14` - approved roadmap work in the stated milestone.
 - `Future` - preserved, not scheduled yet.
 - `V1.1`, `V2`, `V2.5`, `V3`, `V4`, and `V5` - legacy historical labels only; they are not current planning statuses.
@@ -115,7 +115,7 @@ browser automation remain future scope.
 
 The approved sequence and detailed requirements are in `16-post-m7-domain-roadmap.md`.
 
-- `Planned M8` Shared strength/calisthenics Exercise Library, templates, persistent active sessions, logging modes, working/warm-up sets, substitutions/skips, rest timer, history, and session completion, as frozen in `16-m8-strength-training-architecture-contract.md`.
+- `Completed — Milestone 8` Shared strength/calisthenics Exercise Library, templates, persistent active sessions, logging modes, working/warm-up sets, substitutions/skips, rest timer, history, and session completion, as frozen in `16-m8-strength-training-architecture-contract.md`.
 - `Planned M9` Activity records, steps, sports/other activity, PRs, performance Fitness Goals, unified read-projection history, operational summaries, and Fitness widget.
 - `Planned M10` Seeded/custom foods, immutable historical food logs, reusable meals, quick add, macro/water targets, hydration, simple supplements, summaries, and Nutrition widget.
 - `Planned M11` Health-owned weight, sleep, structured wellbeing, history, simple summaries/goals, and Health widget.

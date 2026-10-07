@@ -337,6 +337,10 @@ Future AI features need qualitative review plus structured checks for:
 - Running PRs require actual recorded standard-distance evidence; no longer-run inference.
 - Unified history is a read projection across domain records, not a duplicate timeline table.
 
+### 13.2.1 M8 closure verification
+
+M8 completion verification includes 40 Core Fitness tests, 24 focused Web Fitness tests, and 61 total Web tests. The final solution build passed. PostgreSQL/Testcontainers integration verification remains environment-dependent: the current Rancher Desktop Docker backend fails during Testcontainers PostgreSQL container exec/readiness, so the final full-suite run must be reported separately from application-focused verification and must not be described as a full pass.
+
 ### 13.3 Body metrics
 
 - Health-owned body weight uses correct selected dates and supports safe backfill.
